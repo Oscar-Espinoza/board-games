@@ -44,7 +44,7 @@ with tempfile.TemporaryDirectory(prefix='color-match-turn-') as directory:
                 'username': username, 'credential': credential,
             }])
             result = subprocess.run([
-                'pnpm', 'test:e2e', 'tests/browser/rooms.spec.js', '--workers=2',
+                'pnpm', 'test:e2e', 'tests/browser/rooms.spec.js', f"--workers={1 if os.environ.get('CI') else 2}",
                 *sys.argv[1:],
             ], cwd=root, env=env)
         finally:

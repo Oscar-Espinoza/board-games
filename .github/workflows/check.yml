@@ -5,6 +5,8 @@ permissions:
 jobs:
   rust-and-browsers:
     runs-on: ubuntu-latest
+    env:
+      ALSOFT_DRIVERS: 'null'
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

@@ -19,6 +19,7 @@ check-replay:
 	python3 scripts/check_replays.py
 
 check-browser:
+	node --test tests/transport/*.test.cjs
 	wasm-pack build crates/board-games-web --target web --out-dir ../../web/pkg --release --locked --features fixtures
 	cargo build -p table-server --locked
 	cargo build -p color-match-replay --locked

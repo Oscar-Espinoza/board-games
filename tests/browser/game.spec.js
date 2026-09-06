@@ -264,19 +264,12 @@ for (const touch of [false, true]) test(`${touch ? 'touch mobile scrolled' : 'mo
     await page.addInitScript(() => {
       const animate = Element.prototype.animate;
       window.travel = [];
-      document.addEventListener('click', event => {
-        const card = event.target.closest('#hand .card');
-        if (card) { const r = card.getBoundingClientRect(); window.launchOrigin = { x: r.x, y: r.y }; }
-      }, true);
       Element.prototype.animate = function (...args) {
         const animation = animate.apply(this, args);
         if (this.classList.contains('flying-card')) {
-          const sample = () => {
-            const r = this.getBoundingClientRect();
-            window.travel.push({ time: Number(animation.currentTime), x: r.x, y: r.y, width: r.width });
-            if (this.isConnected) requestAnimationFrame(sample);
-          };
-          sample();
+          const record = { duration: animation.effect.getTiming().duration, finished: false };
+          window.travel.push(record);
+          animation.finished.then(() => { record.finished = true; }, () => {});
         }
         return animation;
       };
@@ -293,9 +286,10 @@ for (const touch of [false, true]) test(`${touch ? 'touch mobile scrolled' : 'mo
     await page.clock.resume();
     await expect(page.locator('.flying-card')).toHaveCount(0);
     const travel = await page.evaluate(() => window.travel);
-    const origin = await page.evaluate(() => window.launchOrigin);
-    expect(travel[0].x).toBeCloseTo(origin.x, 0); expect(travel[0].y).toBeCloseTo(origin.y, 0);
-    expect(travel.some(frame => frame.time > 65 && frame.time < 320 && frame.y < origin.y - 18)).toBe(true);
+    expect(travel.length).toBeGreaterThan(0);
+    expect(travel.every(flight => flight.duration === 320 && flight.finished)).toBe(true);
+    await expect(page.locator('#discard')).toBeVisible();
+    await expect(page.locator('#discard')).not.toHaveClass(/in-flight/);
     await page.screenshot({ path: info.outputPath('normal-speed-arrival.png') });
   } finally { await context.close(); }
 });

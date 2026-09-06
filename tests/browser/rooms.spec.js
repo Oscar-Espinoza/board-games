@@ -1,16 +1,30 @@
 const {test,expect}=require('@playwright/test');
 async function instrument(context) {
+  if (context.transportInstrumented) return;
+  context.transportInstrumented = true;
+  const close = context.close.bind(context);
+  context.close = async (...args) => {
+    for (const [index, page] of context.pages().entries()) {
+      if (!page.isClosed()) {
+        const transitions = await page.evaluate(() => window.transitions || []).catch(() => []);
+        await test.info().attach(`transport-${test.info().attachments.length}-${index}`, { body: JSON.stringify(transitions, null, 2), contentType: 'application/json' });
+      }
+    }
+    return close(...args);
+  };
   await context.addInitScript(()=>{
-    window.received=[];window.sent=[];window.channels=[];window.sockets=[];window.flightCount=0;
+    window.transitions=[];
+    const transition=(kind,id,state)=>window.transitions.push({at:Date.now(),kind,id,state});
+    window.peerConnections=[];window.received=[];window.sent=[];window.channels=[];window.sockets=[];window.flightCount=0;
     const animate=Element.prototype.animate;Element.prototype.animate=function(...args){if(this.classList.contains('flying-card'))window.flightCount++;return animate.apply(this,args);};
-    const OriginalSocket=window.WebSocket;window.WebSocket=class extends OriginalSocket{constructor(...args){super(...args);window.sockets.push(this);}};
+    const OriginalSocket=window.WebSocket;window.WebSocket=class extends OriginalSocket{constructor(...args){super(...args);const id=window.sockets.length;window.sockets.push(this);transition('socket',id,'created');for(const event of ['open','close','error'])this.addEventListener(event,e=>transition('socket',id,event==='close'?`close:${e.code}`:event));const send=this.send.bind(this);this.send=value=>{try{transition('socket-send',id,JSON.parse(value).type);}catch{}return send(value);};this.addEventListener('message',e=>{try{const type=JSON.parse(e.data).type;if(['welcome','room','handoff_commit','ended'].includes(type))transition('socket',id,type);}catch{}});}};
     const Original=window.RTCPeerConnection;
-    window.RTCPeerConnection=class extends Original{constructor(...args){super(...args);this.addEventListener('datachannel',e=>record(e.channel));}createDataChannel(...args){const c=super.createDataChannel(...args);record(c);return c;}};
-    function record(c){window.channels.push(c);c.addEventListener('message',e=>{try{window.received.push(JSON.parse(e.data));}catch{}});const send=c.send.bind(c);c.send=(value)=>{try{window.sent.push(JSON.parse(value));}catch{}return send(value);};}
+    window.RTCPeerConnection=class extends Original{constructor(...args){super(...args);const id=window.peerConnections.length;window.peerConnections.push(this);transition('peer',id,'created');for(const event of ['connectionstatechange','iceconnectionstatechange','signalingstatechange'])this.addEventListener(event,()=>transition(event,id,event==='connectionstatechange'?this.connectionState:event==='iceconnectionstatechange'?this.iceConnectionState:this.signalingState));this.addEventListener('datachannel',e=>record(e.channel));}createDataChannel(...args){const c=super.createDataChannel(...args);record(c);return c;}};
+    function record(c){const id=window.channels.length;window.channels.push(c);transition('channel',id,c.readyState);for(const event of ['open','close','error'])c.addEventListener(event,()=>transition('channel',id,event));c.addEventListener('message',e=>{try{window.received.push(JSON.parse(e.data));}catch{}});const send=c.send.bind(c);c.send=(value)=>{try{window.sent.push(JSON.parse(value));}catch{}return send(value);};}
   });
 }
-async function create(page){await page.goto(process.env.TEST_RELAY ? '/?relay=1' : '/');await expect(page.locator('#app')).toHaveAttribute('data-ready','true');await page.locator('#room-toggle').click();await page.locator('#name').fill('Host');await page.locator('#create-room').click();await expect(page.locator('#invite')).toHaveValue(/#room=[a-f0-9]{64}$/);const url=new URL(await page.locator('#invite').inputValue());if(process.env.TEST_RELAY)url.search='?relay=1';return url.href;}
-async function join(page,url,name){await page.goto(url);await page.locator('#name').fill(name);await page.locator('#join-room').click();await expect(page.locator('#room-details')).toHaveJSProperty('hidden',false);}
+async function create(page){await instrument(page.context());await page.goto(process.env.TEST_RELAY ? '/?relay=1' : '/');await expect(page.locator('#app')).toHaveAttribute('data-ready','true');await page.locator('#room-toggle').click();await page.locator('#name').fill('Host');await page.locator('#create-room').click();await expect(page.locator('#invite')).toHaveValue(/#room=[a-f0-9]{64}$/);const url=new URL(await page.locator('#invite').inputValue());if(process.env.TEST_RELAY)url.search='?relay=1';return url.href;}
+async function join(page,url,name){await instrument(page.context());await page.goto(url);await page.locator('#name').fill(name);await page.locator('#join-room').click();await expect(page.locator('#room-details')).toHaveJSProperty('hidden',false);}
 async function start(host){await expect(host.locator('#start-round')).toBeEnabled({timeout:20000});await host.locator('#start-round').click();await expect(host.locator('#board')).toBeVisible();}
 test('private invite, real DataChannel actions, redaction, stale/duplicate rejection and guest reload',async({browser},info)=>{
   const a=await browser.newContext(),b=await browser.newContext();await instrument(a);await instrument(b);const host=await a.newPage(),guest=await b.newPage();const errors=[];for(const p of [host,guest])p.on('pageerror',e=>errors.push(e.message));
@@ -44,7 +58,7 @@ test('host signaling reconnection keeps live authority',async({browser})=>{
   const a=await browser.newContext(),b=await browser.newContext();await instrument(a);await instrument(b);const host=await a.newPage(),guest=await b.newPage();try{const url=await create(host);await join(guest,url,'Friend');await start(host);await expect(guest.locator('#board')).toHaveAttribute('data-player','1');await host.locator('#draw').click();await expect(guest.locator('#board')).toHaveAttribute('data-revision','1');await host.evaluate(()=>window.sockets.at(-1).close());await expect(guest.locator('#status')).toContainText('paused');await expect(host.locator('#status')).not.toContainText('paused',{timeout:20000});await expect(guest.locator('#board')).toHaveAttribute('data-revision','1');await expect(guest.locator('#draw')).toBeEnabled();}finally{await a.close();await b.close();}
 });
 test('eight human browser contexts receive only their own hands',async({browser})=>{
-  test.setTimeout(60000);const contexts=[];const pages=[];try{
+  test.setTimeout(process.env.CI ? 120000 : 60000);const contexts=[];const pages=[];try{
     for(let i=0;i<8;i++){const c=await browser.newContext();contexts.push(c);await instrument(c);pages.push(await c.newPage());}
     const url=await create(pages[0]);for(let i=1;i<8;i++)await join(pages[i],url,`Friend ${i}`);await expect(pages[0].locator('#roster li')).toHaveCount(8);await start(pages[0]);
     const hands=[];for(let i=0;i<8;i++){await expect(pages[i].locator('#board')).toHaveAttribute('data-player',String(i));await expect(pages[i].locator('#hand-count')).toHaveText('7');hands.push(...await pages[i].locator('.hand [data-card]').evaluateAll(es=>es.map(e=>Number(e.dataset.card))));}expect(new Set(hands).size).toBe(56);
@@ -65,7 +79,7 @@ test('Chromium and Firefox share a live round',async({},info)=>{
   }finally{for(const c of contexts)await c.close();for(const b of engines)await b.close();}
 });
 test('complete a human round and rematch in the same room',async({browser})=>{
-  test.setTimeout(60000);const a=await browser.newContext(),b=await browser.newContext();const host=await a.newPage(),guest=await b.newPage();try{
+  test.setTimeout(process.env.CI ? 120000 : 60000);const a=await browser.newContext(),b=await browser.newContext();const host=await a.newPage(),guest=await b.newPage();try{
     const url=await create(host);await join(guest,url,'Friend');await start(host);await expect(guest.locator('#board')).toHaveAttribute('data-player','1');
     for(let i=0;i<600;i++){
       if((await host.locator('#status').textContent()).includes('win'))break;
@@ -117,7 +131,7 @@ test('explicit guest departure offers immediate replacement and reclaim',async({
  }finally{await a.close();await b.close();}
 });
 test('failed checkpoint transfer retains authority and can retry',async({browser})=>{
- test.setTimeout(45000);const a=await browser.newContext(),b=await browser.newContext();await instrument(a);await instrument(b);const host=await a.newPage(),guest=await b.newPage();try{
+ test.setTimeout(process.env.CI ? 60000 : 45000);const a=await browser.newContext(),b=await browser.newContext();await instrument(a);await instrument(b);const host=await a.newPage(),guest=await b.newPage();try{
   const url=await create(host);await join(guest,url,'Friend');await start(host);await expect(guest.locator('#board')).toHaveAttribute('data-player','1');
   await host.evaluate(()=>{const c=window.channels.find(c=>c.readyState==='open');const send=c.send.bind(c);window.restoreCheckpoint=()=>c.send=send;c.send=value=>{if(JSON.parse(value).type!=='checkpoint')send(value);};});
   await host.locator('#leave-room').click();await expect(host.locator('#status')).toContainText('paused');await expect(host.locator('#error')).toContainText('timed out',{timeout:22000});await expect(host.locator('#draw')).toBeEnabled();
@@ -135,4 +149,44 @@ test('mobile keyboard navigation and clipboard success/fallback',async({page},in
  expect(await page.locator('#invite').evaluate(e=>e.selectionEnd-e.selectionStart)).toBe((await page.locator('#invite').inputValue()).length);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:info.outputPath('room-mobile.png')});
  await page.locator('#room-details [data-action="leave"]').focus();await page.keyboard.press('Enter');await expect(page.locator('#room-panel')).not.toBeVisible();await expect(page.locator('#welcome button')).toBeFocused();
+});
+
+for (const delayed of [false, true]) test(`reconnect regression: ${delayed ? 'delayed authentication' : 'failed offer'} resumes gameplay`, async ({ browser }) => {
+  const a = await browser.newContext(), b = await browser.newContext();
+  await instrument(a); await instrument(b);
+  const host = await a.newPage(), guest = await b.newPage();
+  try {
+    const url = await create(host); await join(guest, url, 'Friend'); await start(host);
+    await expect(guest.locator('#board')).toHaveAttribute('data-player', '1');
+    await host.locator('#draw').click();
+    await expect(guest.locator('#board')).toHaveAttribute('data-revision', '1');
+    await host.evaluate(delayed => {
+      if (delayed) {
+        const send = window.sockets.at(-1).constructor.prototype.send || Object.getPrototypeOf(WebSocket.prototype).send;
+        WebSocket.prototype.send = function(value) {
+          if (JSON.parse(value).type === 'resume' && !window.resumeReleased) {
+            window.releaseResume = () => { window.resumeReleased = true; WebSocket.prototype.send = send; send.call(this, value); };
+          } else send.call(this, value);
+        };
+      } else {
+        const offer = RTCPeerConnection.prototype.createOffer;
+        RTCPeerConnection.prototype.createOffer = function(...args) {
+          RTCPeerConnection.prototype.createOffer = offer;
+          return Promise.reject(new Error('Injected offer failure'));
+        };
+      }
+      window.sockets.at(-1).close();
+    }, delayed);
+    await expect(guest.locator('#status')).toContainText('paused');
+    if (delayed) {
+      await expect.poll(() => host.evaluate(() => typeof window.releaseResume)).toBe('function');
+      // The replacement socket is open, but has not sent its authentication yet.
+      expect(await host.evaluate(() => window.peerConnections.every(pc => pc.connectionState === 'closed'))).toBe(true);
+      await host.evaluate(() => window.releaseResume());
+    }
+    await expect(host.locator('#status')).not.toContainText('paused', { timeout: 20000 });
+    await expect(guest.locator('#draw')).toBeEnabled(); await guest.locator('#draw').click();
+    await expect(host.locator('#board')).toHaveAttribute('data-revision', '2');
+    await expect(guest.locator('#board')).toHaveAttribute('data-revision', '2');
+  } finally { await a.close(); await b.close(); }
 });

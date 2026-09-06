@@ -41,6 +41,13 @@ one high-water action ID per seat per round; IDs at or below it are duplicates,
 including previously rejected requests. Old-round/epoch requests and requests
 frozen during handoff do not consume IDs.
 
+Negotiation waits for authentication on the current signaling socket. Peer work
+is bound to that socket, browser session generation and authority epoch; socket
+loss, departure and handoff invalidate queued callbacks and cancel peer retries.
+Failed or unsent offers release their peer entry so a later offer can proceed.
+An existing connection recovering with an open channel restores Rust peer
+readiness even without another channel-open event.
+
 The server binds signaling senders to a room session established by a random
 256-bit credential. Reconnection supersedes the previous socket generation.
 Only host-to-guest or guest-to-host SDP/ICE routing is allowed. Guests keep their

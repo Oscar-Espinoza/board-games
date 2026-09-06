@@ -1,20 +1,41 @@
 // Browser transport and animation primitives. Rules and host acceptance live in Rust.
 let wasm, socket, current, generation = 0, iceServers = [], heartbeat, iceRefresh, retry, hostTimer;
 const peers = new Map();
+const peerRetries = new Map();
+let authenticatedSocket;
+function signalingReady(epoch) { return epoch === generation && socket === authenticatedSocket && socket?.readyState === WebSocket.OPEN; }
+function validPeer(id, peer) { return peers.get(id) === peer && signalingReady(peer.generation) && socket === peer.socket && current.room?.epoch === peer.authority && current.room.members.some(m => m.id === id && m.connected); }
+function clearPeerRetries() { for (const timer of peerRetries.values()) clearTimeout(timer); peerRetries.clear(); }
+function retryPeer(id, epoch, delay = 1200) {
+  if (!signalingReady(epoch) || current.player !== current.room?.host_id || !current.room.members.some(m => m.id === id && m.connected)) return;
+  clearTimeout(peerRetries.get(id));
+  const ws = socket, authority = current.room.epoch;
+  peerRetries.set(id, setTimeout(() => {
+    peerRetries.delete(id);
+    if (ws === socket && authority === current?.room?.epoch) reconcile(epoch).catch(e => report(e.message));
+  }, delay));
+}
+function failedPeer(id, peer) {
+  if (!validPeer(id, peer)) return;
+  call('peer_state', id, false); closePeer(id); retryPeer(id, peer.generation);
+}
 let pendingSignals = [];
 let counter = Number(sessionStorage.getItem('cm-action-id') || 0);
 export function configure(module) { wasm = module; }
 export function next_action_id() { counter += 1; sessionStorage.setItem('cm-action-id', String(counter)); return BigInt(counter); }
 const report = (message) => { document.getElementById('error').textContent = message; document.getElementById('panel-error').textContent = message; };
 const call = (fn, ...args) => { try { wasm?.[fn](...args); } catch (e) { report(String(e)); } };
-function closePeer(id) { const peer = peers.get(id); if (peer) { peers.delete(id); peer.channel?.close(); peer.pc.close(); } }
+function closePeer(id) { clearTimeout(peerRetries.get(id)); peerRetries.delete(id); const peer = peers.get(id); if (peer) { peers.delete(id); peer.channel?.close(); peer.pc.close(); } }
 export function leave_room() {
-  generation++; clearInterval(heartbeat); clearInterval(iceRefresh); clearTimeout(retry); clearTimeout(hostTimer); hostTimer = null;
+  generation++; authenticatedSocket = null; clearPeerRetries(); clearInterval(heartbeat); clearInterval(iceRefresh); clearTimeout(retry); clearTimeout(hostTimer); hostTimer = null;
   if (socket) { socket.onclose = null; socket.close(); socket = null; }
   for (const id of peers.keys()) closePeer(id);
   current = null; iceServers = []; pendingSignals = []; connectionStatus(''); cancel_motion();
 }
-export function send_signal(value) { if (socket?.readyState === WebSocket.OPEN) socket.send(value); else report('Reconnecting…'); }
+export function send_signal(value) {
+  if (signalingReady(generation)) { try { socket.send(value); return true; } catch { /* Socket loss races sends. */ } }
+  report('Reconnecting…'); return false;
+}
 export function send_peer(id, value) {
   if (!current?.room?.members.some(m => m.id === id && m.connected)) return;
   const channel = peers.get(id)?.channel;
@@ -33,15 +54,17 @@ export function connect_room(kind, name, avatar) {
 }
 function openSocket(epoch) {
   if (!current || epoch !== generation) return;
+  authenticatedSocket = null; pendingSignals = [];
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/signal`); socket = ws;
-  ws.onopen = () => ws.send(JSON.stringify(current.credential ? { type: 'resume', version: 3, invite: current.invite, credential: current.credential } : current.hello));
+  ws.onopen = () => { if (ws !== socket || epoch !== generation) return; ws.send(JSON.stringify(current.credential ? { type: 'resume', version: 3, invite: current.invite, credential: current.credential } : current.hello)); };
   let incoming = Promise.resolve();
   const handleMessage = async ({ data }) => {
-    if (epoch !== generation || ws !== socket || data.length > 32768) return;
+    if (epoch !== generation || ws !== socket || ws.readyState !== WebSocket.OPEN || data.length > 32768) return;
     let event; try { event = JSON.parse(data); } catch { return; }
     try {
       if (event.type === 'welcome') {
         if (event.version !== 3) throw new Error('Unsupported room protocol.');
+        authenticatedSocket = ws;
         current.player = event.player; current.invite = event.room.invite; current.credential = event.credential; current.room = event.room;
         if (event.player !== event.room.host_id) sessionStorage.setItem(`cm-seat:${current.invite}`, event.credential);
         history.replaceState(null, '', `#room=${current.invite}`);
@@ -62,9 +85,13 @@ function openSocket(epoch) {
         }
         const relay = iceServers.some(s => [s.urls].flat().some(u => /^turns?:/.test(u)));
         connectionStatus('Connected', relay ? 'TURN available' : 'direct connections only');
-        for (const event of pendingSignals.splice(0)) if (event.epoch === current.room?.epoch) await receiveSignal(event.from, event.data, epoch);
-        await reconcile(epoch);
+        for (const event of pendingSignals.splice(0)) {
+          if (ws !== socket || !signalingReady(epoch)) return;
+          if (event.epoch === current.room?.epoch) await receiveSignal(event.from, event.data, epoch);
+        }
+        if (ws === socket) await reconcile(epoch);
       } else if (event.type === 'handoff_commit') {
+        clearPeerRetries(); pendingSignals = [];
         cancel_motion();
         if (current.player === event.former_host) {
           sessionStorage.setItem(`cm-seat:${current.invite}`, current.credential);
@@ -82,7 +109,8 @@ function openSocket(epoch) {
       } else if (['handoff_prepare', 'handoff_ready', 'handoff_cancel', 'departed'].includes(event.type)) {
         call('signal_event', data);
       } else if (event.type === 'room') {
-        if (current.room?.host_id !== event.room.host_id) {
+        if (current.room?.host_id !== event.room.host_id || current.room?.epoch !== event.room.epoch) {
+          clearPeerRetries(); pendingSignals = [];
           for (const id of peers.keys()) closePeer(id);
           if (current.player === event.room.host_id) sessionStorage.removeItem(`cm-seat:${current.invite}`);
         }
@@ -93,6 +121,7 @@ function openSocket(epoch) {
         if (event.epoch !== current.room?.epoch) return;
         if (iceServers.length) await receiveSignal(event.from, event.data, epoch); else pendingSignals.push(event);
       } else if (event.type === 'ended') {
+        authenticatedSocket = null; clearPeerRetries();
         call('signal_event', data); clearTimeout(retry); ws.onclose = null; ws.close();
         for (const id of peers.keys()) closePeer(id);
       } else if (event.type === 'error') {
@@ -104,7 +133,8 @@ function openSocket(epoch) {
   };
   ws.onmessage = event => { incoming = incoming.then(() => handleMessage(event)).catch(e => report(`Connection problem: ${e.message || e}`)); };
   ws.onclose = () => {
-    if (epoch !== generation) return;
+    if (epoch !== generation || ws !== socket) return;
+    authenticatedSocket = null; pendingSignals = []; clearPeerRetries(); clearInterval(heartbeat); clearInterval(iceRefresh);
     call('network_state', false);
     connectionStatus('Reconnecting…');
     if (current?.player !== current?.room?.host_id) hostDeadline(epoch);
@@ -112,13 +142,22 @@ function openSocket(epoch) {
     if (current?.credential) retry = setTimeout(() => openSocket(epoch), 1800);
     else if (!document.getElementById('error').textContent) report('Could not join the room. Check the invite and try again.');
   };
-  ws.onerror = () => report('The room service is unavailable. A free host may take a moment to wake up.');
+  ws.onerror = () => { if (ws === socket && epoch === generation) report('The room service is unavailable. A free host may take a moment to wake up.'); };
 }
 async function reconcile(epoch) {
-  if (!current?.room || !iceServers.length || epoch !== generation) return;
-  for (const member of current.room.members) {
+  if (!current?.room || !iceServers.length || !signalingReady(epoch)) return;
+  const ws = socket, room = current.room;
+  // Lobby departures remove the member entirely; active rounds retain a disconnected seat.
+  for (const id of new Set([...peers.keys(), ...peerRetries.keys()])) {
+    if (!room.members.some(m => m.id === id && m.connected)) {
+      const existed = peers.has(id); closePeer(id);
+      if (existed) call('peer_state', id, false);
+    }
+  }
+  for (const member of room.members) {
+    if (!signalingReady(epoch) || socket !== ws || current.room !== room) return;
     if (member.bot || member.id === current.player) continue;
-    if (!member.connected) { if (peers.has(member.id)) { closePeer(member.id); call('peer_state', member.id, false); } continue; }
+    if (!member.connected) continue;
     if (current.player === current.room?.host_id && !peers.has(member.id)) await offer(member.id, epoch);
   }
 }
@@ -126,42 +165,45 @@ function createPeer(id, epoch, connectionId) {
   closePeer(id);
   const forceRelay = new URLSearchParams(location.search).get('relay') === '1';
   const pc = new RTCPeerConnection({ iceServers, iceTransportPolicy: forceRelay ? 'relay' : 'all' });
-  const peer = { pc, channel: null, connectionId, candidates: [], outgoing: [], signaled: false, incoming: Promise.resolve(), windowStart: performance.now(), messages: 0 };
+  const peer = { generation: epoch, socket, authority: current.room.epoch, pc, channel: null, connectionId, candidates: [], outgoing: [], signaled: false, incoming: Promise.resolve(), windowStart: performance.now(), messages: 0 };
   peers.set(id, peer);
-  pc.onicecandidate = ({ candidate }) => { if (candidate && peers.get(id) === peer && epoch === generation) { const value = JSON.stringify({ type: 'signal', epoch: current.room.epoch, to: id, data: { connectionId, candidate: candidate.toJSON() } }); if (peer.signaled) send_signal(value); else peer.outgoing.push(value); } };
+  pc.onicecandidate = ({ candidate }) => { if (candidate && validPeer(id, peer)) { const value = JSON.stringify({ type: 'signal', epoch: current.room.epoch, to: id, data: { connectionId, candidate: candidate.toJSON() } }); if (peer.signaled) { if (!send_signal(value)) failedPeer(id, peer); } else peer.outgoing.push(value); } };
   pc.onconnectionstatechange = () => {
-    if (peers.get(id) !== peer || epoch !== generation) return;
+    if (!validPeer(id, peer)) return;
+    if (pc.connectionState === 'connected' && peer.channel?.readyState === 'open') peer.channel.onopen();
     if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
-      connectionStatus('Reconnecting…'); call('peer_state', id, false);
+      peer.up = false; connectionStatus('Reconnecting…'); call('peer_state', id, false);
       if (current.player !== current.room?.host_id) hostDeadline(epoch);
-      if (pc.connectionState === 'failed') { closePeer(id); if (current.player === current.room?.host_id) setTimeout(() => reconcile(epoch).catch(e => report(e.message)), 1200); }
+      if (pc.connectionState === 'failed') failedPeer(id, peer);
     }
   };
   pc.ondatachannel = ({ channel }) => bindChannel(id, peer, channel, epoch);
   return peer;
 }
 function bindChannel(id, peer, channel, epoch) {
-  if (peer.channel || channel.label !== 'color-match-v3' || !channel.ordered || channel.maxRetransmits !== null || channel.maxPacketLifeTime !== null) { channel.close(); return; }
+  if (!validPeer(id, peer) || peer.channel || channel.label !== 'color-match-v3' || !channel.ordered || channel.maxRetransmits !== null || channel.maxPacketLifeTime !== null) { channel.close(); return; }
   peer.channel = channel;
   channel.onopen = () => {
-    if (peers.get(id) !== peer || epoch !== generation) return;
+    if (!validPeer(id, peer) || peer.up) return;
+    peer.up = true;
     clearTimeout(hostTimer); hostTimer = null; connectionStatus('Connected'); call('peer_state', id, true);
     peer.pc.getStats().then(stats => {
       const pair = [...stats.values()].find(s => s.type === 'candidate-pair' && s.state === 'succeeded' && s.nominated);
       const candidate = pair && stats.get(pair.localCandidateId);
-      if (candidate && peers.get(id) === peer && epoch === generation) connectionStatus('Connected', candidate.candidateType === 'relay' ? 'TURN relay' : 'direct');
+      if (candidate && validPeer(id, peer)) connectionStatus('Connected', candidate.candidateType === 'relay' ? 'TURN relay' : 'direct');
     }).catch(() => {});
   };
   channel.onmessage = ({ data }) => {
-    if (peers.get(id) !== peer || epoch !== generation || typeof data !== 'string' || data.length > 32768) { channel.close(); return; }
+    if (!validPeer(id, peer) || typeof data !== 'string' || data.length > 32768) { channel.close(); return; }
     if (performance.now() - peer.windowStart > 1000) { peer.windowStart = performance.now(); peer.messages = 0; }
     if (++peer.messages > 40) { channel.close(); return; }
     call('peer_message', id, data);
   };
+  if (channel.readyState === 'open') channel.onopen();
   channel.onclose = () => {
-    if (peers.get(id) !== peer || epoch !== generation) return;
+    if (!validPeer(id, peer)) return;
     connectionStatus('Reconnecting…'); call('peer_state', id, false); closePeer(id);
-    if (current?.player === current?.room?.host_id) setTimeout(() => reconcile(epoch).catch(e => report(e.message)), 1000); else hostDeadline(epoch);
+    if (current?.player === current?.room?.host_id) retryPeer(id, epoch, 1000); else hostDeadline(epoch);
   };
 }
 function hostDeadline(epoch) {
@@ -169,35 +211,50 @@ function hostDeadline(epoch) {
   hostTimer = setTimeout(() => {
     if (epoch !== generation) return;
     call('end_session', 'Session ended: the live host did not return within 120 seconds.');
-    generation++; clearInterval(heartbeat); clearInterval(iceRefresh); clearTimeout(retry); if (socket) { socket.onclose = null; socket.close(); }
+    generation++; authenticatedSocket = null; clearPeerRetries(); clearInterval(heartbeat); clearInterval(iceRefresh); clearTimeout(retry); if (socket) { socket.onclose = null; socket.close(); }
     for (const id of peers.keys()) closePeer(id);
   }, 120000);
 }
 function signalDescription(id, peer) {
-  send_signal(JSON.stringify({ type: 'signal', epoch: current.room.epoch, to: id, data: { connectionId: peer.connectionId, description: peer.pc.localDescription.toJSON() } }));
+  if (!validPeer(id, peer)) return;
+  if (!send_signal(JSON.stringify({ type: 'signal', epoch: peer.authority, to: id, data: { connectionId: peer.connectionId, description: peer.pc.localDescription.toJSON() } }))) { failedPeer(id, peer); return; }
   peer.signaled = true;
-  for (const value of peer.outgoing.splice(0)) send_signal(value);
+  for (const value of peer.outgoing.splice(0)) if (!send_signal(value)) { failedPeer(id, peer); return; }
 }
 async function offer(id, epoch) {
   const peer = createPeer(id, epoch, crypto.randomUUID());
-  bindChannel(id, peer, peer.pc.createDataChannel('color-match-v3', { ordered: true }), epoch);
-  await peer.pc.setLocalDescription(await peer.pc.createOffer());
-  if (peers.get(id) === peer && epoch === generation) signalDescription(id, peer);
+  try {
+    bindChannel(id, peer, peer.pc.createDataChannel('color-match-v3', { ordered: true }), epoch);
+    const description = await peer.pc.createOffer();
+    if (!validPeer(id, peer)) return;
+    await peer.pc.setLocalDescription(description);
+    signalDescription(id, peer);
+  } catch { failedPeer(id, peer); }
 }
 async function receiveSignal(id, data, epoch) {
-  if (!current || !data || (current.player !== current.room?.host_id && id !== current.room?.host_id) || typeof data.connectionId !== 'string') return;
+  if (!signalingReady(epoch) || !data || !current.room?.members.some(m => m.id === id && m.connected) || (current.player !== current.room?.host_id && id !== current.room?.host_id) || typeof data.connectionId !== 'string') return;
   if (data.description?.type === 'offer') {
     if (current.player === current.room?.host_id) return;
     const peer = createPeer(id, epoch, data.connectionId);
-    await peer.pc.setRemoteDescription(data.description);
-    await peer.pc.setLocalDescription(await peer.pc.createAnswer());
-    if (peers.get(id) === peer && epoch === generation) signalDescription(id, peer);
+    try {
+      await peer.pc.setRemoteDescription(data.description);
+      if (!validPeer(id, peer)) return;
+      const description = await peer.pc.createAnswer();
+      if (!validPeer(id, peer)) return;
+      await peer.pc.setLocalDescription(description);
+      signalDescription(id, peer);
+    } catch { failedPeer(id, peer); }
   } else {
     const peer = peers.get(id); if (!peer || peer.connectionId !== data.connectionId) return;
     peer.incoming = peer.incoming.then(async () => {
-      if (data.description?.type === 'answer' && current.player === current.room?.host_id) { await peer.pc.setRemoteDescription(data.description); for (const c of peer.candidates.splice(0)) await peer.pc.addIceCandidate(c); }
-      else if (data.candidate) { if (peer.pc.remoteDescription) await peer.pc.addIceCandidate(data.candidate); else peer.candidates.push(data.candidate); }
-    }); await peer.incoming;
+      if (!validPeer(id, peer)) return;
+      if (data.description?.type === 'answer' && current.player === current.room?.host_id) {
+        await peer.pc.setRemoteDescription(data.description);
+        for (const c of peer.candidates.splice(0)) { if (!validPeer(id, peer)) return; await peer.pc.addIceCandidate(c); }
+      } else if (data.candidate) {
+        if (peer.pc.remoteDescription) await peer.pc.addIceCandidate(data.candidate); else peer.candidates.push(data.candidate);
+      }
+    }).catch(() => failedPeer(id, peer)); await peer.incoming;
   }
 }
 function connectionStatus(message, transport = '') {

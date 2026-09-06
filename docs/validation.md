@@ -16,6 +16,56 @@ not a frozen toolchain requirement.
 | coturn | 4.6.1 |
 | Docker | 29.7.2 |
 
+## Browser CI and reconnection reliability (2026-09-06)
+
+CI uses one browser worker, including the local TURN harness, following
+[Playwright's CI recommendation](https://playwright.dev/docs/ci#workers).
+CI budgets are 60 seconds normally, 120 seconds for eight-human and full-round
+rematch tests, and 60 seconds for failed handoffs. Local budgets and the product's
+15/60/120-second deadlines are unchanged. `ALSOFT_DRIVERS=null` selects OpenAL's
+[null output backend](https://raw.githubusercontent.com/kcat/openal-soft/master/docs/env-vars.txt)
+on CI; audio synthesis, mute and unavailable-audio coverage remain enabled.
+
+`node --test tests/transport/*.test.cjs` runs deterministic production-bridge
+regressions with controlled sockets, peers and retry scheduling. It is included
+in `make check-browser`. Room tests attach timestamped socket, peer, ICE,
+signaling-state and DataChannel transitions before closing contexts. These
+attachments contain event types and local connection indices, never credentials,
+SDP, checkpoints or hands. Normal-speed mouse/touch tests verify creation,
+320ms duration, completion, visible arrival and cleanup; controlled-time tests
+retain exact lift, midpoint and destination geometry assertions.
+
+### Local results
+
+- Final `CI=true ALSOFT_DRIVERS=null make check` passed formatting, native and
+  target Clippy, Rust tests, native/WASI replay comparisons, eight transport
+  regressions and **97 browser tests with two intentional interoperability
+  skips**. No failures or flaky results.
+- Final `CI=true ALSOFT_DRIVERS=null make check-turn` passed **40 production
+  room tests with two intentional skips**, across all three engines through
+  local coturn. No failures or flaky results. The workspace retains the
+  production browser package.
+- Eight deterministic transport regressions passed, covering authentication
+  delays, failed/unsent offers, stale socket and peer callbacks, queued ICE work,
+  authority changes, lobby departure cleanup and recovery of an open channel.
+- Firefox passed all **30 direct** and **30 forced-TURN** reconnect cases:
+  ten repetitions each of live-authority reconnect, failed offer and delayed
+  authentication, with retries disabled.
+- WebKit passed **10 normal-speed animation cases**: five repetitions each of
+  mouse desktop and touch mobile, with retries disabled.
+
+The stress checks used `CI=true ALSOFT_DRIVERS=null` and the existing local
+WebKit/coturn paths shown below:
+
+```sh
+pnpm exec playwright test tests/browser/rooms.spec.js --project=firefox \
+  --grep reconnect --repeat-each=10 --retries=0
+python3 scripts/check_turn.py --project=firefox \
+  --grep reconnect --repeat-each=10 --retries=0
+pnpm exec playwright test tests/browser/game.spec.js --project=webkit \
+  --grep 'normal speed' --repeat-each=5 --retries=0
+```
+
 ## Invitations, capacity and deliberate handoff (2026-09-06)
 
 - `make check` passed: native formatting/Clippy/tests, browser/WASI Clippy,

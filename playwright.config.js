@@ -3,10 +3,10 @@ const port = process.env.TEST_PORT || '8081';
 module.exports = defineConfig({
   testDir: './tests/browser',
   fullyParallel: true,
-  timeout: 30000,
+  timeout: process.env.CI ? 60000 : 30000,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 2 : 4,
+  workers: process.env.CI ? 1 : 4,
   reporter: 'list',
   use: { baseURL: `http://127.0.0.1:${port}`, trace: 'retain-on-failure' },
   webServer: {
