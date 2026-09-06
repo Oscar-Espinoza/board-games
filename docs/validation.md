@@ -37,7 +37,10 @@ retain exact lift, midpoint and destination geometry assertions. The eight-human
 capacity/privacy test checks each draw button is enabled, then dispatches the
 DOM click through the Rust handler (as the full-round test does). This avoids
 waiting for pointer stability frames in throttled background WebKit pages;
-real pointer and touch input remain covered by the interaction tests.
+real pointer and touch input remain covered by the interaction tests. Its CI
+turn-readiness and final-revision waits allow 20 seconds for eight-context
+snapshot convergence, within the unchanged 120-second overall budget; local
+assertion waits remain five seconds.
 
 ### Local results
 
@@ -86,6 +89,13 @@ seconds spent waiting for pointer stability before a single draw. This led to
 the targeted DOM-action change above, retaining the 120-second CI budget.
 Chromium, Firefox and the revised animation tests passed without flaky results.
 The failed browser step prevented this run's TURN step from starting.
+
+The second [GitHub run](https://github.com/Oscar-Espinoza/board-games/actions/runs/34015548741)
+for `297c2ff` passed 99 browser tests with two intentional skips. The eight-human
+WebKit case finished within the overall budget but failed its five-second
+turn-readiness assertion. The trace retained open host channels and showed
+the expected next-turn snapshot immediately after that assertion expired.
+This led to the focused CI convergence wait above. TURN again did not run.
 
 ## Invitations, capacity and deliberate handoff (2026-09-06)
 

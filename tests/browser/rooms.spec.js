@@ -58,14 +58,14 @@ test('host signaling reconnection keeps live authority',async({browser})=>{
   const a=await browser.newContext(),b=await browser.newContext();await instrument(a);await instrument(b);const host=await a.newPage(),guest=await b.newPage();try{const url=await create(host);await join(guest,url,'Friend');await start(host);await expect(guest.locator('#board')).toHaveAttribute('data-player','1');await host.locator('#draw').click();await expect(guest.locator('#board')).toHaveAttribute('data-revision','1');await host.evaluate(()=>window.sockets.at(-1).close());await expect(guest.locator('#status')).toContainText('paused');await expect(host.locator('#status')).not.toContainText('paused',{timeout:20000});await expect(guest.locator('#board')).toHaveAttribute('data-revision','1');await expect(guest.locator('#draw')).toBeEnabled();}finally{await a.close();await b.close();}
 });
 test('eight human browser contexts receive only their own hands',async({browser})=>{
-  test.setTimeout(process.env.CI ? 120000 : 60000);const contexts=[];const pages=[];try{
+  test.setTimeout(process.env.CI ? 120000 : 60000);const progress={timeout:process.env.CI ? 20000 : 5000};const contexts=[];const pages=[];try{
     for(let i=0;i<8;i++){const c=await browser.newContext();contexts.push(c);await instrument(c);pages.push(await c.newPage());}
     const url=await create(pages[0]);for(let i=1;i<8;i++)await join(pages[i],url,`Friend ${i}`);await expect(pages[0].locator('#roster li')).toHaveCount(8);await start(pages[0]);
     const hands=[];for(let i=0;i<8;i++){await expect(pages[i].locator('#board')).toHaveAttribute('data-player',String(i));await expect(pages[i].locator('#hand-count')).toHaveText('7');hands.push(...await pages[i].locator('.hand [data-card]').evaluateAll(es=>es.map(e=>Number(e.dataset.card))));}expect(new Set(hands).size).toBe(56);
     // Background WebKit pages throttle the frames used by pointer stability checks.
     // Exercise each Rust action after readiness, as in the full-round transport test.
-    for(let i=0;i<8;i++){await expect(pages[i].locator('#draw')).toBeEnabled();await pages[i].locator('#draw').dispatchEvent('click');}
-    for(const p of pages)await expect(p.locator('#board')).toHaveAttribute('data-revision','8');
+    for(let i=0;i<8;i++){await expect(pages[i].locator('#draw')).toBeEnabled(progress);await pages[i].locator('#draw').dispatchEvent('click');}
+    for(const p of pages)await expect(p.locator('#board')).toHaveAttribute('data-revision','8',progress);
   }finally{for(const c of contexts)await c.close();}
 });
 test('temporary bot after 60 seconds and returning guest reclaims seat',async({browser})=>{
