@@ -1,0 +1,262 @@
+{
+  "version": 2,
+  "seed": [
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19
+  ],
+  "config": {
+    "players": [
+      0,
+      1
+    ]
+  },
+  "actions": [
+    {
+      "player": 0,
+      "action": {
+        "type": "play",
+        "card_id": 61,
+        "uno": false
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "play",
+        "card_id": 37,
+        "uno": false
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "play",
+        "card_id": 62,
+        "uno": false
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "play",
+        "card_id": 53,
+        "uno": false
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "play",
+        "card_id": 4,
+        "uno": false
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "play",
+        "card_id": 13,
+        "uno": false
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "play",
+        "card_id": 16,
+        "uno": false
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "play",
+        "card_id": 17,
+        "uno": false
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "play",
+        "card_id": 19,
+        "uno": false
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "play",
+        "card_id": 23,
+        "uno": true
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "draw"
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "draw"
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "play",
+        "card_id": 74,
+        "uno": false
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "draw"
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "play",
+        "card_id": 99,
+        "uno": false
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "draw"
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "play",
+        "card_id": 92,
+        "uno": false
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "play",
+        "card_id": 67,
+        "uno": false
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "draw"
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "play",
+        "card_id": 54,
+        "uno": false
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "play",
+        "card_id": 100,
+        "uno": false
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "choose_color",
+        "color": "yellow"
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "play",
+        "card_id": 40,
+        "uno": false
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "play",
+        "card_id": 41,
+        "uno": true
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "play",
+        "card_id": 66,
+        "uno": false
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "draw"
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "play",
+        "card_id": 64,
+        "uno": true
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "draw"
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "play",
+        "card_id": 72,
+        "uno": false
+      }
+    }
+  ]
+}

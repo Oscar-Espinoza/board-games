@@ -1,0 +1,169 @@
+{
+  "version": 2,
+  "seed": [
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7
+  ],
+  "config": {
+    "players": [
+      0,
+      1
+    ]
+  },
+  "actions": [
+    {
+      "player": 0,
+      "action": {
+        "type": "play",
+        "card_id": 78,
+        "uno": false
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "play",
+        "card_id": 86,
+        "uno": false
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "play",
+        "card_id": 85,
+        "uno": false
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "play",
+        "card_id": 34,
+        "uno": false
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "play",
+        "card_id": 10,
+        "uno": false
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "play",
+        "card_id": 8,
+        "uno": false
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "play",
+        "card_id": 16,
+        "uno": false
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "play",
+        "card_id": 102,
+        "uno": false
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "choose_color",
+        "color": "yellow"
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "play",
+        "card_id": 31,
+        "uno": false
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "play",
+        "card_id": 45,
+        "uno": false
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "play",
+        "card_id": 47,
+        "uno": true
+      }
+    },
+    {
+      "player": 1,
+      "action": {
+        "type": "draw"
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "play",
+        "card_id": 22,
+        "uno": true
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "play",
+        "card_id": 101,
+        "uno": false
+      }
+    },
+    {
+      "player": 0,
+      "action": {
+        "type": "choose_color",
+        "color": "red"
+      }
+    }
+  ]
+}

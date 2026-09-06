@@ -1,0 +1,18 @@
+[workspace]
+members = ["crates/color-match", "crates/board-games-web", "crates/color-match-replay", "crates/table-protocol", "crates/table-server"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace.dependencies]
+color-match = { path = "crates/color-match" }
+table-protocol = { path = "crates/table-protocol" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[profile.release]
+lto = true
+opt-level = "s"

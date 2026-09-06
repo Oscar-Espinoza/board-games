@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "seed": [
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19
+  ],
+  "actions": [
+    {
+      "player": "human",
+      "action": {
+        "type": "play",
+        "card_id": 3
+      }
+    },
+    {
+      "player": "bot",
+      "action": {
+        "type": "play",
+        "card_id": 10
+      }
+    },
+    {
+      "player": "bot",
+      "action": {
+        "type": "draw"
+      }
+    },
+    {
+      "player": "human",
+      "action": {
+        "type": "play",
+        "card_id": 4
+      }
+    },
+    {
+      "player": "bot",
+      "action": {
+        "type": "play",
+        "card_id": 37
+      }
+    },
+    {
+      "player": "human",
+      "action": {
+        "type": "play",
+        "card_id": 43
+      }
+    },
+    {
+      "player": "human",
+      "action": {
+        "type": "play",
+        "card_id": 47
+      }
+    },
+    {
+      "player": "human",
+      "action": {
+        "type": "choose_color",
+        "color": "green"
+      }
+    },
+    {
+      "player": "bot",
+      "action": {
+        "type": "draw"
+      }
+    },
+    {
+      "player": "human",
+      "action": {
+        "type": "play",
+        "card_id": 29
+      }
+    }
+  ]
+}

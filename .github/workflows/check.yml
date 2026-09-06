@@ -1,0 +1,33 @@
+name: Check
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  rust-and-browsers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown,wasm32-wasip2
+          components: rustfmt,clippy
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.4
+      - uses: bytecodealliance/actions/wasmtime/setup@v1
+        with:
+          version: '48.0.1'
+      - run: cargo install wasm-pack --version 0.15.0 --locked
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - run: make check
+      - run: sudo apt-get update && sudo apt-get install -y coturn
+      - run: make check-turn
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-test-results
+          path: test-results/
