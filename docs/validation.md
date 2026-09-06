@@ -81,6 +81,16 @@ pnpm exec playwright test tests/browser/game.spec.js --project=webkit \
 
 ### Hosted results
 
+Final [GitHub run 34016734013](https://github.com/Oscar-Espinoza/board-games/actions/runs/34016734013)
+for `35ed1e5` completed successfully on 2026-09-06. `make check` passed Rust,
+WASI, replay and transport checks plus **100 browser tests with two intentional
+skips** in 12.3 minutes. `make check-turn` passed **43 production room tests
+with two intentional skips** in 9.1 minutes. Both browser suites used one worker,
+with **no failed attempts, retries or flaky results**. All three engines,
+real direct connections, forced local TURN and audio synthesis remained enabled.
+The following documentation-only commit records this result without changing
+the verified code or tests.
+
 The first follow-up [GitHub run](https://github.com/Oscar-Espinoza/board-games/actions/runs/34014448428)
 for `fe4ae22` passed Rust/WASI/replay checks and 96 browser tests, with two
 intentional skips. The eight-human WebKit case exceeded its 120-second budget
