@@ -233,6 +233,18 @@ fn command(room: &mut Room, sender: PlayerId, cmd: SignalCommand) -> Result<(), 
     }
     match cmd {
         SignalCommand::Ready { player, ready } => {
+            // Channel closure can arrive after a lobby departure or seat reuse by a bot.
+            // Only the host may clear readiness; this stale clear has no remaining target.
+            if sender == room.host_id
+                && player != room.host_id
+                && !ready
+                && !room
+                    .seats
+                    .iter()
+                    .any(|s| s.member.id == player && !s.member.bot)
+            {
+                return Ok(());
+            }
             if sender != room.host_id
                 || player == room.host_id
                 || !room.seats.iter().any(|s| {

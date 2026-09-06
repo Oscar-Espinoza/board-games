@@ -409,3 +409,80 @@ async fn simultaneous_admissions_share_capacity_with_bots() {
         4
     );
 }
+
+#[test]
+fn delayed_readiness_clear_after_lobby_departure_is_harmless() {
+    let mut rooms = HashMap::new();
+    let (invite, host, _, _) = create(&mut rooms);
+    let (_, guest, _, _) = join(&mut rooms, &invite).unwrap();
+    let room = rooms.get_mut(&invite).unwrap();
+    command(
+        room,
+        host,
+        SignalCommand::Ready {
+            player: guest,
+            ready: true,
+        },
+    )
+    .unwrap();
+    command(room, guest, SignalCommand::Leave).unwrap();
+    assert!(!room.ready.contains(&guest));
+    command(
+        room,
+        host,
+        SignalCommand::Ready {
+            player: guest,
+            ready: false,
+        },
+    )
+    .unwrap();
+    assert!(
+        command(
+            room,
+            host,
+            SignalCommand::Ready {
+                player: guest,
+                ready: true
+            }
+        )
+        .is_err()
+    );
+    assert!(
+        command(
+            room,
+            guest,
+            SignalCommand::Ready {
+                player: guest,
+                ready: false
+            }
+        )
+        .is_err()
+    );
+    command(room, host, SignalCommand::AddBot).unwrap();
+    assert!(
+        room.seats
+            .iter()
+            .any(|s| s.member.id == guest && s.member.bot)
+    );
+    command(
+        room,
+        host,
+        SignalCommand::Ready {
+            player: guest,
+            ready: false,
+        },
+    )
+    .unwrap();
+    assert!(
+        command(
+            room,
+            host,
+            SignalCommand::Ready {
+                player: guest,
+                ready: true
+            }
+        )
+        .is_err()
+    );
+    assert!(room.ready.is_empty());
+}

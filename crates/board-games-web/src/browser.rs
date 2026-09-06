@@ -813,7 +813,9 @@ pub fn peer_state(player: u8, connected: bool) -> Result<(), JsValue> {
     });
     if APP.with(|c| {
         let a = c.borrow();
-        a.room.as_ref().is_some_and(|r| a.player == r.host_id)
+        a.room.as_ref().is_some_and(|r| {
+            a.player == r.host_id && r.members.iter().any(|m| m.id == PlayerId(player))
+        })
     }) {
         send_signal(
             &serde_json::json!({"type":"ready","player":player,"ready":connected}).to_string(),
@@ -821,10 +823,15 @@ pub fn peer_state(player: u8, connected: bool) -> Result<(), JsValue> {
     }
     if APP.with(|c| c.borrow().authority.is_some()) {
         publish(vec![], None)?;
-    } else if !connected {
-        network_state(false);
-    } else {
-        request_snapshot();
+    } else if APP.with(|c| {
+        let a = c.borrow();
+        a.room.as_ref().is_some_and(|r| a.player != r.host_id)
+    }) {
+        if connected {
+            request_snapshot();
+        } else {
+            network_state(false);
+        }
     }
     update_start();
     Ok(())

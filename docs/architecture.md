@@ -46,7 +46,11 @@ is bound to that socket, browser session generation and authority epoch; socket
 loss, departure and handoff invalidate queued callbacks and cancel peer retries.
 Failed or unsent offers release their peer entry so a later offer can proceed.
 An existing connection recovering with an open channel restores Rust peer
-readiness even without another channel-open event.
+readiness even without another channel-open event. A lobby guest departure does
+not change the host's signaling availability. Rust removes that peer locally
+without reporting readiness for a seat already absent from its roster; the
+server ignores an authenticated host's delayed readiness clear if departure
+or bot reuse has already removed the human seat.
 
 The server binds signaling senders to a room session established by a random
 256-bit credential. Reconnection supersedes the previous socket generation.

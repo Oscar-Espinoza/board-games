@@ -62,7 +62,9 @@ test('eight human browser contexts receive only their own hands',async({browser}
     for(let i=0;i<8;i++){const c=await browser.newContext();contexts.push(c);await instrument(c);pages.push(await c.newPage());}
     const url=await create(pages[0]);for(let i=1;i<8;i++)await join(pages[i],url,`Friend ${i}`);await expect(pages[0].locator('#roster li')).toHaveCount(8);await start(pages[0]);
     const hands=[];for(let i=0;i<8;i++){await expect(pages[i].locator('#board')).toHaveAttribute('data-player',String(i));await expect(pages[i].locator('#hand-count')).toHaveText('7');hands.push(...await pages[i].locator('.hand [data-card]').evaluateAll(es=>es.map(e=>Number(e.dataset.card))));}expect(new Set(hands).size).toBe(56);
-    for(let i=0;i<8;i++){await expect(pages[i].locator('#draw')).toBeEnabled();await pages[i].locator('#draw').click();}
+    // Background WebKit pages throttle the frames used by pointer stability checks.
+    // Exercise each Rust action after readiness, as in the full-round transport test.
+    for(let i=0;i<8;i++){await expect(pages[i].locator('#draw')).toBeEnabled();await pages[i].locator('#draw').dispatchEvent('click');}
     for(const p of pages)await expect(p.locator('#board')).toHaveAttribute('data-revision','8');
   }finally{for(const c of contexts)await c.close();}
 });
@@ -188,5 +190,25 @@ for (const delayed of [false, true]) test(`reconnect regression: ${delayed ? 'de
     await expect(guest.locator('#draw')).toBeEnabled(); await guest.locator('#draw').click();
     await expect(host.locator('#board')).toHaveAttribute('data-revision', '2');
     await expect(guest.locator('#board')).toHaveAttribute('data-revision', '2');
+  } finally { await a.close(); await b.close(); }
+});
+
+test('lobby guest departure clears readiness and permits a fresh join', async ({ browser }) => {
+  const a = await browser.newContext(), b = await browser.newContext();
+  const host = await a.newPage(), guest = await b.newPage();
+  try {
+    const url = await create(host); await join(guest, url, 'Friend');
+    await expect(host.locator('#start-round')).toBeEnabled();
+    await guest.locator('#room-details [data-action="leave"]').click();
+    await expect(host.locator('#roster li')).toHaveCount(1);
+    await expect(host.locator('#start-round')).toBeDisabled();
+    // A subsequent room response ensures any earlier readiness error was processed.
+    await host.locator('#add-bot').click();
+    await expect(host.locator('#roster li')).toHaveCount(2);
+    await expect(host.locator('#error')).toBeEmpty();
+    await expect(host.locator('#panel-error')).toBeEmpty();
+    await join(guest, url, 'Returning friend'); await start(host);
+    await expect(guest.locator('#board')).toHaveAttribute('data-player', '2');
+    await expect(host.locator('#error')).toBeEmpty();
   } finally { await a.close(); await b.close(); }
 });

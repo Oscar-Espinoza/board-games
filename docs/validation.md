@@ -33,24 +33,34 @@ signaling-state and DataChannel transitions before closing contexts. These
 attachments contain event types and local connection indices, never credentials,
 SDP, checkpoints or hands. Normal-speed mouse/touch tests verify creation,
 320ms duration, completion, visible arrival and cleanup; controlled-time tests
-retain exact lift, midpoint and destination geometry assertions.
+retain exact lift, midpoint and destination geometry assertions. The eight-human
+capacity/privacy test checks each draw button is enabled, then dispatches the
+DOM click through the Rust handler (as the full-round test does). This avoids
+waiting for pointer stability frames in throttled background WebKit pages;
+real pointer and touch input remain covered by the interaction tests.
 
 ### Local results
 
 - Final `CI=true ALSOFT_DRIVERS=null make check` passed formatting, native and
   target Clippy, Rust tests, native/WASI replay comparisons, eight transport
-  regressions and **97 browser tests with two intentional interoperability
+  regressions and **100 browser tests with two intentional interoperability
   skips**. No failures or flaky results.
-- Final `CI=true ALSOFT_DRIVERS=null make check-turn` passed **40 production
+- Final `CI=true ALSOFT_DRIVERS=null make check-turn` passed **43 production
   room tests with two intentional skips**, across all three engines through
   local coturn. No failures or flaky results. The workspace retains the
   production browser package.
+- A lobby leave/rejoin regression passed **15 times** (five per engine) with
+  retries disabled. It covers stale readiness after seat removal and host
+  signaling availability. The signaling regression also checks delayed clears
+  after bot seat reuse, rejection of absent-seat readiness, and host-only access.
 - Eight deterministic transport regressions passed, covering authentication
   delays, failed/unsent offers, stale socket and peer callbacks, queued ICE work,
   authority changes, lobby departure cleanup and recovery of an open channel.
 - Firefox passed all **30 direct** and **30 forced-TURN** reconnect cases:
   ten repetitions each of live-authority reconnect, failed offer and delayed
   authentication, with retries disabled.
+- After the hosted trace investigation, the adjusted WebKit eight-human test
+  passed **five direct and five forced-TURN runs**, with retries disabled.
 - WebKit passed **10 normal-speed animation cases**: five repetitions each of
   mouse desktop and touch mobile, with retries disabled.
 
@@ -65,6 +75,17 @@ python3 scripts/check_turn.py --project=firefox \
 pnpm exec playwright test tests/browser/game.spec.js --project=webkit \
   --grep 'normal speed' --repeat-each=5 --retries=0
 ```
+
+### Hosted results
+
+The first follow-up [GitHub run](https://github.com/Oscar-Espinoza/board-games/actions/runs/34014448428)
+for `fe4ae22` passed Rust/WASI/replay checks and 96 browser tests, with two
+intentional skips. The eight-human WebKit case exceeded its 120-second budget
+on both attempts. The trace showed continued turn progress, with up to 7.7
+seconds spent waiting for pointer stability before a single draw. This led to
+the targeted DOM-action change above, retaining the 120-second CI budget.
+Chromium, Firefox and the revised animation tests passed without flaky results.
+The failed browser step prevented this run's TURN step from starting.
 
 ## Invitations, capacity and deliberate handoff (2026-09-06)
 
