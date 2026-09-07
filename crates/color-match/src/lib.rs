@@ -1,12 +1,13 @@
 //! Deterministic version-2 rules. Authority state is deliberately not serializable.
+/// Domain checkpoint budget. The session separately bounds the final escaped transport wrapper.
+const CHECKPOINT_BUDGET: usize = 32768;
+
 use rand_chacha::ChaCha12Rng;
 use rand_core::{RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 pub const REPLAY_VERSION: u32 = 2;
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct PlayerId(pub u8);
+pub use table_types::PlayerId;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GameConfig {
@@ -228,6 +229,7 @@ fn deck() -> Vec<Card> {
 fn bounded(rng: &mut ChaCha12Rng, bound: u32) -> u32 {
     let threshold = bound.wrapping_neg() % bound;
     loop {
+        // Replay compatibility requires preserving this sampler and its draw consumption.
         let value = rng.next_u32();
         if value >= threshold {
             return value % bound;
@@ -241,6 +243,17 @@ fn shuffle(cards: &mut [Card], rng: &mut ChaCha12Rng) {
     }
 }
 impl Game {
+    /// Canonical metadata without constructing a recipient projection.
+    pub fn revision(&self) -> u64 {
+        self.revision
+    }
+    pub fn phase(&self) -> Phase {
+        self.phase
+    }
+    pub fn players(&self) -> &[PlayerId] {
+        &self.players
+    }
+
     pub fn new(seed: [u8; 32], config: GameConfig) -> Result<Self, RuleError> {
         if !(2..=8).contains(&config.players.len())
             || config
@@ -663,19 +676,23 @@ impl Game {
         .map_err(|e| e.to_string())
     }
     pub fn import_checkpoint(json: &str) -> Result<Self, String> {
-        if json.len() > 32768 {
+        if json.len() > CHECKPOINT_BUDGET {
             return Err("Checkpoint too large".into());
         }
-        let c: GameCheckpoint = serde_json::from_str(json).map_err(|e| e.to_string())?;
-        if !(2..=8).contains(&c.players.len())
-            || c.players
-                .iter()
-                .collect::<std::collections::BTreeSet<_>>()
-                .len()
-                != c.players.len()
-        {
-            return Err("Invalid roster".into());
+        let c: GameCheckpoint =
+            serde_json::from_str(json).map_err(|_| "Malformed game checkpoint")?;
+        if !(2..=8).contains(&c.players.len()) {
+            return Err("Roster size outside 2–8".into());
         }
+        if c.players
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
+            != c.players.len()
+        {
+            return Err("Roster contains duplicate IDs".into());
+        }
+
         let all: Vec<Card> = c
             .hands
             .iter()
@@ -686,36 +703,61 @@ impl Game {
             .collect();
         let expected = deck();
         let mut ids = std::collections::BTreeSet::new();
-        if c.hands.len() != c.players.len()
-            || c.discards.is_empty()
-            || all.len() != 108
-            || all
-                .iter()
-                .any(|card| expected.get(card.id as usize) != Some(card) || !ids.insert(card.id))
-            || c.phase.actor().is_some_and(|p| !c.players.contains(&p))
-            || c.catchable.is_some_and(|p| !c.players.contains(&p))
-            || c.empty_passes as usize > c.players.len()
-        {
-            return Err("Invalid game checkpoint".into());
+        if c.hands.len() != c.players.len() {
+            return Err("Hand count does not match roster".into());
         }
+        if c.discards.is_empty() {
+            return Err("Discard pile is empty".into());
+        }
+        if all.len() != 108 {
+            return Err("Card count is not 108".into());
+        }
+        if all
+            .iter()
+            .any(|card| expected.get(card.id as usize) != Some(card) || !ids.insert(card.id))
+        {
+            return Err("Card identity is invalid or duplicated".into());
+        }
+        if c.phase.actor().is_some_and(|p| !c.players.contains(&p)) {
+            return Err("Phase actor is outside roster".into());
+        }
+        if c.catchable.is_some_and(|p| !c.players.contains(&p)) {
+            return Err("Catchable player is outside roster".into());
+        }
+        if c.empty_passes as usize > c.players.len() {
+            return Err("Empty pass count exceeds roster".into());
+        }
+
         let valid_hand = |p: PlayerId, count: usize| {
             c.players
                 .iter()
                 .position(|id| *id == p)
                 .is_some_and(|i| c.hands[i].len() == count)
         };
-        if c.catchable.is_some_and(|p| !valid_hand(p, 1))
-            || matches!(c.phase, Phase::Finished { outcome: Outcome::Win { player } } if !valid_hand(player, 0))
-            || (matches!(c.phase, Phase::ChoosingColor { .. })
-                && c.discards.last().unwrap().color().is_some())
-            || (c.pending_uno && !matches!(c.phase, Phase::ChoosingColor { .. }))
-            || c.penalty.is_some_and(|p| {
-                ![2, 4].contains(&p.kind) || p.amount == 0 || p.amount > 432 || p.amount % 2 != 0
-            })
-            || c.revision == u64::MAX
-        {
-            return Err("Invalid phase or penalty".into());
+        if c.catchable.is_some_and(|p| !valid_hand(p, 1)) {
+            return Err("Catchable player must hold one card".into());
         }
+        if matches!(c.phase, Phase::Finished { outcome: Outcome::Win { player } } if !valid_hand(player, 0))
+        {
+            return Err("Winner must have an empty hand".into());
+        }
+        if (matches!(c.phase, Phase::ChoosingColor { .. })
+            && c.discards.last().unwrap().color().is_some())
+        {
+            return Err("Color choice requires a wild discard".into());
+        }
+        if c.pending_uno && !matches!(c.phase, Phase::ChoosingColor { .. }) {
+            return Err("Pending UNO requires color choice".into());
+        }
+        if c.penalty.is_some_and(|p| {
+            ![2, 4].contains(&p.kind) || p.amount == 0 || p.amount > 432 || p.amount % 2 != 0
+        }) {
+            return Err("Penalty kind or amount is invalid".into());
+        }
+        if c.revision == u64::MAX {
+            return Err("Revision cannot advance".into());
+        }
+
         let mut rng = ChaCha12Rng::from_seed(c.seed);
         rng.set_stream(c.stream);
         rng.set_word_pos(c.position.parse().map_err(|_| "Invalid RNG position")?);

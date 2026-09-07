@@ -7,6 +7,8 @@ fn create(rooms: &mut HashMap<String, Room>) -> (String, PlayerId, u64, SignalEv
         rooms,
         Hello::Create {
             version: PROTOCOL_VERSION,
+            game_id: GameId::ColorMatch,
+            rules_version: 2,
             name: "Host".into(),
             avatar: 0,
         },
@@ -25,6 +27,8 @@ fn join(
         rooms,
         Hello::Join {
             version: PROTOCOL_VERSION,
+            game_id: GameId::ColorMatch,
+            rules_version: 2,
             invite: invite.into(),
             name: "Friend".into(),
             avatar: 1,
@@ -79,6 +83,8 @@ fn resume_credential_is_separate_and_rotates_connection_binding() {
             &mut rooms,
             Hello::Resume {
                 version: PROTOCOL_VERSION,
+                game_id: GameId::ColorMatch,
+                rules_version: 2,
                 invite: invite.clone(),
                 credential: invite.clone()
             },
@@ -91,6 +97,8 @@ fn resume_credential_is_separate_and_rotates_connection_binding() {
         &mut rooms,
         Hello::Resume {
             version: PROTOCOL_VERSION,
+            game_id: GameId::ColorMatch,
+            rules_version: 2,
             invite: invite.clone(),
             credential,
         },
@@ -341,6 +349,8 @@ fn handoff_binding_timeout_retry_commit_and_former_host_resume() {
         &mut rooms,
         Hello::Resume {
             version: PROTOCOL_VERSION,
+            game_id: GameId::ColorMatch,
+            rules_version: 2,
             invite: invite.clone(),
             credential,
         },
@@ -485,4 +495,171 @@ fn delayed_readiness_clear_after_lobby_departure_is_harmless() {
         .is_err()
     );
     assert!(room.ready.is_empty());
+}
+
+#[test]
+fn game_binding_is_required_for_admission_and_resume() {
+    let mut rooms = HashMap::new();
+    let (invite, _, _, welcome) = create(&mut rooms);
+    let SignalEvent::Welcome { credential, .. } = welcome else {
+        panic!()
+    };
+    for hello in [
+        Hello::Join {
+            version: PROTOCOL_VERSION,
+            game_id: GameId::Catan,
+            rules_version: 1,
+            invite: invite.clone(),
+            name: "Friend".into(),
+            avatar: 1,
+        },
+        Hello::Resume {
+            version: PROTOCOL_VERSION,
+            game_id: GameId::Catan,
+            rules_version: 1,
+            invite: invite.clone(),
+            credential,
+        },
+        Hello::Create {
+            version: PROTOCOL_VERSION,
+            game_id: GameId::ColorMatch,
+            rules_version: 999,
+            name: "Host".into(),
+            avatar: 0,
+        },
+        Hello::Create {
+            version: 3,
+            game_id: GameId::ColorMatch,
+            rules_version: 2,
+            name: "Host".into(),
+            avatar: 0,
+        },
+    ] {
+        let (tx, _) = mpsc::channel(64);
+        assert!(admit(&mut rooms, hello, tx).is_err());
+        assert_eq!(rooms.len(), 1);
+        assert_eq!(rooms[&invite].seats.len(), 1);
+    }
+}
+
+#[test]
+fn catan_rooms_enforce_humans_capacity_setup_and_game_binding() {
+    let mut rooms = HashMap::new();
+    let (tx, rx) = mpsc::channel(64);
+    std::mem::forget(rx);
+    let (invite, _, _, _) = admit(
+        &mut rooms,
+        Hello::Create {
+            version: PROTOCOL_VERSION,
+            game_id: GameId::Catan,
+            rules_version: 1,
+            name: "Host".into(),
+            avatar: 0,
+        },
+        tx,
+    )
+    .unwrap();
+    let r = rooms.get_mut(&invite).unwrap();
+    assert_eq!(r.capacity, 4);
+    assert!(command(r, PlayerId(0), SignalCommand::AddBot).is_err());
+    assert!(
+        command(r, PlayerId(0), SignalCommand::Capacity { capacity: 2 })
+            .unwrap_err()
+            .contains("3–6")
+    );
+    assert!(command(r, PlayerId(0), SignalCommand::Capacity { capacity: 7 }).is_err());
+    command(
+        r,
+        PlayerId(0),
+        SignalCommand::UpdateOptions {
+            options: table_protocol::RoomOptions::Catan {
+                setup: table_protocol::BoardSetup::Beginner,
+            },
+        },
+    )
+    .unwrap();
+    assert!(
+        command(r, PlayerId(0), SignalCommand::Start)
+            .unwrap_err()
+            .contains("at least 3")
+    );
+    for i in 1..3 {
+        let (tx, rx) = mpsc::channel(64);
+        std::mem::forget(rx);
+        admit(
+            &mut rooms,
+            Hello::Join {
+                version: PROTOCOL_VERSION,
+                game_id: GameId::Catan,
+                rules_version: 1,
+                invite: invite.clone(),
+                name: format!("P{i}"),
+                avatar: i,
+            },
+            tx,
+        )
+        .unwrap();
+    }
+    let r = rooms.get_mut(&invite).unwrap();
+    assert!(
+        command(
+            r,
+            PlayerId(1),
+            SignalCommand::UpdateOptions {
+                options: table_protocol::RoomOptions::Catan {
+                    setup: table_protocol::BoardSetup::Variable
+                }
+            }
+        )
+        .is_err()
+    );
+    assert!(
+        command(r, PlayerId(0), SignalCommand::Start)
+            .unwrap_err()
+            .contains("at least 3")
+    );
+    r.ready.extend([PlayerId(1), PlayerId(2)]);
+    command(r, PlayerId(0), SignalCommand::Start).unwrap();
+    assert!(r.locked);
+    assert!(
+        command(
+            r,
+            PlayerId(0),
+            SignalCommand::UpdateOptions {
+                options: table_protocol::RoomOptions::Catan {
+                    setup: table_protocol::BoardSetup::Variable
+                }
+            }
+        )
+        .is_err()
+    );
+    assert!(command(r, PlayerId(0), SignalCommand::Capacity { capacity: 6 }).is_err());
+}
+
+#[test]
+fn color_match_rejects_catan_options_without_changing_room() {
+    let mut rooms = HashMap::new();
+    let (invite, host, _, _) = create(&mut rooms);
+    let room = rooms.get_mut(&invite).unwrap();
+    let result = command(
+        room,
+        host,
+        SignalCommand::UpdateOptions {
+            options: table_protocol::RoomOptions::Catan {
+                setup: table_protocol::BoardSetup::Beginner,
+            },
+        },
+    );
+    assert_eq!(result.unwrap_err(), "Room options do not match the game.");
+    assert_eq!(room.options, table_protocol::RoomOptions::ColorMatch {});
+    assert!(
+        command(room, host, SignalCommand::Capacity { capacity: 1 })
+            .unwrap_err()
+            .contains("2–8")
+    );
+    assert!(
+        command(room, host, SignalCommand::Start)
+            .unwrap_err()
+            .contains("at least 2")
+    );
 }

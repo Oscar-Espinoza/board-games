@@ -1,11 +1,14 @@
 FROM rust:slim-bookworm AS build
-RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev ca-certificates python3 && rm -rf /var/lib/apt/lists/*
 RUN rustup target add wasm32-unknown-unknown && cargo install wasm-pack --version 0.15.0 --locked
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
 COPY web ./web
-RUN cargo build -p table-server --release --locked && wasm-pack build crates/board-games-web --target web --out-dir ../../web/pkg --release --locked
+COPY site ./site
+COPY artwork/catan ./artwork/catan
+COPY scripts/build_web.py ./scripts/build_web.py
+RUN cargo build -p table-server --release --locked && python3 scripts/build_web.py
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/* && useradd --system --uid 10001 table
 WORKDIR /app

@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="theme-color" content="#092c27" />
+    <title>Color Match · The Game Table</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="__ASSET_BASE__/style.css" />
+  </head>
+  <body data-runtime="__ASSET_BASE__/color_match_web.js">
+    <main id="app" inert>
+      <header class="toolbar">
+        <a class="wordmark" href="/" data-catalog>✦ <span>THE GAME TABLE</span></a
+        ><span id="mode">Private tables</span>
+        <nav aria-label="Table tools">
+          <button id="room-toggle" data-panel="room-panel">Room controls</button
+          ><button data-panel="rules-panel">Rules</button
+          ><button id="sound-toggle" role="switch" aria-label="Move sounds" aria-checked="true">
+            Sound on</button
+          ><button id="fullscreen" aria-label="Toggle fullscreen">⛶</button
+          ><button id="leave-room" data-action="leave" hidden>Leave room</button>
+        </nav>
+      </header>
+      <div class="status-line">
+        <p id="status" role="status" tabindex="-1">Loading the game…</p>
+        <span id="diagnostics"></span>
+      </div>
+      <div id="welcome" hidden>
+        <span class="eyebrow">A SEAT FOR EVERY FRIEND</span>
+        <h1>Your table.<br />Your people.</h1>
+        <p>Create a private room, invite a friend, and deal everyone in.</p>
+        <button id="welcome-action" data-panel="room-panel">Create room</button>
+      </div>
+      <section hidden id="board" aria-label="Color Match table">
+        <div class="felt-mark" aria-hidden="true">COLOR<br /><span>MATCH</span></div>
+        <div id="seat-0" class="seat" hidden></div>
+        <div id="seat-1" class="seat" hidden></div>
+        <div id="seat-2" class="seat" hidden></div>
+        <div id="seat-3" class="seat" hidden></div>
+        <div id="seat-4" class="seat" hidden></div>
+        <div id="seat-5" class="seat" hidden></div>
+        <div id="seat-6" class="seat" hidden></div>
+        <div id="seat-7" class="seat" hidden></div>
+        <div class="center-table">
+          <div class="pile">
+            <button id="draw" data-action="draw" class="card card-back" aria-label="Draw one">
+              <span aria-hidden="true">CM</span></button
+            ><span id="draw-label">Draw one</span
+            ><small>Stock · <span id="stock-count">0</span></small>
+          </div>
+          <div class="pile">
+            <div id="discard" class="card"></div>
+            <span>Discard</span><small id="direction"></small>
+          </div>
+          <div class="color-info">
+            <small>ACTIVE COLOR</small><strong id="active-color"></strong><b id="penalty"></b>
+          </div>
+        </div>
+        <section id="hand-section" class="hand-section" aria-label="Your hand">
+          <div class="hand-heading">
+            <span
+              ><strong id="you-name">You</strong
+              ><small><span id="hand-count">7</span> cards in hand</small></span
+            ><button id="uno" data-action="uno" aria-pressed="false">UNO!</button
+            ><button id="catch" data-action="catch" hidden></button>
+          </div>
+          <div
+            id="hand"
+            class="hand"
+            tabindex="0"
+            aria-label="Your cards, scroll horizontally"
+          ></div>
+        </section>
+        <fieldset id="color-choices" hidden>
+          <legend>Choose the next color</legend>
+          <button id="choose-Red" data-action="color" data-color="Red" class="red">Red</button
+          ><button id="choose-Yellow" data-action="color" data-color="Yellow" class="yellow">
+            Yellow</button
+          ><button id="choose-Green" data-action="color" data-color="Green" class="green">
+            Green</button
+          ><button id="choose-Blue" data-action="color" data-color="Blue" class="blue">Blue</button>
+        </fieldset>
+      </section>
+      <div class="messages">
+        <p id="announcement" role="status" aria-live="polite"></p>
+        <p id="error" role="alert"></p>
+        <div id="replace-controls"></div>
+      </div>
+      <dialog id="room-panel">
+        <div class="panel-heading">
+          <h2>Pull up a chair.</h2>
+          <button data-close aria-label="Close room controls">✕</button>
+        </div>
+        <p id="panel-error" role="alert"></p>
+        <div id="identity">
+          <p>Make a private table for friends.</p>
+          <label for="name">Your name</label
+          ><input id="name" maxlength="24" value="Player" autocomplete="nickname" /><label
+            for="avatar"
+            >Your avatar</label
+          ><select id="avatar">
+            <option value="0">🦊 Fox</option>
+            <option value="1">🐻 Bear</option>
+            <option value="2">🐸 Frog</option>
+            <option value="3">🐙 Octopus</option>
+            <option value="4">🐱 Cat</option>
+            <option value="5">🐼 Panda</option>
+            <option value="6">🦉 Owl</option>
+            <option value="7">🐯 Tiger</option></select
+          ><button data-action="back">Back</button>
+          <div class="row">
+            <button id="create-room" data-action="create" class="primary">Create room</button
+            ><button id="join-room" data-action="join" class="primary" hidden>Join room</button>
+          </div>
+        </div>
+        <div id="room-details" hidden>
+          <label for="invite">Invite link</label>
+          <div class="row">
+            <input id="invite" readonly aria-label="Invite link" /><button id="copy-invite">
+              Copy
+            </button>
+          </div>
+          <label for="room-size">Room size</label
+          ><select id="room-size">
+            <option value="2">2 seats</option>
+            <option value="3">3 seats</option>
+            <option value="4">4 seats</option>
+            <option value="5">5 seats</option>
+            <option value="6">6 seats</option>
+            <option value="7">7 seats</option>
+            <option value="8" selected>8 seats</option>
+          </select>
+          <p id="room-count"></p>
+          <ul id="roster"></ul>
+          <div id="host-controls" class="row">
+            <button id="add-bot" data-action="add-bot">Add bot</button
+            ><button id="start-round" data-action="start" class="primary">Start round</button>
+          </div>
+          <button data-action="leave">Leave room</button>
+          <p class="hint">
+            Start with at least two friends connected. Leave room transfers hosting to a connected
+            friend. Keep this tab open to recover from a lost connection.
+          </p>
+        </div>
+        <hr />
+        <button
+          id="animations-toggle"
+          role="switch"
+          aria-label="Card animations"
+          aria-checked="true"
+        >
+          Card animations on
+        </button>
+      </dialog>
+      <dialog id="rules-panel">
+        <div class="panel-heading">
+          <h2>A little friendly competition.</h2>
+          <button data-close aria-label="Close rules">✕</button>
+        </div>
+        <p>2–8 players. Seven cards each. Empty your hand to win.</p>
+        <p>
+          Match the active color, number or symbol. You may always draw one instead; drawing ends
+          your turn.
+        </p>
+        <p>
+          <b>⊘ Skip</b> skips the next player. <b>⇄ Reverse</b> reverses direction, or skips the
+          other player at a two-seat table.
+        </p>
+        <p>
+          <b>+2</b> answers +2 in any color. <b>Wild +4</b> answers either +2 or +4. A +2 cannot
+          answer +4. Stack or draw the full accumulated penalty and lose your turn.
+        </p>
+        <p>
+          Both Wilds let you choose a color; +4 is always legal outside a penalty stack. No
+          challenges. A final Wild needs its color selected before you win.
+        </p>
+        <p>
+          <b>UNO!</b> With two cards, arm UNO before playing. If you forget and leave one card, any
+          opponent can catch you for two cards until the next accepted play or draw. Wild catches
+          open after color selection.
+        </p>
+        <p>
+          Old discards refill an empty stock, keeping the top card. If a penalty exceeds available
+          cards, draw what remains. A full rotation of empty-stock passes is a draw.
+        </p>
+        <p class="hint">
+          Use Tab and Enter/Space. Scroll your hand horizontally. Bots use their own hand and public
+          information, choose the lowest legal card ID, call UNO and catch missed calls. No scoring
+          between rounds.
+        </p>
+      </dialog>
+    </main>
+    <div id="loading-controls">
+      <p id="load-status" role="status">Loading Color Match…</p>
+      <button id="retry-load" hidden>Retry</button> <a href="/">Return to catalog</a>
+    </div>
+    <noscript>Enable JavaScript to play.</noscript>
+    <script type="module" src="__ASSET_BASE__/loader.js"></script>
+  </body>
+</html>

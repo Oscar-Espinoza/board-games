@@ -4,3 +4,8 @@
 /test-results/
 /playwright-report/
 __pycache__/
+
+/web/assets/
+/web/games/color-match/index.html
+
+/web/games/catan/index.html

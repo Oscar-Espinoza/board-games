@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: color-match
+    name: board-games
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile
@@ -10,4 +10,4 @@ services:
       - key: BIND_ADDR
         value: 0.0.0.0
       - key: TURN_ZERO_SPEND_VERIFIED
-        value: "false"
+        value: 'false'

@@ -2,7 +2,7 @@
 
 ## Project and navigation
 
-This repository is a long-lived monorepo for browser-based board games. UNO or an UNO-like game is a probable first substantial game, but its rules, state model, and interaction patterns must not become universal assumptions for other games.
+This repository is a long-lived monorepo with one browser-games catalog. Board games are a category. Games own their rules, state, rendering and assets; share code by demonstrated functionality rather than genre. Catalog-wide startup utilities must work without optional table-session packages.
 
 Before foundational changes, inspect existing code, manifests, applicable instructions, and architecture documentation. Follow established conventions where they exist; do not infer a settled architecture from this document. Use `docs/` for detailed designs and architectural decision records (ADRs) as decisions arise. Add links here to actual documents when created. Do not invent document paths, links, or documentation that does not yet exist.
 
@@ -35,7 +35,8 @@ After changes, run checks relevant to the affected behavior and targets. Report 
 ## Established architecture and commands
 
 - [Exact Color Match rules](docs/rules.md)
-- [Architecture](docs/architecture.md)
+- [CATAN product contract and implementation status](docs/games/catan.md)
+- [Architecture and catalog/session ownership](docs/architecture.md#catalog-ownership-and-optional-table-sessions)
 - ADRs: [execution targets](docs/adr/001-execution-targets.md), [rendering](docs/adr/002-rendering.md), [determinism](docs/adr/003-determinism.md), [multiplayer trust](docs/adr/004-multiplayer.md)
 - [Setup and usage](README.md), [validation and tested versions](docs/validation.md)
 - [Free deployment and connectivity](docs/deployment.md)
@@ -48,3 +49,13 @@ comparisons, and Playwright in Chromium, Firefox, and WebKit. Focused checks are
 relay through a disposable local coturn service. See README for
 Rust targets, Wasmtime, and browser dependencies. Browser checks run an isolated
 Rust server on port 8081 (`TEST_PORT` overrides it). Retain both dependency lockfiles and replay fixtures.
+
+## Readability conventions
+
+Use stable rustfmt defaults. Format macro bodies manually where rustfmt cannot reach:
+keep branches, graphics descriptors and HTML-builder arguments readable on separate lines.
+Use logical spacing between validation, mutation and effects, and explain boundary
+contracts and non-obvious invariants. Avoid comments that restate the code.
+`make format` runs rustfmt and pinned Prettier; `make check-format` checks maintained
+web and configuration files and is included in `make check`. Generated releases,
+artwork and golden fixtures are excluded from Prettier.

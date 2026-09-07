@@ -1,6 +1,6 @@
 # The Game Table
 
-**Color Match** is a Rust/Wasm card table for 2–8 players: a full-screen felt
+Play **CATAN** with 3–6 humans on an overhead tabletop, or **Color Match** with 2–8 players. Both use Rust/Wasm and private WebRTC rooms. Color Match includes: a full-screen felt
 surface, animated cards, deterministic bots, UNO calls and private WebRTC rooms.
 
 ## Play locally
@@ -13,7 +13,17 @@ cargo install wasm-pack --version 0.15.0 --locked
 make dev
 ```
 
-Open **http://127.0.0.1:8080** and choose **Create room**. Enter a name and
+Open **http://127.0.0.1:8080**, select a game, then create a table.
+For CATAN, select 3–6 seats and variable or beginner setup, share the invite,
+and start once at least three humans have connected. Five or six players use
+the extension and paired turns. CATAN has no bots; disconnected seats pause play.
+Click the large dice tray or **Roll dice** to begin. Select a piece in the rack,
+choose a highlighted location and confirm. Trade and development choices open
+compact panels; phone controls use sheets and an expandable hand. Choose an
+animal avatar before joining. The table fills the viewport; the corner menu
+contains rules, independent sound/motion controls and an optional fullscreen toggle.
+
+For Color Match, choose **Create room**. Enter a name and
 preset avatar, then copy the private invite link. **Room size** selects 2–8
 seats including the host and optional bots (default eight). The host can change
 capacity before the first round, provided it covers occupied seats.
@@ -47,7 +57,7 @@ Closing room controls only dismisses the dialog. **Leave room** is available
 in the lobby and during play. Before play it frees the seat and, if necessary,
 promotes the earliest-joined connected human.
 
-During play, a deliberate guest departure preserves their hand and seat. The
+During play, a deliberate guest departure preserves their hand and seat. In Color Match, the
 host can immediately choose **Wait** or **Fill with bot**. An accidental guest
 disconnection keeps the 60-second replacement delay. Reopening the invitation
 in the same browser tab reclaims the seat and stops its temporary bot.
@@ -68,7 +78,10 @@ replication or database. Rooms expire after four hours or server restart.
 
 ## Build and verify
 
-`make build` creates `web/pkg/`. The Axum server serves that package, the site,
+`make build` creates separate content-addressed releases in `web/assets/<game>/`
+and generates `web/games/<game>/index.html` from the corresponding `site/` template.
+CATAN includes its original SVG artwork; see [provenance](docs/games/catan-assets.md).
+Python 3 is required for this packaging step. The Axum server serves that package, the site,
 and signaling from one origin. Rooms require this signaling service.
 You can choose a different development port with `PORT=8082 make dev`.
 
@@ -126,3 +139,30 @@ Wasmtime. Browsers do not directly execute WASI commands or components.
 Design: [architecture](docs/architecture.md), [execution targets](docs/adr/001-execution-targets.md),
 [rendering](docs/adr/002-rendering.md), [determinism](docs/adr/003-determinism.md),
 [multiplayer trust](docs/adr/004-multiplayer.md), [deployment](docs/deployment.md).
+
+
+## Game catalog
+
+`/` is a lightweight catalog; play Color Match at `/games/color-match/`.
+Legacy root-level invites redirect there with their secret fragment preserved.
+CATAN is playable at `/games/catan/`. See the [CATAN contract and validation limits](docs/games/catan.md).
+The catalog never initializes a game runtime. Game entry pages revalidate and
+load one immutable, content-hashed release. Retain old asset directories during
+rolling deployments so clients with earlier entry pages can finish loading.
+Transport v5 rejects older clients; Color Match's rules/replay fixtures remain v2.
+
+Formatting uses stable rustfmt defaults and exactly pinned Prettier 3.9.6, following
+its [installation guidance](https://prettier.io/docs/install).
+Run `make format` to format Rust and maintained JS/CSS/HTML/configuration files;
+`make check-format` checks the latter and `make check-rust` checks Rust formatting.
+Generated assets, artwork and golden fixtures are excluded. Transport tests use
+`node --experimental-vm-modules --test tests/transport/*.test.cjs`; the flag is
+required for [isolated ES-module evaluation](https://nodejs.org/api/vm.html#class-vmmodule). Protocol constants are generated from
+Rust as part of every release, not maintained in a separate JavaScript copy.
+
+Maintained browser assets are grouped under `web/color-match/`, `web/catan/`,
+`web/catalog/`, `web/shared/` and optional `web/table/`. The `game-catalog` crate
+owns discovery independently of room admission. See [catalog and session ownership](docs/architecture.md#catalog-ownership-and-optional-table-sessions).
+Validate build declarations without compiling Wasm with
+`python3 scripts/build_web.py --validate`; build a single game with
+`python3 scripts/build_web.py --game color-match` (or `catan`).

@@ -465,3 +465,36 @@ fn checkpoint_continues_missed_uno_and_catch_windows() {
     }
     assert!(catches > 0);
 }
+
+#[test]
+fn checkpoint_diagnostics_identify_checks_without_private_contents() {
+    let game = Game::new(
+        [7; 32],
+        GameConfig {
+            players: vec![PlayerId(0), PlayerId(1)],
+        },
+    )
+    .unwrap();
+    let original: serde_json::Value =
+        serde_json::from_str(&game.export_checkpoint().unwrap()).unwrap();
+    for (key, value, message) in [
+        (
+            "hands",
+            serde_json::json!([]),
+            "Hand count does not match roster",
+        ),
+        ("discards", serde_json::json!([]), "Discard pile is empty"),
+        (
+            "revision",
+            serde_json::json!(u64::MAX),
+            "Revision cannot advance",
+        ),
+    ] {
+        let mut invalid = original.clone();
+        invalid[key] = value;
+        assert_eq!(
+            Game::import_checkpoint(&invalid.to_string()).err().unwrap(),
+            message
+        );
+    }
+}

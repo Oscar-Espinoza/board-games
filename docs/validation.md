@@ -1,6 +1,70 @@
 # Validation record
 
-Observed locally on Ubuntu 24.04.4 LTS, 2026-09-05–06. These are tested versions,
+## Coding-practices cleanup, 2026-09-07
+
+The cleanup uses protocol v5 while preserving Color Match v2 and CATAN v1 rules
+and golden replay bytes. Prettier 3.9.6 is exactly pinned; rustfmt retains its
+stable defaults. `make check` includes the maintained-web formatting gate.
+Transport tests use actual isolated ES modules with Node's required
+`--experimental-vm-modules` flag and evaluate the Rust constants exporter.
+
+Focused validation passed 62 Rust tests and ten transport tests. Both replay
+scripts also passed under `python -O`, including invalid-input rejection. Copies
+run with missing fixture directories failed explicitly with `Missing replay input`
+before attempting replay execution.
+
+The first browser run could not launch the installed WebKit because this host
+lacked `libavif.so.16`. The documented temporary wrapper and unpacked libraries
+were recreated under `/tmp/board-games-browser-deps/`, along with coturn and its
+libraries; no system packages were installed. Node subprocesses and wasm-pack's
+cache required execution outside the filesystem sandbox.
+
+A WebKit trace exposed a CATAN resize callback reaching Wasm before initialization.
+Presentation now receives the module only after initialization resolves. A delayed
+Wasm/resize regression and the handoff/rejoin scenario passed three repetitions
+each without retries. That scenario's snapshot-convergence and rejoin assertions
+now use 20-second readiness waits. The eight-human case also reproduced the
+previously documented local five-second readiness limit; three repetitions passed
+without retries using its existing CI wait settings. A native lifecycle regression also verifies that a reconnecting successor
+recovers its staged authority if the commit event was lost; recovery is bound to the
+expected successor, round and next epoch. Full verification uses
+`CI=1` for the repository's existing single-worker browser configuration.
+
+`CI=1 make check` passed with the temporary WebKit environment: 182 browser
+cases passed and four intentional skips remained (unsupported WebGPU backend
+checks and duplicate cross-engine coverage). The run had no flaky/retried cases.
+The final missed-commit recovery regression was additionally checked natively
+and with browser-target Clippy; relay and production builds include that change.
+
+`CI=1 make check-turn` passed with 83 cases and 16 intentional skips using
+only disposable local coturn. Skips cover fixture-only production exclusions,
+unsupported WebGPU backends and duplicate cross-engine coverage. No flaky/retried
+cases remained. The subsequent `make build` passed. Export-section inspection of
+both active Wasm binaries and their JavaScript bindings found no `fixture_*`
+exports; both releases include generated protocol v5 constants:
+
+- Color Match: `328ef6f9686f8cd4d306`
+- CATAN: `ffa57bc8c9c3a577a50c`
+
+Final full commands used the existing host-specific verification environment:
+
+```sh
+export CI=1
+export WEBKIT_EXECUTABLE=/tmp/board-games-browser-deps/webkit
+export LD_LIBRARY_PATH=/tmp/board-games-browser-deps/root/usr/lib/x86_64-linux-gnu
+export TURN_SERVER_BINARY=/tmp/board-games-browser-deps/root/usr/bin/turnserver
+make check
+make check-turn
+make build
+```
+
+The formatting-only pass is separately reviewable in the local artifact
+`/tmp/board-games-cleanup/formatting-only.patch`; its pre-format source archive is
+beside it. Existing uncommitted work was retained. Remote CI and deployment were
+not run; `render.yaml` only renames the undeployed service configuration.
+
+
+Observed locally on Ubuntu 24.04.4 LTS, 2026-09-05–07. These are tested versions,
 not a frozen toolchain requirement.
 
 | Tool | Version |
@@ -15,6 +79,175 @@ not a frozen toolchain requirement.
 | WebKit | 26.6, Playwright build 2359 |
 | coturn | 4.6.1 |
 | Docker | 29.7.2 |
+
+## CATAN illustrated table v2 (2026-09-07)
+
+The v2 presentation keeps the Rust rules, protocol v4, recipient views and WASI
+replays unchanged. Original artwork, shared Rust layout, sRGB/mipmapped wgpu
+materials, retained geometry and semantic DOM controls replace the scrolling
+presentation. The rendering decision and artwork provenance were updated together.
+
+- `make check-rust` passed workspace formatting, Clippy, native tests and browser/
+  WASI target checks. Follow-up checks cover the final CATAN layout/renderer edits.
+- `make check-replay` passed every Color Match and CATAN native/WASI/golden
+  comparison, including rejected inputs. The eight CATAN fixtures are unchanged.
+- Eight JavaScript transport regressions passed. The existing Color Match and
+  shared-room browser suite passed **103 cases, with two intentional skips**,
+  across Chromium, Firefox and WebKit with retries disabled.
+- New CATAN checks exercise viewport fitting at 1920×1080, 1366×768, 768×1024,
+  1024×768 and 390×844; all player counts; original avatars; direct dice activation;
+  touch/keyboard piece previews and confirmation; player trades and seat notices;
+  development choices; discards and robber decisions; fullscreen denial/entry/
+  Escape; reduced motion, independent sound and idle frame suspension; graphics
+  restoration; host transfer with open panels/effects; and rematches.
+- Screenshot review caught an opaque WebGPU background; the WebGPU path now
+  explicitly requests premultiplied alpha (supported by wgpu 26's implementation
+  despite its incomplete capability list). WebKit exposed a fullscreen top-layer
+  ordering issue; an already-open dialog is re-promoted after entry. The touch
+  test exits desktop fullscreen before restoring the specified phone viewport.
+- An intermediate concurrent run had a Playwright artifact-stream teardown error
+  in the Chromium six-seat capture, after the page assertions. This is distinct
+  from a game/renderer assertion; the acceptance rerun uses an isolated output.
+
+- The final direct CATAN sweep passed 47 cases with two intentional backend
+  skips; Firefox/WebKit initially failed a test assumption about Escape ordering.
+  Firefox's focused correction passed, and both corrected Escape cases then
+  passed in the full production relay run. Across those runs, all 49 applicable
+  CATAN cases are verified. The catalog's 15 cross-browser cases also passed.
+- The production local TURN suite passed **83 cases, with 16 intentional skips**,
+  across all three engines, with retries disabled. Skips exclude four privileged
+  fixture scenarios per engine and duplicate cross-engine/backend invocations.
+  This includes room reconnect/handoff, active panels/effects, all table sizes,
+  graphics recovery, fullscreen and actual relay-candidate assertions.
+- Final visual review found external SVG icons disappearing at fractional intrinsic
+  dimensions. Harbor icons now use full-size SVG images with a shared-coordinate
+  transform. Follow-up production composition/WebGPU/asset-retry checks passed
+  **7 cases with two intentional backend skips**, across all three engines.
+  Two additional Chromium checks refreshed final five/six-seat captures.
+- All 31 artwork SVGs regenerate byte-for-byte; the twelve terrain variations are
+  distinct. The final production release excludes fixture exports. Docker's build
+  context includes the artwork sources; no Docker image or public deployment was
+  built in this presentation pass.
+
+### Release and local software-renderer measurements
+
+Measured on the local Intel i7-11700K host, Ubuntu 24.04.4, Chromium 153, at
+1280×720 with WebGL2 through ANGLE / SwiftShader Vulkan (software rendering),
+4× MSAA. Sixty explicit frame submissions in a three-context production relay
+room measured 0.3 ms median and 0.6 ms p95 CPU submission time. Associated browser
+RAF intervals were 33.4 ms median and 50 ms p95. These intervals include browser
+scheduling/throttling and software rendering; neither metric measures physical
+GPU completion or guarantees display frame rate. An idle scene requests no frames.
+
+| Final runtime including artwork | Raw bytes | gzip bytes, offline estimate |
+| --- | ---: | ---: |
+| Color Match | 1,002,475 | 211,047 |
+| CATAN | 7,441,342 | 1,375,046 |
+
+CATAN Wasm is 6,233,195 bytes. The CATAN runtime total includes all 31
+packaged SVGs; the catalog requests none of them. Compression estimates sum gzip
+per file and do not assert deployment compression. Measurements and reviewed
+screenshots were collected locally under `test-results/catan-v2-review/` (ignored
+artifacts); browser tests regenerate captures into their selected output directory.
+
+Reproduce the focused browser acceptance with:
+
+```sh
+python3 scripts/build_web.py --fixtures
+cargo build -p table-server -p catan-replay -p color-match-replay --locked
+CI=true ALSOFT_DRIVERS=null pnpm exec playwright test tests/browser/catan.spec.js \
+  tests/browser/catalog.spec.js --retries=0 --output=/tmp/catan-v2-review
+```
+
+Use this host's WebKit wrapper/environment listed below when needed. Screenshots
+and CPU submission JSON are emitted into the chosen Playwright output directory.
+They are local verification artifacts, not runtime assets. Physical phones,
+physical GPU memory/completion timings, subjective sound review and user visual
+acceptance remain unavailable; software-adapter captures do not establish them.
+
+## CATAN implementation (2026-09-07)
+
+- Sixteen Rust rule tests exercise all counts/setups, published starting resources,
+  construction, conservation, shortages, seven/discards, robber/theft privacy,
+  development effects/timing, route branches/loops/cuts/ties, atomic trading,
+  paired opportunities, checkpoint rejection and victory-point revelation.
+- Session tests replay complete base and extension games through authority,
+  restoring checkpoints and changing host/epoch after every action. Setup binding,
+  duplicate requests, recipient snapshots and the no-bot disconnect policy are checked.
+- Eight full games finish in 305–971 actions, covering all 3–6-player/setup pairs.
+  Native, WASI and golden outputs match exactly, including canonical checkpoints.
+- CATAN browser checks: 16 passed, two intentionally skipped (the explicit
+  Chromium software-WebGPU test does not run in Firefox/WebKit). Coverage includes
+  beginner play, variable keyboard placement, paired turns, deliberate handoff,
+  victory/rematch, mobile controls and context recovery. WebGL2 runs in all engines.
+- `make check-rust` passed workspace tests, formatting and Clippy, including both
+  browser targets and both WASI replay targets. `make check-replay` passed both
+  games' fixtures. Eight shared JavaScript transport tests passed.
+- Color Match/catalog regression suite: 118 passed, two intentionally skipped,
+  across Chromium, Firefox and WebKit, with retries disabled and CI readiness waits.
+- Forced local TURN suite: 59 passed, seven intentionally skipped, across all
+  three engines with retries disabled. Skips cover the scoring fixture and
+  engine-specific tests.
+- A final production build excludes scoring/seed fixture exports. Its WebGPU
+  and mobile graphics-recovery tests also passed after adding device-loss notification.
+- Graphics use original procedural meshes/materials, with no downloaded image set.
+  No real-phone GPU memory or animation frame-time measurements were possible in
+  this environment. Software GPU success is not a hardware performance result.
+
+### Local release measurements
+
+Production release measured on September 7 using an Intel i7-11700K, Ubuntu,
+Chromium 153 and ANGLE SwiftShader (software Vulkan), at 1280×720. The local
+server used uncompressed assets. A fresh browser context reached the initialized
+CATAN page in 157 ms on loopback. Sixty explicit base-board animation submissions
+had median 0.5 ms and p95 1.1 ms CPU submission time. These exclude asynchronous
+GPU completion and are **not** end-to-end frame-time or physical GPU benchmarks.
+
+| Runtime files (Wasm, JS, CSS) | Raw bytes | gzip bytes, offline estimate |
+| --- | ---: | ---: |
+| Color Match | 1,002,475 | 211,047 |
+| CATAN | 6,310,912 | 1,266,605 |
+
+CATAN Wasm alone is 6,162,989 bytes. Catalog visits request neither Wasm artifact.
+Compression estimates sum gzip output for each file; they do not assert that a
+particular deployment negotiates compression. Physical-phone startup, GPU memory
+and frame-time measurements remain outstanding.
+
+## Catalog and protocol v4 foundation (2026-09-06)
+
+This historical pass validated the catalog and Color Match migration only.
+CATAN was implemented in the subsequent September 7 pass below.
+
+- `make check-rust` passed formatting, native/target Clippy and the Rust suite.
+  The added game-binding test initially exposed a missing resume check; that was
+  fixed before the successful run. Follow-up Color Match adapter tests and Clippy
+  passed, including checkpoint restoration with nonconsecutive IDs above seven.
+- `make check-replay` passed all four native/WASI/golden comparisons and invalid
+  input cases after the shared identity extraction. Fixtures are unchanged.
+- Eight deterministic transport tests passed after extracting presentation.
+- The direct browser suite ran 117 cases: 114 passed, two intentionally skipped,
+  and WebKit's eight-human test exceeded the existing local five-second readiness
+  wait. The targeted test passed with `CI=true`, retries disabled and the existing
+  20-second CI readiness allowance. No product deadlines or tests were relaxed.
+- The default WebKit launcher initially failed before test execution; use the
+  existing local `WEBKIT_EXECUTABLE`/`LD_LIBRARY_PATH` setup documented below.
+- Production forced-TURN coverage completed across all three engines: 45 passed,
+  two intentionally skipped and one Chromium eight-seat case passed on retry.
+  That retry was caused by two concurrent test processes writing the same
+  Playwright artifact directory (`ENOENT` during context closure), not a room
+  assertion. A separate direct run was also affected by that collision. Always
+  use distinct `--output` directories when running independent suites concurrently.
+  The affected Chromium forced-TURN case subsequently passed in isolation with
+  retries disabled (`--output=/tmp/catan-turn-eight`).
+- Catalog request capture verifies no game runtime on `/` or the CATAN status
+  page; Color Match loads its runtime from exactly one content-hashed release.
+  Checks cover immutable asset/revalidated entry headers, legacy invite fragments
+  and relay queries, inert failed loading and successful retry, and active-host
+  transfer before catalog navigation. These passed in all three browser engines;
+  departure also passed through forced TURN.
+
+The workspace retains a production package. Docker packaging was updated for
+Python and the source entry template; a Docker image was not built in this pass.
 
 ## Browser CI and reconnection reliability (2026-09-06)
 
@@ -307,10 +540,10 @@ fixture drains the starting stock before deterministic play. Generate new
 reviewable inputs with:
 
 ```sh
-cargo run -q -p color-match --example fixture --locked -- 7
-cargo run -q -p color-match --example fixture --locked -- 19
-cargo run -q -p color-match --example fixture --locked -- 7 normal 8
-cargo run -q -p color-match --example fixture --locked -- 7 drain
+cargo run -q -p color-match --example color-match-fixture --locked -- 7
+cargo run -q -p color-match --example color-match-fixture --locked -- 19
+cargo run -q -p color-match --example color-match-fixture --locked -- 7 normal 8
+cargo run -q -p color-match --example color-match-fixture --locked -- 7 drain
 ```
 
 Golden updates are explicit compatibility changes. Seeds and all-player outputs
@@ -323,3 +556,48 @@ No Cloudflare TURN credentials or verified zero-spend billing controls were
 available. No service was provisioned, no paid resources were created, and the
 public HTTPS invite/separate-network/Cloudflare TURN checks remain **incomplete**.
 See [deployment](deployment.md) for the prepared configuration and remaining work.
+
+## Catalog foundation checks
+
+`python3 scripts/test_build_web.py` checks missing inputs, duplicate release filenames,
+registration mismatches and optional table dependency agreement; `make check-browser`
+includes it. `python3 scripts/build_web.py --validate` validates maintained declarations
+and catalog/table agreement without compiling Wasm. `cargo test -p game-catalog --locked`
+checks catalog/table modes and player bounds in both directions.
+Browser catalog tests cover mode labels, metadata previews, legacy invites, independent
+assets, loading failures/retry and a solo startup fixture with no room DOM or transport.
+The fixture exists only in test interception. `make build` omits Wasm fixture exports;
+`make check-browser` explicitly builds with them for game scenario tests.
+
+Fixture browser builds publish to `target/browser-test-site/`, which Playwright serves
+using the server's `WEB_ROOT` override. Production builds and `make dev` continue
+to use `web/`; concurrent development cannot replace test fixture pages. TURN checks
+set `TEST_WEB_ROOT=web` to exercise the production release.
+Normal browser and relay runs also use separate artifact directories under
+`test-results/browser/` and `test-results/relay/`, so one suite cannot remove the
+other suite's screenshots and traces.
+
+### Foundation verification, 2026-09-07
+
+- Formatting, Clippy (native, browser and WASI targets), 63 Rust tests, ten
+  transport tests and six build-validation tests passed. Native/WASI outputs
+  matched every existing Color Match and CATAN golden replay.
+- The 204-case browser run reported 198 passes, four intentional skips, one
+  stale-template-runtime failure and one artifact-cleanup retry. The template
+  reference was corrected and its Chromium room test passed without retries.
+  Separate browser/relay artifact directories fix the cleanup collision; the
+  Firefox layout case then passed three repetitions without retries. All 200
+  non-skipped scenarios passed in the broad run or these focused rechecks.
+- Production TURN coverage reported 82 passes, 16 intentional skips and one
+  readiness-timeout retry. That Chromium handoff/rejoin case subsequently passed
+  three forced-relay repetitions without retries. No session timing or authority
+  behavior was changed to accommodate the test.
+- `make build` passed. Export-section inspection of the active Wasm modules and
+  JavaScript bindings found no fixture exports. Both releases contain protocol v5:
+  Color Match `22b0045921420812e5a4`, CATAN `695cd23e9a4f844b2b68`.
+
+Verification used the existing WebKit/coturn wrapper and library paths documented
+above, with `CI=1`. Relay checks used `TEST_PORT=8082` while the normal browser
+server used 8081. An initial development-build collision motivated isolating
+fixture releases as well as test artifacts. Existing source work and historical
+release directories were preserved; deployment infrastructure was not changed.

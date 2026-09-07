@@ -5,3 +5,8 @@ web/pkg
 .git
 .env
 .env.*
+
+web/assets
+web/games/color-match/index.html
+
+web/games/catan/index.html

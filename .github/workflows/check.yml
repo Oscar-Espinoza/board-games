@@ -3,7 +3,22 @@ on: [push, pull_request]
 permissions:
   contents: read
 jobs:
-  rust-and-browsers:
+  rust-and-replay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown,wasm32-wasip2
+          components: rustfmt,clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: rust-replay
+      - uses: bytecodealliance/actions/wasmtime/setup@v1
+        with:
+          version: '48.0.1'
+      - run: make check-rust check-replay
+  browser-transport-turn:
     runs-on: ubuntu-latest
     env:
       ALSOFT_DRIVERS: 'null'
@@ -11,21 +26,26 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: wasm32-unknown-unknown,wasm32-wasip2
-          components: rustfmt,clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: browser-transport-turn
       - uses: actions/setup-node@v4
         with:
           node-version: 24
       - uses: pnpm/action-setup@v4
         with:
           version: 10.12.4
-      - uses: bytecodealliance/actions/wasmtime/setup@v1
+      - uses: actions/cache@v4
+        id: wasm-pack
         with:
-          version: '48.0.1'
-      - run: cargo install wasm-pack --version 0.15.0 --locked
+          path: ~/.cargo/bin/wasm-pack
+          key: wasm-pack-${{ runner.os }}-${{ runner.arch }}-0.15.0
+      - if: steps.wasm-pack.outputs.cache-hit != 'true'
+        run: cargo install wasm-pack --version 0.15.0 --locked
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium firefox webkit
-      - run: make check
+      - run: make check-format check-browser
       - run: sudo apt-get update && sudo apt-get install -y coturn
       - run: make check-turn
       - uses: actions/upload-artifact@v4

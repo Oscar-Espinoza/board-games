@@ -9,7 +9,6 @@ use axum::{
     response::{IntoResponse, Response},
     routing::get,
 };
-use color_match::PlayerId;
 use rand::RngCore;
 use std::{
     collections::HashMap,
@@ -17,11 +16,23 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use table_protocol::{GameId, PlayerId};
 use table_protocol::{
     Hello, MAX_MESSAGE, Member, PROTOCOL_VERSION, RoomView, SignalCommand, SignalEvent,
 };
 use tokio::sync::{Mutex, Semaphore, mpsc};
 use tower_http::{services::ServeDir, set_header::SetResponseHeaderLayer};
+// Server operational budgets are independent of the shared wire-message budget.
+const MAX_ROOMS: usize = 256;
+const MAX_SOCKETS: usize = 512;
+const MAX_TRACKED_IPS: usize = 4096;
+const UPGRADES_PER_MINUTE: u32 = 128;
+const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
+const HANDOFF_TIMEOUT: Duration = Duration::from_secs(15);
+const SIGNAL_QUEUE_CAPACITY: usize = 64;
+const SOCKET_IDLE_TIMEOUT: Duration = Duration::from_secs(35);
+const MESSAGES_PER_SECOND: u32 = 40;
+const ICE_REQUEST_INTERVAL: Duration = Duration::from_secs(60);
 const ROOM_LIFETIME: Duration = Duration::from_secs(4 * 3600);
 #[derive(Clone)]
 struct App {
@@ -43,6 +54,9 @@ struct Handoff {
     ready: bool,
 }
 struct Room {
+    options: table_protocol::RoomOptions,
+    game_id: GameId,
+    rules_version: u32,
     next_transfer: u64,
     capacity: u8,
     host_id: PlayerId,
@@ -59,8 +73,65 @@ struct Room {
     host_lost: Option<Instant>,
 }
 impl Room {
+    fn expire_handoff(&mut self) {
+        if self
+            .handoff
+            .as_ref()
+            .is_some_and(|h| h.started.elapsed() >= HANDOFF_TIMEOUT)
+        {
+            self.handoff = None;
+            self.broadcast(SignalEvent::HandoffCancel {
+                message: "Transfer timed out. You are still in the room; retry Leave room.".into(),
+            });
+        }
+    }
+    fn cancel_handoff(&mut self, message: &str) {
+        if self.handoff.take().is_some() {
+            self.broadcast(SignalEvent::HandoffCancel {
+                message: message.into(),
+            });
+        }
+    }
+    fn depart(&mut self, player: PlayerId) {
+        self.cancel_handoff(
+            "A player left during transfer. You are still in the room; retry Leave room.",
+        );
+        if let Some(s) = self.seats.iter_mut().find(|s| s.member.id == player) {
+            if let Some(tx) = s.socket.take() {
+                let _ = tx.try_send(SignalEvent::Left);
+            }
+            s.member.connected = false;
+            s.generation += 1;
+        }
+        self.ready.remove(&player);
+        if player == self.host_id {
+            if let Some(next) = self
+                .seats
+                .iter()
+                .find(|s| s.member.id != player && !s.member.bot && s.member.connected)
+            {
+                self.ready.clear();
+                self.host_id = next.member.id;
+                self.epoch += 1;
+            } else {
+                self.closed = true;
+                self.broadcast(SignalEvent::Ended {
+                    message: "Room closed: no human successor.".into(),
+                });
+            }
+        }
+        if !self.locked {
+            self.seats.retain(|s| s.member.id != player);
+        }
+        self.broadcast(SignalEvent::Departed { player });
+        self.publish();
+    }
+
     fn view(&self) -> RoomView {
         RoomView {
+            options: self.options,
+            game_id: self.game_id,
+            rules_version: self.rules_version,
             capacity: self.capacity,
             host_id: self.host_id,
             epoch: self.epoch,
@@ -85,7 +156,7 @@ impl Room {
             || self.created.elapsed() >= ROOM_LIFETIME
             || self
                 .host_lost
-                .is_some_and(|t| t.elapsed() >= Duration::from_secs(120))
+                .is_some_and(|t| t.elapsed() >= Duration::from_millis(table_protocol::HOST_WAIT_MS))
     }
 }
 fn secret() -> String {
@@ -128,13 +199,18 @@ fn admit(
     let (invite, id) = match hello {
         Hello::Create {
             version,
+            game_id,
+            rules_version,
             name,
             avatar,
         } => {
-            if version != PROTOCOL_VERSION {
-                return Err("Unsupported protocol.".into());
+            if version != PROTOCOL_VERSION || rules_version != game_id.entry().rules_version {
+                return Err("Unsupported protocol. Reload this page.".into());
             }
-            if rooms.len() >= 256 {
+            if !game_id.entry().playable {
+                return Err("This game is not available yet.".into());
+            }
+            if rooms.len() >= MAX_ROOMS {
                 return Err("Room capacity reached. Try later.".into());
             }
             let (name, avatar) = identity(name, avatar)?;
@@ -142,8 +218,11 @@ fn admit(
             rooms.insert(
                 invite.clone(),
                 Room {
+                    options: game_id.default_options(),
+                    game_id,
+                    rules_version,
                     next_transfer: 0,
-                    capacity: 8,
+                    capacity: game_id.entry().default_capacity,
                     host_id: PlayerId(0),
                     epoch: 0,
                     ready: Default::default(),
@@ -162,15 +241,20 @@ fn admit(
         }
         Hello::Join {
             version,
+            game_id,
+            rules_version,
             invite,
             name,
             avatar,
         } => {
-            if version != PROTOCOL_VERSION {
-                return Err("Unsupported protocol.".into());
+            if version != PROTOCOL_VERSION || rules_version != game_id.entry().rules_version {
+                return Err("Unsupported protocol. Reload this page.".into());
             }
             let (name, avatar) = identity(name, avatar)?;
             let room = rooms.get_mut(&invite).ok_or("Room not found or expired.")?;
+            if room.game_id != game_id || room.rules_version != rules_version {
+                return Err("This invite belongs to another game or rules version.".into());
+            }
             if room.expired() || room.locked || room.seats.len() >= usize::from(room.capacity) {
                 return Err("Room is full, expired or already playing.".into());
             }
@@ -182,13 +266,18 @@ fn admit(
         }
         Hello::Resume {
             version,
+            game_id,
+            rules_version,
             invite,
             credential,
         } => {
-            if version != PROTOCOL_VERSION {
-                return Err("Unsupported protocol.".into());
+            if version != PROTOCOL_VERSION || rules_version != game_id.entry().rules_version {
+                return Err("Unsupported protocol. Reload this page.".into());
             }
             let room = rooms.get(&invite).ok_or("Room not found or expired.")?;
+            if room.game_id != game_id || room.rules_version != rules_version {
+                return Err("This invite belongs to another game or rules version.".into());
+            }
             if room.expired() {
                 return Err("Room expired.".into());
             }
@@ -441,6 +530,14 @@ fn command(room: &mut Room, sender: PlayerId, cmd: SignalCommand) -> Result<(), 
                 .map_err(|_| "Peer is busy or disconnected.")?;
             }
         }
+        SignalCommand::UpdateOptions { options } => {
+            if sender != room.host_id || room.locked {
+                return Err("Only the host can choose options before play.".into());
+            }
+            options.validate(room.game_id)?;
+            room.options = options;
+            room.publish();
+        }
         SignalCommand::Capacity { .. }
         | SignalCommand::AddBot
         | SignalCommand::RemoveBot { .. }
@@ -454,17 +551,23 @@ fn command(room: &mut Room, sender: PlayerId, cmd: SignalCommand) -> Result<(), 
             match cmd {
                 SignalCommand::Capacity { capacity } => {
                     if room.locked
-                        || !(2..=8).contains(&capacity)
+                        || !(room.game_id.entry().min_players..=room.game_id.entry().max_players)
+                            .contains(&capacity)
                         || usize::from(capacity) < room.seats.len()
                     {
-                        return Err(
-                            "Choose 2–8 seats, at least the occupied seats, before play.".into(),
-                        );
+                        return Err(format!(
+                            "Choose {}–{} seats, at least the occupied seats, before play.",
+                            room.game_id.entry().min_players,
+                            room.game_id.entry().max_players
+                        ));
                     }
                     room.capacity = capacity;
                 }
                 SignalCommand::AddBot => {
-                    if room.locked || room.seats.len() >= usize::from(room.capacity) {
+                    if !room.game_id.entry().bots
+                        || room.locked
+                        || room.seats.len() >= usize::from(room.capacity)
+                    {
                         return Err("Room is locked or full.".into());
                     }
                     let id = (0..8)
@@ -473,7 +576,7 @@ fn command(room: &mut Room, sender: PlayerId, cmd: SignalCommand) -> Result<(), 
                     room.seats.push(seat(id, format!("Bot {id}"), id, true));
                 }
                 SignalCommand::RemoveBot { player } => {
-                    if room.locked {
+                    if room.locked || !room.game_id.entry().bots {
                         return Err("Room is locked.".into());
                     }
                     let index = room
@@ -490,7 +593,7 @@ fn command(room: &mut Room, sender: PlayerId, cmd: SignalCommand) -> Result<(), 
                             .iter()
                             .filter(|s| !s.member.bot && s.member.connected)
                             .count()
-                            < 2
+                            < usize::from(room.game_id.entry().min_players)
                         || room.seats.iter().any(|s| {
                             !s.member.bot
                                 && (!s.member.connected
@@ -498,7 +601,10 @@ fn command(room: &mut Room, sender: PlayerId, cmd: SignalCommand) -> Result<(), 
                                         && !room.ready.contains(&s.member.id)))
                         })
                     {
-                        return Err("Need at least two connected humans with ready game connections and no active round.".into());
+                        return Err(format!(
+                            "Need at least {} connected humans with ready game connections and no active round.",
+                            room.game_id.entry().min_players
+                        ));
                     }
                     room.active = true;
                     room.locked = true;
@@ -518,7 +624,22 @@ async fn ice(app: &App) -> Result<serde_json::Value, String> {
         let key = std::env::var("CLOUDFLARE_TURN_KEY_ID").map_err(|_| "TURN key is missing.")?;
         let token =
             std::env::var("CLOUDFLARE_TURN_API_TOKEN").map_err(|_| "TURN token is missing.")?;
-        let value:serde_json::Value=app.http.post(format!("https://rtc.live.cloudflare.com/v1/turn/keys/{key}/credentials/generate-ice-servers")).bearer_auth(token).json(&serde_json::json!({"ttl":600})).send().await.map_err(|_|"TURN provider unavailable.")?.error_for_status().map_err(|_|"TURN provider rejected credentials.")?.json().await.map_err(|_|"Invalid TURN provider response.")?;
+        let endpoint = format!(
+            "https://rtc.live.cloudflare.com/v1/turn/keys/{key}/credentials/generate-ice-servers"
+        );
+        let value: serde_json::Value = app
+            .http
+            .post(endpoint)
+            .bearer_auth(token)
+            .json(&serde_json::json!({"ttl":600}))
+            .send()
+            .await
+            .map_err(|_| "TURN provider unavailable.")?
+            .error_for_status()
+            .map_err(|_| "TURN provider rejected credentials.")?
+            .json()
+            .await
+            .map_err(|_| "Invalid TURN provider response.")?;
         return value
             .get("iceServers")
             .cloned()
@@ -556,12 +677,12 @@ async fn upgrade(
     }
     let mut rates = app.rates.lock().await;
     rates.retain(|_, (t, _)| t.elapsed() < Duration::from_secs(60));
-    if rates.len() > 4096 {
+    if rates.len() > MAX_TRACKED_IPS {
         return StatusCode::TOO_MANY_REQUESTS.into_response();
     }
     let entry = rates.entry(addr.ip()).or_insert((Instant::now(), 0));
     entry.1 += 1;
-    if entry.1 > 128 {
+    if entry.1 > UPGRADES_PER_MINUTE {
         return StatusCode::TOO_MANY_REQUESTS.into_response();
     }
     drop(rates);
@@ -583,7 +704,7 @@ async fn send(socket: &mut WebSocket, event: &SignalEvent) -> bool {
 }
 async fn session(mut socket: WebSocket, app: App) {
     let Ok(Some(Ok(Message::Text(text)))) =
-        tokio::time::timeout(Duration::from_secs(10), socket.recv()).await
+        tokio::time::timeout(HANDSHAKE_TIMEOUT, socket.recv()).await
     else {
         return;
     };
@@ -597,7 +718,7 @@ async fn session(mut socket: WebSocket, app: App) {
         .await;
         return;
     };
-    let (tx, mut rx) = mpsc::channel(64);
+    let (tx, mut rx) = mpsc::channel(SIGNAL_QUEUE_CAPACITY);
     let admission = admit(&mut *app.rooms.lock().await, hello, tx.clone());
     let (invite, id, generation, welcome) = match admission {
         Ok(a) => a,
@@ -616,25 +737,57 @@ async fn session(mut socket: WebSocket, app: App) {
     let mut last_ice = None::<Instant>;
     loop {
         tokio::select! {
-            event=rx.recv()=>{let Some(event)=event else {break;};let end=matches!(event,SignalEvent::Ended { .. });if !send(&mut socket,&event).await||end {break;}}
-            _=heartbeat.tick()=>{
-                let mut rooms=app.rooms.lock().await;let Some(room)=rooms.get_mut(&invite) else {break;};
-                room.expire_handoff();
-                if room.expired() {drop(rooms);send(&mut socket,&SignalEvent::Ended {message:"Room expired or host did not return within 120 seconds.".into()}).await;break;}
-                if last_message.elapsed()>Duration::from_secs(35) {break;}
+            event = rx.recv() => {
+                let Some(event) = event else { break; };
+                let ended = matches!(event, SignalEvent::Ended { .. });
+                if !send(&mut socket, &event).await || ended { break; }
             }
-            message=socket.recv()=>{
-                let Some(Ok(Message::Text(text)))=message else {break;};last_message=Instant::now();
-                if rate.0.elapsed()>=Duration::from_secs(1) {rate=(Instant::now(),0);}rate.1+=1;if rate.1>40 {break;}
-                let cmd=match serde_json::from_str::<SignalCommand>(&text) {Ok(cmd)=>cmd,Err(_)=>{let _=tx.try_send(SignalEvent::Error {message:"Invalid signaling message.".into()});continue;}};
-                let mut rooms=app.rooms.lock().await;let Some(room)=rooms.get_mut(&invite) else {break;};
-                if room.expired()||!room.seats.iter().any(|s|s.member.id==id&&s.generation==generation) {break;}
-                if matches!(cmd,SignalCommand::Ice) {
-                    drop(rooms);if last_ice.is_some_and(|t|t.elapsed()<Duration::from_secs(60)) {continue;}last_ice=Some(Instant::now());
-                    let result=ice(&app).await;let _=tx.try_send(match result {Ok(ice_servers)=>SignalEvent::Ice {ice_servers},Err(message)=>SignalEvent::Error {message}});continue;
+            _ = heartbeat.tick() => {
+                let mut rooms = app.rooms.lock().await;
+                let Some(room) = rooms.get_mut(&invite) else { break; };
+                room.expire_handoff();
+                if room.expired() {
+                    drop(rooms);
+                    send(&mut socket, &SignalEvent::Ended {
+                        message: format!("Room expired or host did not return within {} seconds.", table_protocol::HOST_WAIT_MS / 1000),
+                    }).await;
+                    break;
                 }
-                if matches!(cmd,SignalCommand::Ping) {let _=tx.try_send(SignalEvent::Pong);continue;}
-                if let Err(message)=command(room,id,cmd) {let _=tx.try_send(SignalEvent::Error {message});}
+                if last_message.elapsed() > SOCKET_IDLE_TIMEOUT { break; }
+            }
+            message = socket.recv() => {
+                let Some(Ok(Message::Text(text))) = message else { break; };
+                last_message = Instant::now();
+                if rate.0.elapsed() >= Duration::from_secs(1) { rate = (Instant::now(), 0); }
+                rate.1 += 1;
+                if rate.1 > MESSAGES_PER_SECOND { break; }
+                let cmd = match serde_json::from_str::<SignalCommand>(&text) {
+                    Ok(cmd) => cmd,
+                    Err(_) => {
+                        let _ = tx.try_send(SignalEvent::Error { message: "Invalid signaling message.".into() });
+                        continue;
+                    }
+                };
+                let mut rooms = app.rooms.lock().await;
+                let Some(room) = rooms.get_mut(&invite) else { break; };
+                if room.expired() || !room.seats.iter().any(|s| s.member.id == id && s.generation == generation) { break; }
+                if matches!(cmd, SignalCommand::Ice) {
+                    // Provider requests must not hold the room mutex across network I/O.
+                    drop(rooms);
+                    if last_ice.is_some_and(|t| t.elapsed() < ICE_REQUEST_INTERVAL) { continue; }
+                    last_ice = Some(Instant::now());
+                    let event = match ice(&app).await {
+                        Ok(ice_servers) => SignalEvent::Ice { ice_servers },
+                        Err(message) => SignalEvent::Error { message },
+                    };
+                    let _ = tx.try_send(event);
+                    continue;
+                }
+                if matches!(cmd, SignalCommand::Ping) {
+                    let _ = tx.try_send(SignalEvent::Pong);
+                    continue;
+                }
+                if let Err(message) = command(room, id, cmd) { let _ = tx.try_send(SignalEvent::Error { message }); }
             }
         }
     }
@@ -659,7 +812,7 @@ async fn session(mut socket: WebSocket, app: App) {
 async fn main() {
     let app = App {
         rooms: Arc::default(),
-        connections: Arc::new(Semaphore::new(512)),
+        connections: Arc::new(Semaphore::new(MAX_SOCKETS)),
         rates: Arc::default(),
         http: reqwest::Client::builder()
             .timeout(Duration::from_secs(10))
@@ -683,10 +836,30 @@ async fn main() {
             });
         }
     });
+    // Tests serve isolated fixture releases; deployments retain the existing web root.
+    let web_root =
+        std::path::PathBuf::from(std::env::var("WEB_ROOT").unwrap_or_else(|_| "web".into()));
     let router = Router::new()
+        .route(
+            "/catalog.json",
+            get(|| async { axum::Json(game_catalog::CATALOG) }),
+        )
         .route("/healthz", get(|| async { "ok" }))
         .route("/signal", get(upgrade))
-        .fallback_service(ServeDir::new("web"))
+        .nest_service(
+            "/assets",
+            tower::ServiceBuilder::new()
+                .layer(SetResponseHeaderLayer::overriding(
+                    axum::http::header::CACHE_CONTROL,
+                    HeaderValue::from_static("public, max-age=31536000, immutable"),
+                ))
+                .service(ServeDir::new(web_root.join("assets"))),
+        )
+        .fallback_service(ServeDir::new(web_root))
+        .layer(SetResponseHeaderLayer::if_not_present(
+            axum::http::header::CACHE_CONTROL,
+            HeaderValue::from_static("no-cache"),
+        ))
         .layer(SetResponseHeaderLayer::overriding(
             axum::http::header::REFERRER_POLICY,
             HeaderValue::from_static("no-referrer"),
@@ -701,7 +874,7 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(format!("{bind}:{port}"))
         .await
         .unwrap();
-    println!("Color Match listening on {bind}:{port}");
+    println!("Game Table listening on {bind}:{port}");
     axum::serve(
         listener,
         router.into_make_service_with_connect_info::<SocketAddr>(),
@@ -711,59 +884,3 @@ async fn main() {
 }
 #[cfg(test)]
 mod tests;
-
-impl Room {
-    fn expire_handoff(&mut self) {
-        if self
-            .handoff
-            .as_ref()
-            .is_some_and(|h| h.started.elapsed() >= Duration::from_secs(15))
-        {
-            self.handoff = None;
-            self.broadcast(SignalEvent::HandoffCancel {
-                message: "Transfer timed out. You are still in the room; retry Leave room.".into(),
-            });
-        }
-    }
-    fn cancel_handoff(&mut self, message: &str) {
-        if self.handoff.take().is_some() {
-            self.broadcast(SignalEvent::HandoffCancel {
-                message: message.into(),
-            });
-        }
-    }
-    fn depart(&mut self, player: PlayerId) {
-        self.cancel_handoff(
-            "A player left during transfer. You are still in the room; retry Leave room.",
-        );
-        if let Some(s) = self.seats.iter_mut().find(|s| s.member.id == player) {
-            if let Some(tx) = s.socket.take() {
-                let _ = tx.try_send(SignalEvent::Left);
-            }
-            s.member.connected = false;
-            s.generation += 1;
-        }
-        self.ready.remove(&player);
-        if player == self.host_id {
-            if let Some(next) = self
-                .seats
-                .iter()
-                .find(|s| s.member.id != player && !s.member.bot && s.member.connected)
-            {
-                self.ready.clear();
-                self.host_id = next.member.id;
-                self.epoch += 1;
-            } else {
-                self.closed = true;
-                self.broadcast(SignalEvent::Ended {
-                    message: "Room closed: no human successor.".into(),
-                });
-            }
-        }
-        if !self.locked {
-            self.seats.retain(|s| s.member.id != player);
-        }
-        self.broadcast(SignalEvent::Departed { player });
-        self.publish();
-    }
-}

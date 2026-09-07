@@ -38,13 +38,13 @@ with tempfile.TemporaryDirectory(prefix='color-match-turn-') as directory:
                     time.sleep(0.1)
             else:
                 sys.exit('Local TURN did not become ready.')
-            env = dict(os.environ, LOCAL_TURN_TEST='true', TEST_RELAY='1')
+            env = dict(os.environ, LOCAL_TURN_TEST='true', TEST_RELAY='1', TEST_WEB_ROOT='web')
             env['LOCAL_ICE_SERVERS'] = json.dumps([{
                 'urls': [f'turn:127.0.0.1:{port}?transport=udp'],
                 'username': username, 'credential': credential,
             }])
             result = subprocess.run([
-                'pnpm', 'test:e2e', 'tests/browser/rooms.spec.js', f"--workers={1 if os.environ.get('CI') else 2}",
+                'pnpm', 'test:e2e', 'tests/browser/rooms.spec.js', 'tests/browser/catan.spec.js', f"--workers={1 if os.environ.get('CI') else 2}",
                 *sys.argv[1:],
             ], cwd=root, env=env)
         finally:

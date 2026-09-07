@@ -2,6 +2,13 @@
   "name": "board-games-browser-tests",
   "private": true,
   "packageManager": "pnpm@10.12.4",
-  "scripts": { "test:e2e": "playwright test" },
-  "devDependencies": { "@playwright/test": "1.63.0" }
+  "scripts": {
+    "test:e2e": "playwright test",
+    "format": "prettier --write \"**/*.{js,cjs,mjs,css,html,json,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{js,cjs,mjs,css,html,json,yml,yaml}\""
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "prettier": "3.9.6"
+  }
 }

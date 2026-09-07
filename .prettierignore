@@ -1,0 +1,10 @@
+node_modules/
+target/
+web/assets/
+web/games/
+web/pkg/
+artwork/
+tests/fixtures/
+pnpm-lock.yaml
+test-results/
+playwright-report/
