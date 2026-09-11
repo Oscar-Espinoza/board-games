@@ -1,0 +1,16 @@
+{
+  "name": "@board-games/uno",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./server": "./src/index.ts",
+    "./Board.svelte": "./src/Board.svelte"
+  },
+  "dependencies": {
+    "@board-games/game-core": "workspace:*",
+    "@board-games/shared": "workspace:*"
+  },
+  "peerDependencies": {
+    "svelte": "^5.0.0"
+  }
+}

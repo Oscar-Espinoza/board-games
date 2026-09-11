@@ -1,53 +1,25 @@
-# Free deployment and connectivity
+# Local hosting through a tunnel
 
-`render.yaml` prepares one Docker web service with `plan: free`, `/healthz`, and
-no database, disk or paid add-on. `Dockerfile` builds the Rust server and browser
-Wasm, then runs as an unprivileged user. The server serves `web/` and `/signal`
-from one origin. Set `APP_ORIGIN` to the final HTTPS origin for explicit Origin
-validation. `BIND_ADDR=0.0.0.0` is set in the blueprint; Render supplies `PORT`.
+Use Bun 1.4.2 or newer. Run from the repository root:
 
-Public deployment is **incomplete**. The installed Render CLI returned
-`unauthorized` for its read-only identity check. No Cloudflare TURN key/token
-was configured, no billing settings could be verified, and no service was
-provisioned. The workspace has no Git metadata or remote to deploy from.
+```sh
+bun install --frozen-lockfile
+bun run build
+bun run start
+```
 
-Before creating a service, verify the account can remain at zero spend and
-record the actual provider controls. Render Free services sleep after inactivity,
-share 750 monthly instance hours per workspace and have bandwidth/build quotas.
-Free compute does not guarantee zero overage charges: Render documents paid
-supplementary bandwidth when applicable. Cloudflare currently includes 1,000 GB
-of TURN per month, with paid usage above that allowance. An allowance or alert
-is not a hard spending cap. If the accounts cannot enforce the user's zero-spend
-constraint, do not enable TURN or provision the public service.
+The Bun process serves the built SvelteKit SPA and Socket.IO at http://127.0.0.1:3000. Point an HTTPS tunnel at this one port and share a room URL on the tunnel origin. The tunnel must support ordinary HTTP and Socket.IO's WebSocket upgrade or polling requests. No TURN server, Redis, database, accounts or extra public frontend port is needed.
 
-For an approved zero-spend configuration, set these server-side environment
-variables through the provider's secret controls, never committed files:
+| Variable             | Default     | Use                                                                                          |
+| -------------------- | ----------- | -------------------------------------------------------------------------------------------- |
+| `HOST`               | `127.0.0.1` | Listener address; set `0.0.0.0` only when direct LAN access or the chosen tunnel requires it |
+| `PORT`               | `3000`      | Bun HTTP and Socket.IO port                                                                  |
+| `RECONNECT_GRACE_MS` | `120000`    | How long disconnected seats retain their reconnect secret                                    |
 
-- `CLOUDFLARE_TURN_KEY_ID`
-- `CLOUDFLARE_TURN_API_TOKEN`
-- `TURN_ZERO_SPEND_VERIFIED=true`, only after actual billing verification
-- `APP_ORIGIN=https://<the-service>.onrender.com`
+`bun run dev` starts Bun and Vite; open port 5173 during development. Its Vite proxy targets the Bun `PORT` (3000 by default). Set `WEB_PORT` to change the initial Vite port; Vite chooses the next available port if it is occupied. Ctrl+C terminates the frontend runner and backend watcher, with a 1.2-second forced-stop fallback for lingering development process groups. This supervisor is used only for development.
 
-The server calls Cloudflare's credential endpoint with a 600-second TTL only
-for authenticated room sessions. Browsers request refreshed ICE credentials every
-five minutes and renew their peer connections when credentials change. Without the attestation it returns Cloudflare
-STUN only; the UI explicitly says direct connections only. This supports local
-development but does not satisfy the public friend-invite acceptance criterion.
-There is no WebSocket gameplay fallback.
+The PC must remain running during play. All room state is in memory and disappears when Bun restarts. A disconnected player's seat is reserved for the configured grace period, then may be replaced. There is no automatic game persistence or cross-server synchronization.
 
-Use `?relay=1#room=<invite>` to force `iceTransportPolicy: relay` for diagnostics.
-The toolbar reports whether the selected local candidate is direct or relayed.
-A local relay test uses `LOCAL_TURN_TEST=true` and `LOCAL_ICE_SERVERS` containing
-standard ICE server JSON; keep these development variables off public services.
-`make check-turn` runs a disposable loopback relay. The test setup and observed
-results are in [validation](validation.md).
+Reconnect credentials live in browser localStorage for the room's origin. Changing the tunnel hostname or switching browser profiles does not carry those credentials across. The shareable URL contains the room ID, not a reconnect token. A display name alone cannot restore another player's seat.
 
-Final public acceptance requires a health check, an HTTPS invite opened from
-separate networks, direct and forced Cloudflare TURN play, Chromium/Firefox/WebKit
-interoperability, reconnects, and verification that no provider credentials or
-other hands appear in guest traffic. Local relay success cannot establish these
-provider or separate-network results.
-
-Sources checked 2026-09-05: [Render Free](https://render.com/docs/free),
-[Cloudflare TURN FAQ and pricing](https://developers.cloudflare.com/realtime/turn/faq/),
-[Cloudflare credential API](https://developers.cloudflare.com/realtime/turn/generate-credentials/).
+Turn-based snapshots favor correctness over latency tuning. A server in Argentina and friends in Europe need only a working connection; no regional deployment infrastructure is required. Zombies is independently hosted from `../zombies-game` using its own Rust server and commands.

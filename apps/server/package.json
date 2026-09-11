@@ -1,0 +1,16 @@
+{
+  "name": "@board-games/server",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@board-games/game-core": "workspace:*",
+    "@board-games/shared": "workspace:*",
+    "@board-games/uno": "workspace:*",
+    "@board-games/catan": "workspace:*",
+    "socket.io": "^4.8.1",
+    "sirv": "^3.0.2"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.1"
+  }
+}

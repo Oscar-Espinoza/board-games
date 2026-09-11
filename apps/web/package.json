@@ -1,0 +1,27 @@
+{
+  "name": "@board-games/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --bun vite --host 127.0.0.1",
+    "build": "bun --bun vite build",
+    "check": "bun --bun paraglide-js compile --project ../../packages/shared/project.inlang --outdir ../../packages/shared/src/paraglide --emit-ts-declarations && bun --bun svelte-kit sync && bun --bun svelte-check --tsconfig ./tsconfig.json"
+  },
+  "dependencies": {
+    "@board-games/game-core": "workspace:*",
+    "@board-games/shared": "workspace:*",
+    "@board-games/uno": "workspace:*",
+    "@board-games/catan": "workspace:*",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-static": "3.0.10",
+    "@sveltejs/kit": "2.70.3",
+    "@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "svelte": "5.57.0",
+    "svelte-check": "^4.3.0",
+    "vite": "8.3.0",
+    "@inlang/paraglide-js": "2.25.1",
+    "typescript": "^5.9.0"
+  }
+}

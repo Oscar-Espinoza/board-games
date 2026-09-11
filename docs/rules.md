@@ -1,4 +1,4 @@
-# Color Match rules, version 2
+# UNO rules (preserved Color Match house rules)
 
 An ordered roster contains 2–8 distinct stable `PlayerId` seats. The first seat
 starts. Deal seven cards to each player, one at a time in roster order.
@@ -46,11 +46,7 @@ then clear the penalty. Each empty-stock draw is a pass; a full rotation of
 consecutive empty-stock passes ends in a draw. A play or successful draw resets
 the pass count, including cards drawn after an UNO catch.
 
-Bots see only their own hand and public information. They catch available missed
-calls first, then play the lowest-ID legal card or draw. They declare UNO with
-two cards. For a Wild, they select their most-held color; ties use Red, Yellow,
-Green, Blue order. During penalties they stack legally or draw.
-
-Version-1 fixtures remain unchanged in `tests/fixtures/` as historical artifacts.
-The current runner explicitly rejects version 1. Version-2 fixtures are in
-`tests/fixtures/v2/`.
+The TypeScript port lives in `games/uno`. The server injects randomness; historical
+ChaCha replay/checkpoint formats and browser bots are retired. Shared rooms
+support human players, reconnecting seats and rematches. Rule tests cover card
+conservation, complete rounds, penalty combinations, catches and invalid actions.

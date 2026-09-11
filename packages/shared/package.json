@@ -1,0 +1,13 @@
+{
+  "name": "@board-games/shared",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./messages": "./src/paraglide/messages.js",
+    "./runtime": "./src/paraglide/runtime.js"
+  },
+  "dependencies": {
+    "@board-games/game-core": "workspace:*"
+  }
+}
