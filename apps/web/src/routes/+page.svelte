@@ -10,6 +10,9 @@
   import type { GameId } from '$lib/catalog/types';
   let selected = $state<GameId>('uno');
   let panel = $state<'start' | 'summary' | 'rules' | 'join' | null>(null);
+  let boardLanguage = $state('en'),
+    allowAbbreviations = $state(false),
+    allowMultiwordNames = $state(false);
   let name = $state(''),
     code = $state(''),
     setup = $state('variable'),
@@ -21,12 +24,14 @@
   const game = $derived(catalog[selectedIndex]!);
   const summaries = {
     azul: m.library_azul_summary,
+    codenames: m.library_cn_summary,
     uno: m.library_uno_summary,
     catan: m.library_catan_summary,
     carcassonne: m.library_carcassonne_summary,
   };
   const loops = {
     azul: [m.library_azul_loop_0, m.library_azul_loop_1, m.library_azul_loop_2],
+    codenames: [m.library_cn_loop_0, m.library_cn_loop_1, m.library_cn_loop_2],
     uno: [m.library_uno_loop_0, m.library_uno_loop_1, m.library_uno_loop_2],
     catan: [
       m.library_catan_loop_0,
@@ -117,7 +122,9 @@
       const credentials = await create(
         selected,
         practice ? name.trim() || 'Player' : name.trim(),
-        { setup, practice },
+        selected === 'codenames'
+          ? { boardLanguage, allowAbbreviations, allowMultiwordNames }
+          : { setup, practice },
       );
       await goto(`/room/${credentials.roomId}`);
     } catch (error) {
@@ -229,6 +236,25 @@
           placeholder="Alex"
         /></label
       >
+      {#if selected === 'codenames'}<fieldset>
+          <legend>{m.cn_language()}</legend><select
+            bind:value={boardLanguage}
+            aria-label={m.cn_language()}
+            ><option value="en">English</option><option value="es"
+              >Español</option
+            ></select
+          ><label
+            ><input
+              type="checkbox"
+              bind:checked={allowAbbreviations}
+            />{m.cn_abbreviations()}</label
+          ><label
+            ><input
+              type="checkbox"
+              bind:checked={allowMultiwordNames}
+            />{m.cn_names()}</label
+          >
+        </fieldset>{/if}
       {#if selected === 'catan'}<fieldset>
           <legend>{m.setup()}</legend>
           <div class="choice-row">

@@ -20,6 +20,7 @@
   });
   const sceneLoaders = {
     azul: () => import('./guides/AzulScene.svelte'),
+    codenames: () => import('./guides/CodenamesScene.svelte'),
     uno: () => import('./guides/UnoScene.svelte'),
     catan: () => import('./guides/CatanScene.svelte'),
     carcassonne: () => import('./guides/CarcassonneScene.svelte'),

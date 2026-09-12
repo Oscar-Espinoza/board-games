@@ -10,7 +10,8 @@
     "socket.io": "^4.8.1",
     "sirv": "^3.0.2",
     "@board-games/carcassonne": "workspace:*",
-    "@board-games/azul": "workspace:*"
+    "@board-games/azul": "workspace:*",
+    "@board-games/codenames": "workspace:*"
   },
   "devDependencies": {
     "socket.io-client": "^4.8.1"

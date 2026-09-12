@@ -4,7 +4,28 @@
 </script>
 
 <svg viewBox="0 0 120 78" aria-hidden="true">
-  {#if game === 'uno'}
+  {#if game === 'codenames'}
+    <rect
+      x="6"
+      y="5"
+      width="108"
+      height="68"
+      rx="6"
+      fill="#203847"
+    />{#each Array.from({ length: 6 }, (_, i) => i) as i}<rect
+        x={15 + (i % 3) * 31}
+        y={14 + Math.floor(i / 3) * 27}
+        width="27"
+        height="22"
+        rx="3"
+        fill={step === 2 && i === 4 ? '#a93645' : '#f5eedc'}
+      />{/each}{#if step === 1}<path
+        d="M49 43h25v22H49z"
+        fill="none"
+        stroke="#b88b47"
+        stroke-width="3"
+      />{/if}
+  {:else if game === 'uno'}
     {#if step === 2}<circle cx="60" cy="37" r="29" fill="#e6bb62" /><path
         d="M44 36l11 12 23-25"
         stroke="#fff6df"

@@ -36,6 +36,14 @@ export const catalog = [
     description: m.azul_description,
     preview: 'tiles',
   },
+  {
+    id: 'codenames',
+    name: 'Codenames',
+    minPlayers: 4,
+    maxPlayers: 8,
+    description: m.cn_description,
+    preview: 'dossiers',
+  },
 ] as const;
 export type RoomView = {
   id: string;
