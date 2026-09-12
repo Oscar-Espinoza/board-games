@@ -43,3 +43,5 @@ Actual Safari on macOS/iOS, physical-device touch/audio quality, a multi-human g
 ## Integration
 
 Owner implementation commits remain `f2eb656` and `a000b06`. `9790459` duplicates coordinator `ef5a1be` and must not be picked again. The coordinator preserved the planning handoff as `azul.md` and renamed the Medium implementation handoff `azul-implementation.md`; keep that integration naming. High adds this separate `azul-review.md` and game/evidence corrections. Preserve the coordinator's room errorCode propagation, translated session errors, library layout and root documentation updates.
+
+Final High implementation and evidence commit: `e2ecd17` (`fix(azul): preserve workshop play and clarify ceramic boards`). Final `bun run format:check` passed for all matched maintained files; `git diff --check` passed. The subsequent documentation-only commit records this hash. `bun.lock` is the sole intentionally uncommitted artifact.
