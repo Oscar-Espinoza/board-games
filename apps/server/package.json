@@ -11,7 +11,8 @@
     "sirv": "^3.0.2",
     "@board-games/carcassonne": "workspace:*",
     "@board-games/azul": "workspace:*",
-    "@board-games/codenames": "workspace:*"
+    "@board-games/codenames": "workspace:*",
+    "@board-games/sushi-go-party": "workspace:*"
   },
   "devDependencies": {
     "socket.io-client": "^4.8.1"

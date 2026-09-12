@@ -25,6 +25,7 @@
   const summaries = {
     azul: m.library_azul_summary,
     codenames: m.library_cn_summary,
+    'sushi-go-party': m.sgp_summary,
     uno: m.library_uno_summary,
     catan: m.library_catan_summary,
     carcassonne: m.library_carcassonne_summary,
@@ -32,6 +33,7 @@
   const loops = {
     azul: [m.library_azul_loop_0, m.library_azul_loop_1, m.library_azul_loop_2],
     codenames: [m.library_cn_loop_0, m.library_cn_loop_1, m.library_cn_loop_2],
+    'sushi-go-party': [m.sgp_loop_0, m.sgp_loop_1, m.sgp_loop_2],
     uno: [m.library_uno_loop_0, m.library_uno_loop_1, m.library_uno_loop_2],
     catan: [
       m.library_catan_loop_0,

@@ -15,7 +15,8 @@
     "socket.io-client": "^4.8.1",
     "@board-games/carcassonne": "workspace:*",
     "@board-games/azul": "workspace:*",
-    "@board-games/codenames": "workspace:*"
+    "@board-games/codenames": "workspace:*",
+    "@board-games/sushi-go-party": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "3.0.10",

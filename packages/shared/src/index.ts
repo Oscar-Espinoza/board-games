@@ -44,6 +44,14 @@ export const catalog = [
     description: m.cn_description,
     preview: 'dossiers',
   },
+  {
+    id: 'sushi-go-party',
+    name: 'Sushi Go Party!',
+    minPlayers: 2,
+    maxPlayers: 8,
+    description: m.sgp_description,
+    preview: 'sushi',
+  },
 ] as const;
 export type RoomView = {
   id: string;

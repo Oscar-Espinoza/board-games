@@ -2,6 +2,7 @@
 export const gameClients = {
   azul: () => import('@board-games/azul/Board.svelte'),
   codenames: () => import('@board-games/codenames/Board.svelte'),
+  'sushi-go-party': () => import('@board-games/sushi-go-party/Board.svelte'),
   uno: () => import('@board-games/uno/Board.svelte'),
   carcassonne: () => import('@board-games/carcassonne/Board.svelte'),
   catan: () => import('@board-games/catan/Board.svelte'),
