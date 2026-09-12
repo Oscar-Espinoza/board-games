@@ -270,10 +270,34 @@ seat replacement, host migration and rematch. Sushi includes every standard box
 card, all eight presets and advanced chained choices; documented app conventions
 are distinguished from verified publisher rules.
 
-The first combined rules/session/content suite passed 261 tests with 39,705
-assertions. Frozen installation, type/Svelte checks (zero errors/warnings),
-production frontend/server build and formatting passed. The independent Sushi
-review and final focused browser results are recorded below when complete.
+After all three independent reviews were integrated, the final combined
+rules/session/content suite passed **263 tests with 53,401 assertions**. Frozen
+installation, type/Svelte checks (zero errors/warnings) and the production
+frontend/server build passed. Repository formatting passed after the final
+evidence/documentation update.
+
+The broad combined browser sweep ran 126 checks: **123 passed, one inherited
+WebKit pinch case was skipped, and two Chromium catalog checks failed** because
+they assumed every Board retained a source-path manifest key. Codenames and Sushi
+can compile as shared chunks. The assertion now identifies all six Board chunks;
+the two corrected Chromium cases passed, as did their WebKit counterparts. Every
+game's main browser journeys and the existing UNO/Catan/Carcassonne/library
+regressions passed. The new illustrated-guide journey was held until Sushi's
+authored scenes landed.
+
+Final affected verification against the rebuilt combined branch passed **14
+Chromium/WebKit checks**: ten cover complete Sushi matches/rematches, eight-seat
+advanced play, saved private choices, locale continuity and the new bilingual
+guide/practice journey; four walk all 26×3 Sushi frames in both languages and
+verify actual movement paths, audio activation and interruption cancellation.
+Across the broad sweep, corrected catalog reruns and final affected runs, all
+**132 configured browser cases are accounted for: 131 passed and one skipped**.
+This is coverage across those runs, not a claim of a separate final unfiltered run.
+
+Desktop 1440×900, tablet 768×1024, phones 390×844 and 360×640, plus Codenames
+320px and Sushi landscape, have inspected captures. The short-phone Sushi review
+corrected actual region overlap and added non-overlap assertions. Motion records
+are real browser video; privacy checks inspect actual recipient socket payloads.
 
 The combined browser sweep uses isolated temporary browser installations to avoid
 cache cleanup by unrelated sessions:
@@ -303,3 +327,11 @@ empty. Consequently its index/status differ from the initial dirty-checkout audi
 but no captured source content differs. The integration branch records that main
 commit as an ancestor without changing its integrated tree. The original checkout
 is not reset, switched or rewritten by this delivery.
+
+### Final cleanup
+
+Every server opened for this delivery has stopped. The final listener audit found
+no process listening on allocated backend ports 3011–3013, frontend ports
+5181–5183 or browser ports 3110–3113. The original checkout remains clean on
+`7d69ad1`; its source tree still exactly matches the captured baseline. The
+completed integration is committed separately on `integration/three-games`.
