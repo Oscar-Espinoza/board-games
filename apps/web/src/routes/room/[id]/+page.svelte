@@ -51,6 +51,21 @@
         });
     }
   });
+  function errorText() {
+    if (session.errorCode === 'STALE_REVISION') return m.action_stale();
+    if (session.errorCode === 'MATCH_CHANGED') return m.action_match_changed();
+    if (session.errorCode === 'TIMEOUT') return m.action_timeout();
+    const key = session.error.startsWith('AZUL_')
+      ? 'azul_error'
+      : session.error;
+    if (/^(azul_|cn_|sgp_)/.test(key)) {
+      const translated = (
+        m as unknown as Record<string, (() => string) | undefined>
+      )[key];
+      if (translated) return translated();
+    }
+    return session.error;
+  }
   async function joinRoom(useToken = true) {
     session.error = '';
     session.errorCode = undefined;
@@ -111,13 +126,7 @@
       {m.disconnected()}
     </p>{/if}
   {#if session.error}<p class="error" role="alert">
-      {session.errorCode === 'STALE_REVISION'
-        ? m.action_stale()
-        : session.errorCode === 'MATCH_CHANGED'
-          ? m.action_match_changed()
-          : session.errorCode === 'TIMEOUT'
-            ? m.action_timeout()
-            : session.error}<button
+      {errorText()}<button
         type="button"
         aria-label={m.catan_dismiss_error()}
         onclick={() => (session.error = '')}>×</button
