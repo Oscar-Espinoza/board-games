@@ -1,5 +1,6 @@
 import type { GameId } from '../types';
 export const guideLoaders = {
+  azul: () => import('./azul'),
   uno: () => import('./uno'),
   catan: () => import('./catan'),
   carcassonne: () => import('./carcassonne'),

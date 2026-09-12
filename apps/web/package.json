@@ -13,7 +13,8 @@
     "@board-games/uno": "workspace:*",
     "@board-games/catan": "workspace:*",
     "socket.io-client": "^4.8.1",
-    "@board-games/carcassonne": "workspace:*"
+    "@board-games/carcassonne": "workspace:*",
+    "@board-games/azul": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "3.0.10",

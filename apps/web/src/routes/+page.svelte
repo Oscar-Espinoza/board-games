@@ -20,11 +20,13 @@
   const selectedIndex = $derived(catalog.findIndex((g) => g.id === selected));
   const game = $derived(catalog[selectedIndex]!);
   const summaries = {
+    azul: m.library_azul_summary,
     uno: m.library_uno_summary,
     catan: m.library_catan_summary,
     carcassonne: m.library_carcassonne_summary,
   };
   const loops = {
+    azul: [m.library_azul_loop_0, m.library_azul_loop_1, m.library_azul_loop_2],
     uno: [m.library_uno_loop_0, m.library_uno_loop_1, m.library_uno_loop_2],
     catan: [
       m.library_catan_loop_0,
