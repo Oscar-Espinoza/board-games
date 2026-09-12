@@ -110,3 +110,20 @@ compact controls and practice language continuity. See
 `f4851e6` extends library coverage documentation and bilingual key checks to all
 six games. Sushi's implementation is completing its commit/handoff phase; its
 independent High review and final combined verification remain pending.
+
+## Six-game implementation checkpoint
+
+Sushi Medium implementation, translations and registration are integrated as
+`a60cc3f` / `2814027` / `c10296c` (owner `c503066` / `930e46c` / `d02059e`).
+The full Medium handoff, including final owner `a3ece84`, is preserved in
+[sushi-go-party-implementation.md](sushi-go-party-implementation.md); do not
+replay that handoff commit onto the planning document. Independent High review
+is active, including complete library scoring examples and effect cancellation.
+
+`d2829d1` records the regenerated six-game Bun lockfile and fixes lazy-loading
+checks to recognize shared Board chunks without relying on source-path keys.
+Combined frozen installation, check (zero errors/warnings), build, and 261 tests
+with 39,705 assertions passed. Formatting passed after normalizing two handoffs/
+coverage tables. The broad Chromium/WebKit run is underway; the new guide journey
+awaits Sushi's illustrated-scene corrections. All owned servers must stop after
+validation, per the user's explicit follow-up instruction.
