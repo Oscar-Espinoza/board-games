@@ -916,5 +916,8 @@
   "learn_carcassonne_robbers_chapter_title": "Robbers · optional",
   "learn_carcassonne_crop_chapter_title": "Crop Circles · optional",
   "learn_carcassonne_crop_add_chapter_title": "Crop Circles: adding a figure",
-  "learn_carcassonne_abbot_reference_chapter_title": "Abbot reference"
+  "learn_carcassonne_abbot_reference_chapter_title": "Abbot reference",
+  "action_stale": "The table changed. Review the current position and choose again.",
+  "action_match_changed": "A new match has started. Choose an action on the current table.",
+  "action_timeout": "The server did not respond. Reconnect to synchronize before trying again."
 }

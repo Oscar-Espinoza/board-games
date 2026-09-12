@@ -53,6 +53,7 @@
   });
   async function joinRoom(useToken = true) {
     session.error = '';
+    session.errorCode = undefined;
     try {
       await join(page.params.id, name, useToken);
     } catch (error) {
@@ -60,6 +61,7 @@
     }
   }
   async function start() {
+    session.errorCode = undefined;
     try {
       await request('start', {});
     } catch (error) {
@@ -109,7 +111,13 @@
       {m.disconnected()}
     </p>{/if}
   {#if session.error}<p class="error" role="alert">
-      {session.error}<button
+      {session.errorCode === 'STALE_REVISION'
+        ? m.action_stale()
+        : session.errorCode === 'MATCH_CHANGED'
+          ? m.action_match_changed()
+          : session.errorCode === 'TIMEOUT'
+            ? m.action_timeout()
+            : session.error}<button
         type="button"
         aria-label={m.catan_dismiss_error()}
         onclick={() => (session.error = '')}>×</button
@@ -159,6 +167,7 @@
             round={room.round}
             connected={session.connected}
             pending={session.pending}
+            errorCode={session.errorCode}
             practice={room.practice}
             canConfigure={room.hostId === room.playerId}
             canRematch={room.status === 'finished' &&

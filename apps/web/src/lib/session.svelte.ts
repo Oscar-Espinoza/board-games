@@ -10,6 +10,7 @@ export const session = $state({
   room: null as RoomView | null,
   connected: false,
   error: '',
+  errorCode: undefined as SocketReplyError['code'],
   pending: false,
   storageWarning: false,
 });
@@ -120,6 +121,7 @@ export async function send(action: unknown) {
   if (!session.room || session.pending) return;
   session.pending = true;
   session.error = '';
+  session.errorCode = undefined;
   const initial = session.room;
   const id = crypto.randomUUID();
   try {
@@ -143,6 +145,8 @@ export async function send(action: unknown) {
     });
   } catch (error) {
     session.error = (error as Error).message;
+    session.errorCode =
+      error instanceof SocketReplyError ? error.code : undefined;
   } finally {
     session.pending = false;
   }

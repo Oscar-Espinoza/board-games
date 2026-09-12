@@ -916,5 +916,8 @@
   "learn_carcassonne_robbers_chapter_title": "Bandidos · opcional",
   "learn_carcassonne_crop_chapter_title": "Círculos de cosecha · opcional",
   "learn_carcassonne_crop_add_chapter_title": "Círculos de cosecha: agregar una figura",
-  "learn_carcassonne_abbot_reference_chapter_title": "Referencia del abad"
+  "learn_carcassonne_abbot_reference_chapter_title": "Referencia del abad",
+  "action_stale": "La mesa cambió. Revisa la situación actual y vuelve a elegir.",
+  "action_match_changed": "Comenzó una partida nueva. Elige una acción en la mesa actual.",
+  "action_timeout": "El servidor no respondió. Vuelve a conectarte para sincronizar antes de intentarlo de nuevo."
 }
