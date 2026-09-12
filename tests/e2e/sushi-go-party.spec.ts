@@ -174,7 +174,7 @@ test('two independent browsers complete three rounds, reconnect, score and remat
   test.setTimeout(180000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.setViewportSize({ width: 1440, height: 900 });
   const { pages, contexts } = await room(page, browser, 2);
   try {
     await ready(pages);
@@ -229,7 +229,7 @@ test('eight independent seats use Spoon/Chopsticks and remain readable across vi
   test.setTimeout(180000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.setViewportSize({ width: 1440, height: 900 });
   const { pages, contexts } = await room(page, browser, 8);
   try {
     await page
@@ -260,9 +260,10 @@ test('eight independent seats use Spoon/Chopsticks and remain readable across vi
       await ready(pages);
     await page.waitForTimeout(800);
     for (const [name, width, height] of [
-      ['eight-seats', 1440, 1000],
-      ['tablet', 820, 1180],
-      ['narrow-phone', 360, 800],
+      ['eight-seats', 1440, 900],
+      ['tablet', 768, 1024],
+      ['narrow-phone', 360, 640],
+      ['portrait-phone', 390, 844],
       ['wide-phone', 844, 390],
     ] as const) {
       await page.setViewportSize({ width, height });
@@ -279,6 +280,16 @@ test('eight independent seats use Spoon/Chopsticks and remain readable across vi
       expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(height);
       expect(bounds!.x).toBeGreaterThanOrEqual(0);
       expect(await page.locator('.friend-plate').count()).toBe(7);
+      if (width === 360 && height === 640) {
+        const own = await page.locator('.own-area').boundingBox();
+        const menu = await page.locator('.menu-mini').boundingBox();
+        expect(menu!.y + menu!.height).toBeLessThanOrEqual(own!.y);
+        for (const friend of await page.locator('.friend-plate').all()) {
+          const box = (await friend.boundingBox())!;
+          expect(box.y + box.height).toBeLessThanOrEqual(menu!.y);
+          expect(box.height).toBeGreaterThanOrEqual(44);
+        }
+      }
     }
     await page
       .getByRole('button', { name: 'The little book of sushi' })
@@ -333,7 +344,7 @@ test('practice choices cover private Menu, copy, Takeout and Spoon with keyboard
       },
     });
   });
-  await page.setViewportSize({ width: 360, height: 800 });
+  await page.setViewportSize({ width: 360, height: 640 });
   await page.goto('/practice/sushi-go-party');
   await page.getByRole('button', { name: 'Table settings' }).click();
   await page
@@ -414,4 +425,210 @@ test('local language switch preserves a noninitial saved Menu offer and score', 
   await page.locator('.decision .choice-cards>button').first().click();
   await expect(page.locator('.sushi-table')).toHaveAttribute('data-turn', '2');
   await saveVideo(page, 'local-language', info.project.name);
+});
+
+test('all 26 illustrated lessons teach three distinct frames in English and Spanish', async ({
+  page,
+}, info) => {
+  test.setTimeout(180000);
+  for (const locale of ['en', 'es']) {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await page
+      .getByRole('combobox', { name: /^(Language|Idioma)$/ })
+      .selectOption(locale);
+    await page
+      .locator('.game-names')
+      .getByRole('button', { name: /Sushi Go Party/ })
+      .click();
+    await page
+      .getByRole('button', {
+        name: locale === 'en' ? 'Rules' : 'Reglas',
+        exact: true,
+      })
+      .click();
+    await expect(page.locator('.desktop-nav button')).toHaveCount(3);
+    let count = 0;
+    for (let chapter = 0; chapter < 3; chapter++) {
+      await page.locator('.desktop-nav button').nth(chapter).click();
+      for (const lesson of await page.locator('article[data-lesson]').all()) {
+        count++;
+        await lesson.locator('.example-toggle').click();
+        const descriptions = new Set<string>();
+        for (let step = 0; step < 3; step++) {
+          const img = lesson.getByRole('img');
+          await expect(img).toBeVisible();
+          const caption = await lesson.locator('.frame-caption').textContent();
+          expect(await img.getAttribute('aria-label')).toContain(
+            caption!.trim(),
+          );
+          descriptions.add((await img.getAttribute('aria-label'))!);
+          if (step < 2)
+            await lesson.locator('.scenario-controls button').last().click();
+        }
+        expect(descriptions.size).toBe(3);
+        if ((await lesson.getAttribute('data-lesson')) === 'onigiri') {
+          await page.setViewportSize({ width: 360, height: 640 });
+          await lesson.getByRole('img').screenshot({
+            path: `${evidence}/${info.project.name}-lesson-onigiri-${locale}.png`,
+          });
+          expect(
+            await page
+              .getByRole('dialog')
+              .evaluate((el) => el.scrollWidth <= el.clientWidth),
+          ).toBe(true);
+          await page.setViewportSize({ width: 1440, height: 900 });
+        }
+      }
+    }
+    expect(count).toBe(26);
+    await page.keyboard.press('Escape');
+  }
+  await saveVideo(page, 'authored-lessons', info.project.name);
+});
+
+test('accepted motion uses seat paths and cancels on hide, resize and preferences without replay or hidden audio', async ({
+  page,
+}, info) => {
+  await page.addInitScript(() => {
+    const state = {
+      hidden: false,
+      audio: 0,
+      unlocks: 0,
+      paths: [] as { frames: Keyframe[]; seats: number[][] }[],
+    };
+    Object.assign(window, { sushiReview: state });
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      get: () => state.hidden,
+    });
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (frames, options) {
+      if (this.classList.contains('sushi-passing-bundle')) {
+        const root = this.parentElement!.getBoundingClientRect();
+        state.paths.push({
+          frames: frames as Keyframe[],
+          seats: [...this.parentElement!.querySelectorAll('[data-seat]')].map(
+            (el) => {
+              const b = el.getBoundingClientRect();
+              return [
+                b.x + b.width / 2 - root.x - 15,
+                b.y + b.height / 2 - root.y - 20,
+              ];
+            },
+          ),
+        });
+      }
+      return animate.call(this, frames, options);
+    };
+    Object.defineProperty(window, 'AudioContext', {
+      value: class {
+        state = 'running';
+        currentTime = 0;
+        destination = {};
+        constructor() {
+          state.unlocks++;
+        }
+        resume() {
+          return Promise.resolve();
+        }
+        close() {
+          return Promise.resolve();
+        }
+        createOscillator() {
+          return {
+            connect() {},
+            disconnect() {},
+            type: '',
+            frequency: {
+              setValueAtTime() {},
+              exponentialRampToValueAtTime() {},
+            },
+            start() {
+              state.audio++;
+            },
+            stop() {},
+            onended: null,
+          };
+        }
+        createGain() {
+          return {
+            connect() {},
+            disconnect() {},
+            gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} },
+          };
+        }
+      },
+    });
+  });
+  const stats = () => page.evaluate(() => (window as any).sushiReview);
+  const visibility = async (hidden: boolean) => {
+    await page.evaluate((hidden) => {
+      (window as any).sushiReview.hidden = hidden;
+      document.dispatchEvent(new Event('visibilitychange'));
+    }, hidden);
+  };
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/practice/sushi-go-party');
+  expect((await stats()).unlocks).toBe(0);
+  await page.getByRole('button', { name: 'Table settings' }).click();
+  await page
+    .getByRole('combobox', { name: 'Guests', exact: true })
+    .selectOption('2');
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  const turn = async () => {
+    await select(page);
+    await page.getByTestId('sgp-keep').click();
+    await page.getByTestId('sgp-practice-others').click();
+  };
+  await turn();
+  await expect(page.locator('.sushi-passing-bundle')).toHaveCount(2);
+  const recorded = await stats();
+  expect(recorded.unlocks).toBe(1);
+  expect(recorded.audio).toBeGreaterThan(0);
+  expect(recorded.paths).toHaveLength(2);
+  for (const path of recorded.paths) {
+    for (const frame of [path.frames[0], path.frames.at(-1)]) {
+      expect(
+        path.seats.some(([x, y]: number[]) =>
+          frame.transform.startsWith(`translate(${x}px,${y}px)`),
+        ),
+      ).toBe(true);
+    }
+    expect(path.frames[0].transform).not.toBe(path.frames.at(-1).transform);
+  }
+  await visibility(true);
+  await expect(page.locator('.sushi-passing-bundle,.reveal-card')).toHaveCount(
+    0,
+  );
+  const hiddenAudio = (await stats()).audio;
+  await turn();
+  await page.waitForTimeout(850);
+  expect((await stats()).audio).toBe(hiddenAudio);
+  await expect(page.locator('.sushi-passing-bundle,.reveal-card')).toHaveCount(
+    0,
+  );
+  await visibility(false);
+  await expect(page.locator('.sushi-passing-bundle,.reveal-card')).toHaveCount(
+    0,
+  );
+  await turn();
+  await expect(page.locator('.sushi-passing-bundle')).toHaveCount(2);
+  await page.setViewportSize({ width: 360, height: 640 });
+  await expect(page.locator('.sushi-passing-bundle,.reveal-card')).toHaveCount(
+    0,
+  );
+  await page.getByRole('button', { name: 'Table settings' }).click();
+  await page.getByLabel('Soft table sounds').uncheck();
+  await page.getByLabel('Animate the table').uncheck();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  const muted = (await stats()).audio;
+  await turn();
+  await page.waitForTimeout(850);
+  await expect(page.locator('.sushi-passing-bundle,.reveal-card')).toHaveCount(
+    0,
+  );
+  expect((await stats()).audio).toBe(muted);
+  await capture(page, 'lifecycle-phone-640', info.project.name);
+  await saveVideo(page, 'presentation-lifecycle', info.project.name);
 });

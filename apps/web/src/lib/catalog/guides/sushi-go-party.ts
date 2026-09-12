@@ -38,7 +38,11 @@ export default {
           id: 'draft',
           title: m.sgp_loop_0,
           explanation: m.sgp_quick,
-          frames: [m.sgp_loop_0, m.sgp_loop_1, m.sgp_loop_2],
+          frames: [
+            text('example_draft_0'),
+            text('example_draft_1'),
+            text('example_draft_2'),
+          ],
           scene: 'draft',
           values: ['1', '✓', '→'],
         },
@@ -51,7 +55,7 @@ export default {
         id: kind,
         title: text(kind),
         explanation: text('rule_' + kind),
-        frames: [text(kind), text('rule_' + kind), m.sgp_loop_2] as [
+        frames: [0, 1, 2].map((step) => text(`example_${kind}_${step}`)) as [
           () => string,
           () => string,
           () => string,
@@ -68,7 +72,11 @@ export default {
           id: 'advanced',
           title: m.sgp_rules_advanced,
           explanation: m.sgp_advanced,
-          frames: [m.sgp_loop_0, m.sgp_loop_1, m.sgp_advanced],
+          frames: [
+            text('example_advanced_0'),
+            text('example_advanced_1'),
+            text('example_advanced_2'),
+          ],
           scene: 'spoon',
           values: ['1', '2', '3'],
         },
@@ -76,7 +84,11 @@ export default {
           id: 'conventions',
           title: m.sgp_rules_conventions,
           explanation: m.sgp_conventions,
-          frames: [m.sgp_quick, m.sgp_advanced, m.sgp_conventions],
+          frames: [
+            text('example_conventions_0'),
+            text('example_conventions_1'),
+            text('example_conventions_2'),
+          ],
           scene: 'special_order',
           values: ['C1', 'C3', 'C7'],
         },

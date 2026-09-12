@@ -499,6 +499,25 @@ test('event cursor skips reconnect, gap and match changes', () => {
   expect(c.take('match-2', { ...p, sequence: 8 })).toEqual([]);
 });
 
+test('presentation cursor never rewinds on stale snapshots and resets after hidden-tab suspension', () => {
+  const cursor = new EventCursor();
+  const presentation = (sequence: number) => ({
+    sequence,
+    round: 1,
+    turn: 1,
+    events: [{ type: 'committed' as const, seat: 'a' }],
+  });
+  expect(cursor.take('match', presentation(10))).toEqual([]);
+  expect(cursor.take('match', presentation(11))).toHaveLength(1);
+  expect(cursor.take('match', presentation(9))).toEqual([]);
+  expect(cursor.take('match', presentation(10))).toEqual([]);
+  expect(cursor.take('match', presentation(11))).toEqual([]);
+  expect(cursor.take('match', presentation(12))).toHaveLength(1);
+  cursor.reset();
+  expect(cursor.take('match', presentation(13))).toEqual([]);
+  expect(cursor.take('match', presentation(14))).toHaveLength(1);
+});
+
 test('copying unattached Nigiri offers optional attachment; copied attached source cannot attach', () => {
   for (const attachSource of [false, true]) {
     const f = startPractice(
@@ -637,4 +656,74 @@ test('failed Spoon is discarded and exact variant requests need no supplier choi
       ).toBe(true);
     assertConservation(s);
   }
+});
+
+test('six-seat third-round Menu stock survives all retained desserts and three retained copies', () => {
+  const fixture = startPractice(
+    6,
+    { ...presets.two, specials: ['menu', 'special_order'] },
+    702,
+  );
+  let s = fixture.state;
+  const random = fixture.random;
+  const desserts = s.manifest.filter((c) => c.face.kind === 'fruit');
+  const orders = s.manifest.filter((c) => c.face.kind === 'special_order');
+  const retained = [...desserts.slice(0, 12), ...orders];
+  s.deck = s.manifest.filter(
+    (c) => !retained.includes(c) && !desserts.slice(12).includes(c),
+  );
+  s.reserve = desserts.slice(12);
+  s.hands = s.players.map(() => []);
+  s.tableaus = s.players.map(() => []);
+  s.desserts = s.players.map(() => []);
+  s.discard = [];
+  for (const [i, c] of retained.entries()) {
+    s.desserts[i % 6].push({
+      ...desserts[i % 12].face,
+      id: `retained-${i}`,
+      physical: c.physical,
+      playedTurn: 1,
+      collectedRound: i < 7 ? 1 : 2,
+      boxed: false,
+      copied: c.face.kind === 'special_order',
+      wasabi: null,
+      copyCanAttach: false,
+    });
+  }
+  s.round = 2;
+  s.phase = 'round-end';
+  s.ready = [];
+  assertConservation(s);
+  for (const player of s.players) {
+    s = apply(
+      s,
+      player,
+      { type: 'READY', round: 2, version: s.setupVersion },
+      random,
+    );
+    assertConservation(s);
+  }
+  expect(s.round).toBe(3);
+  expect(s.deck).toHaveLength(6);
+  arrangeHand(s, 0, ['menu', 'menu', 'menu']);
+  for (const seat of [1, 2])
+    [s.hands[0][seat], s.hands[seat][0]] = [s.hands[seat][0], s.hands[0][seat]];
+  for (let seat = 3; seat < 6; seat++) arrangeHand(s, seat, ['nigiri']);
+  expect(s.hands.slice(0, 3).map((h) => h[0].face.kind)).toEqual([
+    'menu',
+    'menu',
+    'menu',
+  ]);
+  s = firstTurn(s, random);
+  for (const remaining of [5, 4, 3]) {
+    expect(s.prompt?.kind).toBe('menu');
+    expect(s.prompt?.offer).toHaveLength(4);
+    const offer = view(s, s.players[s.prompt!.actor]).private.prompt!.cards;
+    expect(offer.length).toBeGreaterThan(0);
+    s = choose(s, { type: 'card', card: offer[0].handle }, random);
+    assertConservation(s);
+    expect(s.deck.length + (s.prompt?.offer.length ?? 0)).toBe(remaining);
+  }
+  expect(s.phase).toBe('draft');
+  expect(s.turn).toBe(2);
 });

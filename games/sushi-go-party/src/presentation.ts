@@ -80,7 +80,13 @@ export function projectPresentation(p: Presentation): Presentation {
 export class EventCursor {
   private scope = '';
   private sequence = -1;
+  reset() {
+    this.scope = '';
+    this.sequence = -1;
+  }
   take(scope: string, presentation: Presentation): Event[] {
+    if (this.scope === scope && presentation.sequence <= this.sequence)
+      return [];
     if (this.scope !== scope || presentation.sequence !== this.sequence + 1) {
       this.scope = scope;
       this.sequence = presentation.sequence;

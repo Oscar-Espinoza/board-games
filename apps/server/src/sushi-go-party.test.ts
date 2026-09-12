@@ -153,8 +153,8 @@ test('real minimum/maximum socket clients concurrently READY and PICK with safe 
           ready[i].revision = f.current(i).revision;
           expect((await f.raw(f.sockets[i], 'action', ready[i])).ok).toBe(true);
         }
-      const original = f.projected(0),
-        revision = f.current(0).revision;
+      const revision = f.current(0).revision;
+      const allHands = f.sockets.map((_, i) => f.projected(i).private.hand);
       const picks = f.sockets.map((_, i) => ({
         id: `pick-${i}`,
         round: initial.round,
@@ -192,9 +192,10 @@ test('real minimum/maximum socket clients concurrently READY and PICK with safe 
           expect(text).not.toContain('physical-');
           expect(text).not.toContain('"deck"');
           expect(text).not.toContain('"reserve"');
-          if (i !== 0)
-            for (const card of original.private.hand)
-              expect(text).not.toContain(card.handle);
+          for (let other = 0; other < count; other++)
+            if (other !== i)
+              for (const card of allHands[other])
+                expect(text).not.toContain(card.handle);
           for (let other = 0; other < count; other++)
             if (other !== i) expect(text).not.toContain(f.creds[other].token);
         }
@@ -346,11 +347,16 @@ test('real Menu and Spoon supplier prompts reconnect with identical recipient-on
       const saved = f.projected(actor).private;
       expect(saved.prompt?.kind).toBe(effect);
       expect(saved.prompt!.cards.length).toBeGreaterThan(1);
+      await pause(20);
       for (let i = 0; i < (effect === 'menu' ? 2 : 3); i++)
         if (i !== actor) {
-          expect(f.projected(i).private.prompt).toBeNull();
+          const delivered = f.payloads[i].at(-1)!.game as ReturnType<
+            typeof view
+          >;
+          expect(delivered).toEqual(f.projected(i));
+          expect(delivered.private.prompt).toBeNull();
           for (const c of saved.prompt!.cards)
-            expect(JSON.stringify(f.projected(i))).not.toContain(c.handle);
+            expect(JSON.stringify(delivered)).not.toContain(c.handle);
         }
       f.sockets[actor].disconnect();
       await pause(15);
@@ -361,6 +367,11 @@ test('real Menu and Spoon supplier prompts reconnect with identical recipient-on
       });
       const v = f.rooms.view(f.creds[0].roomId, newSocket.id!);
       expect((v.game as ReturnType<typeof view>).private).toEqual(saved);
+      await pause(20);
+      const restored = f.payloads.at(-1)!.at(-1)!.game as ReturnType<
+        typeof view
+      >;
+      expect(restored.private).toEqual(saved);
       const input = {
         id: `resolve-${effect}`,
         round: v.round,

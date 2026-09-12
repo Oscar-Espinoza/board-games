@@ -90,13 +90,29 @@
   let lastPick = '';
   let lastPrompt = '';
   let cancelMotion = () => {};
+  let motionVersion = 0;
+  let hidden = $state(false);
   let timer: ReturnType<typeof setTimeout>;
+  function clearPresentation() {
+    motionVersion++;
+    cancelMotion();
+    cancelMotion = () => {};
+    clearTimeout(timer);
+    revealCards = [];
+    scoring = false;
+    scoredCards = [];
+  }
   const label = (key: string, values: Record<string, string | number> = {}) =>
     t(key, values, locale);
   const name = (id: string) => players.find((p) => p.id === id)?.name ?? id;
   function seatPosition(i: number, n: number) {
     const angle = n === 1 ? Math.PI / 2 : Math.PI * (i / (n - 1));
-    return `--x:${50 + 40 * Math.cos(angle)}%;--y:${48 - 33 * Math.sin(angle)}%;`;
+    const top = Math.ceil(n / 2);
+    const shortX =
+      i < top
+        ? ((i + 0.5) * 100) / top
+        : 100 - ((i - top + 0.5) * 100) / (n - top);
+    return `--x:${50 + 40 * Math.cos(angle)}%;--y:${48 - 33 * Math.sin(angle)}%;--short-x:${shortX}%;--short-y:${i < top ? 96 : 170}px;`;
   }
   function toggle(list: string[], id: string) {
     return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
@@ -166,17 +182,25 @@
     systemReduced = media.matches;
     const change = () => {
       systemReduced = media.matches;
-      cancelMotion();
+      clearPresentation();
+      cursor.reset();
     };
     media.addEventListener('change', change);
-    const resize = () => cancelMotion();
+    const resize = () => clearPresentation();
+    const visibility = () => {
+      hidden = document.hidden;
+      clearPresentation();
+      cursor.reset();
+    };
+    visibility();
+    document.addEventListener('visibilitychange', visibility);
     window.addEventListener('resize', resize);
     loaded = true;
     return () => {
       media.removeEventListener('change', change);
       window.removeEventListener('resize', resize);
-      cancelMotion();
-      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', visibility);
+      clearPresentation();
       audio.close();
     };
   });
@@ -188,7 +212,8 @@
           JSON.stringify({ sound, volume, motion }),
         );
       } catch {}
-      if (!motion) cancelMotion();
+      clearPresentation();
+      cursor.reset();
     }
   });
   $effect(() => {
@@ -220,12 +245,9 @@
       `${round}:${playerId}:${connected}`,
       pub.presentation,
     );
-    if (!events.length) return;
-    cancelMotion();
-    clearTimeout(timer);
-    revealCards = [];
-    scoring = false;
-    scoredCards = [];
+    clearPresentation();
+    if (!events.length || hidden || !connected) return;
+    const version = motionVersion;
     const revealed = events.flatMap((e) =>
       e.type === 'reveal'
         ? e.cards
@@ -257,7 +279,7 @@
       );
       if (passing?.type === 'pass')
         void tick().then(() => {
-          if (root)
+          if (root && version === motionVersion && !document.hidden)
             cancelMotion = passBundles(
               root,
               passing.edges,
@@ -1990,6 +2012,36 @@
     }
     .sushi-table:has(.seat:nth-of-type(7)) .seat {
       width: 72px;
+    }
+  }
+  @media (max-width: 500px) and (max-height: 700px) {
+    .seat {
+      left: var(--short-x);
+      top: var(--short-y);
+      width: 72px;
+    }
+    .friend-avatar {
+      display: none;
+    }
+    .table-center {
+      top: 207px;
+      width: 94%;
+    }
+    .table-center .eyebrow {
+      position: absolute;
+      top: -160px;
+      left: 0;
+      right: 0;
+    }
+    .table-center h1,
+    .table-center .ready-count {
+      display: none;
+    }
+    .menu-mini {
+      max-width: none;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      justify-content: flex-start;
     }
   }
   @media (max-height: 700px) and (min-width: 650px) {
