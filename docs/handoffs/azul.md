@@ -103,3 +103,7 @@ Owner commands (ports reserved server/web/browser **3011/5181/3111**): `bun inst
 - [ ] End Medium phase with enough detail to spawn Astra High final review in same worktree. High reviewer must inspect/fix rule invariants, projection privacy, true coordinate movement, focus/layout and localization gaps and run necessary checks. Do not declare complete because the happy path renders.
 
 Planning validation: repository instructions/current contract/library/session test patterns inspected; primary English/Spanish sources fetched; official 25-cell wall visually inspected. No application tests run because this phase changed only this handoff.
+
+## Implementation phase
+
+See [Medium implementation evidence and High-review checklist](azul-implementation.md). High review is in progress.

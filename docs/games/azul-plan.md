@@ -1,3 +1,7 @@
+# Execution status
+
+Implementation is delivered for High review in `feature/azul`; the original planning-only disclaimer below is historical. The approved owner handoff supersedes it. See [Azul rules](azul.md) and [delivery handoff](../handoffs/azul.md) for current decisions and actual validation.
+
 # Azul implementation plan
 
 Status: research and planning only. No implementation authorized by this document.
