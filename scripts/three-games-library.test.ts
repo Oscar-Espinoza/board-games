@@ -37,7 +37,7 @@ for (const [game, guide] of Object.entries({
 
 test('new game, card, library and transport copy has matching English and Spanish keys', () => {
   const included = (key: string) =>
-    /^(azul_|cn_|sgp_|learn_azul_|learn_codenames_|learn_sushi_|library_azul_|library_codenames_|library_sushi_|action_)/.test(
+    /^(azul_|cn_|sgp_|learn_azul_|learn_codenames_|learn_sushi_|library_azul_|library_codenames_|library_sushi_|library_cn_|library_sgp_|action_)/.test(
       key,
     );
   const english = Object.keys(en).filter(included).sort();

@@ -31,12 +31,19 @@ All examples teach the current implementation. Scenario IDs are stable lesson ID
 | carcassonne / magic     | magic                                                                                                   | docs/games/carcassonne.md; games/carcassonne/src/index.ts |
 | carcassonne / robbers   | robber                                                                                                  | docs/games/carcassonne.md; games/carcassonne/src/index.ts |
 | carcassonne / crop      | crop, crop-add                                                                                          | docs/games/carcassonne.md; games/carcassonne/src/index.ts |
+| azul / draft | draft, marker | docs/games/azul.md; games/azul/src/index.ts |
+| azul / wall | pattern, cross, penalty | docs/games/azul.md; games/azul/src/index.ts |
+| azul / end | finish, conventions | docs/games/azul.md; games/azul/src/index.ts |
+| codenames / setup–connection | setup, clues, review, guess, budget, finish, connection | docs/games/codenames.md; games/codenames/src/index.ts |
+| sushi-go-party / quick | draft | docs/games/sushi-go-party.md; games/sushi-go-party/src/index.ts |
+| sushi-go-party / dishes | nigiri, maki, temaki, uramaki, tempura, sashimi, dumpling, eel, tofu, onigiri, edamame, miso, chopsticks, spoon, menu, special_order, takeout, wasabi, tea, soy, pudding, ice_cream, fruit | docs/games/sushi-go-party.md; games/sushi-go-party/src/index.ts |
+| sushi-go-party / advanced | advanced, conventions | docs/games/sushi-go-party.md; games/sushi-go-party/src/index.ts |
 
 ## Presentation boundary
 
 The home route loads original SVG box artwork and metadata only. Each rulebook
 and its game-specific scene renderer are dynamically imported when requested.
-There are 78 lessons, each with three manually selected frames in both languages.
+There are 118 lessons across six games, each with three frames in both languages.
 Scenarios use authored diagrams and quantities, not game instances or random
 results. Existing in-game guides remain independent.
 
@@ -53,12 +60,18 @@ book while refresh is pending cancels that navigation. No reading history is sto
 - `scripts/library.test.ts` checks bilingual coverage, unique lesson IDs, supported
   scenes, all eleven optional modules and eight numbered messages. Numerical road,
   city, cathedral, inn, mage/witch, field and production examples use the pure rules.
+- `scripts/three-games-library.test.ts` checks all three new guide structures,
+  unique lesson IDs, distinct frame captions and matching English/Spanish keys.
 - Existing UNO tests cover penalties, catches, drawing, final wilds and empty stock.
   Existing Catan tests cover costs, shortages, seven, trading, development, awards
   and paired opportunities. Existing Carcassonne tests cover 3.1 builder/pig behavior,
   messages, gold and module interactions.
 - `tests/e2e/library.spec.ts` walks every scenario and verifies lazy-loading
   boundaries, recovery, stale imports, focus, desktop/mobile layouts and touch.
+
+- `tests/e2e/three-games-library.spec.ts` covers the six-cover composition at
+  desktop, tablet and phone sizes, all three new illustrated books in both
+  languages, focus restoration and local practice links.
 
 No gameplay rule was changed to accommodate a lesson. The existing Carcassonne
 caveats about independent tabletop topology review still apply.
