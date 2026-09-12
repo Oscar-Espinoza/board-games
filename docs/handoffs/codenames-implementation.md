@@ -1,5 +1,8 @@
 # Codenames implementation → High review
 
+High review is now complete; see [review and fixes](codenames-review.md). The
+review priorities below are retained as the original Medium handoff.
+
 Prepared September 12, 2026. The Medium implementation is complete and committed;
 this document records actual evidence and the targeted independent review still
 needed. Original planning handoff remains in the integration worktree at

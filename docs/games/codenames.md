@@ -1,6 +1,6 @@
 # Codenames
 
-Two teams of 4–8 seated players choose their own roles: exactly one spymaster
+Four to eight seated players form two teams and choose their own roles: exactly one spymaster
 and at least one operative per team. Uneven teams are legal. The host chooses
 English or Spanish board words and the abbreviation/multiword-name agreements
 when creating a room. Everyone sees those fixed options before readying.
@@ -13,7 +13,8 @@ agents, eight opposing agents, seven civilians and one assassin. Randomness is
 injected; words, starting team and identity arrangement are shuffled separately.
 No key exists during setup. Both spymasters receive the key, operatives do not.
 Hosting grants no extra game information. Board words never change when interface
-locale changes.
+locale changes. Local practice also preserves its clue, reveals and phase while
+changing the interface language.
 
 The active spymaster gives a meaning-based clue and count (0–9 or unlimited).
 NFC-normalized Unicode clues preserve accents, reject invisible/control characters
@@ -60,5 +61,5 @@ sequence behavior have automated coverage. Real Socket.IO coverage exercises
 operative-host privacy, forged actors, competing guesses, stale/duplicate/round
 intention handling, authenticated synchronization, reconnection and fresh rematch.
 Browser results and remaining manual checks are recorded in the implementation
-handoff. WebKit automation does not replace physical Safari/iOS validation; fluent
+handoff and [High review](../handoffs/codenames-review.md). WebKit automation does not replace physical Safari/iOS validation; fluent
 human Spanish review and a human four-person playtest remain required release work.
