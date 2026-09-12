@@ -40,13 +40,15 @@ shared commit will be retained when reconciling translation catalogs.
 
 ## Verification so far
 
-- Ten focused transport tests pass: retry invariants and real Socket.IO privacy,
+- Eleven focused transport tests pass (37 assertions): retry invariants and real Socket.IO privacy,
   stale/match codes, deduplication, acceptance checks and private synchronization.
 - Svelte/TypeScript check passed after the initial shared integration, zero
   warnings. Final combined checks are still required.
-- WebKit binary is present but its local libavif16 dependency was unavailable.
-  Coordinator is recreating the temporary wrapper documented in validation.md;
-  no system package or optional extension installation is needed.
+- Chromium and WebKit launch from an isolated temporary browser cache at
+  `/tmp/board-games-three-games-browsers`. WebKit uses the `webkit` wrapper in
+  that directory with locally extracted codec libraries; no system package or
+  optional extension installation was needed. Set `PLAYWRIGHT_BROWSERS_PATH` to
+  that directory and `WEBKIT_EXECUTABLE` to its wrapper for this machine.
 
 ## Remaining delivery
 
@@ -64,11 +66,11 @@ unless real evidence becomes available.
 Azul Medium implementation and wiring are on integration as `c15a022` / `2edae65`
 (from owner `f2eb656` / `a000b06`). Its original planning handoff is preserved;
 Medium evidence including `b0df8ea` is in `azul-implementation.md`, so skip the
-owner's separate handoff commit. High review is active in the Azul worktree.
+owner's separate handoff commit. High review is complete in the Azul worktree.
 
 Codenames Medium implementation and wiring are on integration as `db7554b` /
 `86a96c4` (from `23aa459` / `ccb1c57`). Its Medium handoff `bf2b10d` was copied into
-integration via `b327de7`, so skip that owner handoff commit. High review is active.
+integration via `b327de7`, so skip that owner handoff commit. High review is complete.
 Shared catalog order preserves UNO/Catan/Carcassonne, then Azul/Codenames/Sushi.
 Expected conflicts in manifests, message catalogs and lazy registries were
 resolved by retaining each game's independent additions and shared error copy.
@@ -88,3 +90,23 @@ Reviewer discovery propagated to all owners: Paraglide's default document reload
 loses local in-memory practice progress. Use `reload:false` with locale-reactive
 rendering, and verify an actual accepted action survives the locale switch.
 Multiplayer state remains server-backed across reload.
+
+## Reviewed game integration
+
+Azul High fixes and final handoff are integrated as `5230b2c` / `d72c08b`
+(owner `e2ecd17` / `9923c28`). They correct right-to-left pattern filling,
+wall contrast and accessible labels, compact opponent inspection, 44px controls,
+local practice language continuity and axis scoring explanations. See
+[Azul review](azul-review.md) and [visual evidence](../evidence/azul/README.md).
+
+Codenames High fixes/evidence are integrated as `76fffbc` / `41d62cc`
+(owner `ded18f8` / `8c25ee1`). The final warm leather/wood table adjustment is
+`332d2be` (owner `cec03e9`). The review covers competing operative confirmations,
+clue review and penalties, reservation guidance, sound/presentation lifecycle,
+compact controls and practice language continuity. See
+[Codenames review](codenames-review.md) and
+[visual evidence](../evidence/codenames/README.md).
+
+`f4851e6` extends library coverage documentation and bilingual key checks to all
+six games. Sushi's implementation is completing its commit/handoff phase; its
+independent High review and final combined verification remain pending.
