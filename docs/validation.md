@@ -11,7 +11,7 @@ Run commands from the repository root with Bun 1.4.2 or newer.
 | `bun run test:e2e`              | Run Playwright browser integration coverage                                          |
 | `bun run format:check`          | Check source formatting                                                              |
 
-Install the browser binary required by the Playwright configuration with `bun --bun playwright install --with-deps chromium webkit` when it is unavailable. Build first with `bun run build`; Playwright starts the built server automatically on port 3100 (`TEST_PORT` overrides it). Browser integration checks cover both game tables, room creation and joining, token-based reconnection, recipient privacy, lazy game loading, and English/Spanish UI. Inspect the current test configuration for server setup and ports.
+Install the browser binary required by the Playwright configuration with `bun --bun playwright install --with-deps chromium webkit` when it is unavailable. Build first with `bun run build`; Playwright starts the built server automatically on port 3100 (`TEST_PORT` overrides it). Browser integration checks cover all six game tables, room creation and joining, token-based reconnection, recipient privacy, lazy game loading, and English/Spanish UI. Inspect the current test configuration for server setup and ports.
 
 Rules tests should exercise important legal/illegal moves and victory transitions. Session tests should verify actor binding, reservation expiration, replacement secrets, stale/duplicate actions and recipient projection. Browser tests should validate observable behavior rather than duplicate rule implementation.
 
@@ -250,3 +250,56 @@ Browser verification used Playwright's owned server on port 3100. The initially
 present user server on port 3000 was not terminated by the agent. All owned test
 servers stopped; a final listener check confirmed ports 3000 and 3100 were empty.
 Actual Safari hardware testing remains manual; WebKit automation does not replace it.
+
+## Azul, Codenames and Sushi Go Party — September 12, 2026
+
+This delivery lives on `integration/three-games` in the isolated integration
+worktree. Implementation stayed isolated from the original checkout. Per-game planning,
+implementation and independent High review handoffs live in [handoffs](handoffs/).
+[Combined visual evidence](evidence/integration/README.md) links actual table
+screenshots and motion recordings. The library contains 118 lessons across six
+games with English/Spanish frames; practice routes use separate deterministic
+fixtures and the real rules.
+
+Shared coverage includes coded stale/match failures, authenticated private
+synchronization, original-ID retries with at most three attempts, lost replies,
+passed hands, setup changes and mutable reactive selections. Azul drafts and
+Codenames guesses never retry automatically. Game suites cover complete seeded
+matches, scoring, invalid intentions, recipient payload privacy, reconnect,
+seat replacement, host migration and rematch. Sushi includes every standard box
+card, all eight presets and advanced chained choices; documented app conventions
+are distinguished from verified publisher rules.
+
+The first combined rules/session/content suite passed 261 tests with 39,705
+assertions. Frozen installation, type/Svelte checks (zero errors/warnings),
+production frontend/server build and formatting passed. The independent Sushi
+review and final focused browser results are recorded below when complete.
+
+The combined browser sweep uses isolated temporary browser installations to avoid
+cache cleanup by unrelated sessions:
+
+```sh
+PLAYWRIGHT_BROWSERS_PATH=/tmp/board-games-three-games-browsers \
+WEBKIT_EXECUTABLE=/tmp/board-games-three-games-browsers/webkit \
+TEST_PORT=3110 bun run test:e2e
+```
+
+The wrapper supplies locally extracted WebKit codec dependencies; it is specific
+to this test machine and is not shipped as an application requirement. Browser
+journeys use independent clients and real in-memory rooms, plus explicitly local
+practice fixtures. The inherited Catan native pinch case remains skipped in
+WebKit because that test uses Chrome's CDP touch interface.
+
+Physical macOS/iOS Safari, human group playtesting, subjective speaker listening
+and fluent Spanish review remain **unverified**. Automated complete matches,
+audio-source instrumentation and WebKit checks do not establish those outcomes.
+
+### Original checkout audit
+
+During implementation, `main` advanced independently to `7d69ad1` ("Carcassone
+added, catan improvements added") and the original checkout became clean. Its
+tree is exactly identical to baseline `4eb18bb`: `git diff 4eb18bb 7d69ad1` is
+empty. Consequently its index/status differ from the initial dirty-checkout audit,
+but no captured source content differs. The integration branch records that main
+commit as an ancestor without changing its integrated tree. The original checkout
+is not reset, switched or rewritten by this delivery.

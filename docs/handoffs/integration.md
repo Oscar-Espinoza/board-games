@@ -127,3 +127,13 @@ with 39,705 assertions passed. Formatting passed after normalizing two handoffs/
 coverage tables. The broad Chromium/WebKit run is underway; the new guide journey
 awaits Sushi's illustrated-scene corrections. All owned servers must stop after
 validation, per the user's explicit follow-up instruction.
+
+## Original checkout advanced independently
+
+Preservation audit found original `main` now at `7d69ad1`, committed at 03:02:47
+on September 12, with a clean checkout. Its tree exactly matches the captured
+baseline `4eb18bb`; their diff is empty. Original status/index therefore no longer
+match the initial dirty record, but every captured source file does. Preserve this
+new commit and clean checkout. Integration records `7d69ad1` as a parent via a
+merge retaining the current integration tree, justified by that exact tree equality.
+This keeps the delivery based on current main without replaying the same baseline.
