@@ -169,7 +169,10 @@ test('three total attempts retain the exact intention and ID; each uses synchron
   expect(calls.map((c) => c.revision)).toEqual([10, 11, 12]);
   expect(
     calls.every(
-      (c) => c.id === 'same-id' && c.action === pick && c.round === 2,
+      (c) =>
+        c.id === 'same-id' &&
+        JSON.stringify(c.action) === JSON.stringify(pick) &&
+        c.round === 2,
     ),
   ).toBe(true);
 });
@@ -228,4 +231,28 @@ test('ordinary game errors do not trigger synchronization or retry', async () =>
     }),
   ).rejects.toThrow('Invalid card');
   expect(synced).toBe(false);
+});
+
+test('editing the local selection during synchronization does not change the retained intention', async () => {
+  const initial = room();
+  let latest = initial;
+  const intention = structuredClone(pick);
+  const calls: ActionRequest[] = [];
+  await deliverIntention(initial, new Proxy(intention, {}), 'stable', {
+    current: () => latest,
+    submit: async (request) => {
+      calls.push(request);
+      if (calls.length === 1) {
+        intention.card = 'another-card';
+        throw new SocketReplyError('stale', 'STALE_REVISION');
+      }
+    },
+    synchronize: async () => {
+      latest = { ...initial, revision: initial.revision + 1 };
+      return { room: latest, accepted: false };
+    },
+  });
+  expect(calls).toHaveLength(2);
+  expect(calls[0].action).toEqual(pick);
+  expect(calls[1].action).toEqual(pick);
 });

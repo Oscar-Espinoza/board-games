@@ -107,10 +107,18 @@ export async function deliverIntention(
     }): Promise<Synchronization>;
   },
 ) {
+  // Selection controls may continue to change while synchronization is in flight.
+  // Use the wire representation, which also unwraps Svelte reactive proxies.
+  const intention: unknown = JSON.parse(JSON.stringify(action));
   let revision = initial.revision;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      await transport.submit({ id, round: initial.round, revision, action });
+      await transport.submit({
+        id,
+        round: initial.round,
+        revision,
+        action: intention,
+      });
       return;
     } catch (error) {
       if (
@@ -139,8 +147,8 @@ export async function deliverIntention(
         return;
       if (
         attempt === 2 ||
-        !canRetryIntention(initial, synchronized.room, action) ||
-        !canRetryIntention(initial, live, action)
+        !canRetryIntention(initial, synchronized.room, intention) ||
+        !canRetryIntention(initial, live, intention)
       )
         throw error;
       revision = live.revision;
