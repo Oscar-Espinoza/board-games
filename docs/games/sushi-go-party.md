@@ -19,10 +19,14 @@ end, and Uramaki points that were already awarded. After round three, dessert
 scoring determines the result. The room host can start another feast.
 
 The illustrated book opens searchable dish rules and advanced conventions. The
+catalog library adds 26 authored, accessible lessons with distinct before/action/
+result diagrams and numerical examples in English and Spanish. The
 gear contains sound, volume, motion and supplied room controls. Sounds start only
 after a user gesture and never block actions. Only presentation preferences and
 the existing room reconnect credential are stored in the browser. Missing seats
-pause choices while preserving commitments and prompts.
+pause choices while preserving commitments and prompts. Cosmetic events cancel on
+hiding, reconnection, snapshot gaps, resize and preference changes; returning to
+the table renders the latest state without replaying older events.
 
 ## Edition evidence and inventory
 
@@ -136,3 +140,6 @@ Implementation validation is recorded in the handoff and evidence index. Pure
 seeded matches, real independent Socket.IO clients, and browser journeys are
 reported separately. WebKit automation is not physical Safari-device validation.
 Physical Safari and a live human group playtest remain unverified.
+
+The [independent review](../handoffs/sushi-go-party-review.md) records rules/privacy
+assessment, presentation fixes, exact viewport evidence and remaining device limits.
