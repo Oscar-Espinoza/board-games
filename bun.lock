@@ -16,10 +16,13 @@
     "apps/server": {
       "name": "@board-games/server",
       "dependencies": {
+        "@board-games/azul": "workspace:*",
         "@board-games/carcassonne": "workspace:*",
         "@board-games/catan": "workspace:*",
+        "@board-games/codenames": "workspace:*",
         "@board-games/game-core": "workspace:*",
         "@board-games/shared": "workspace:*",
+        "@board-games/sushi-go-party": "workspace:*",
         "@board-games/uno": "workspace:*",
         "sirv": "^3.0.2",
         "socket.io": "^4.8.1",
@@ -31,10 +34,13 @@
     "apps/web": {
       "name": "@board-games/web",
       "dependencies": {
+        "@board-games/azul": "workspace:*",
         "@board-games/carcassonne": "workspace:*",
         "@board-games/catan": "workspace:*",
+        "@board-games/codenames": "workspace:*",
         "@board-games/game-core": "workspace:*",
         "@board-games/shared": "workspace:*",
+        "@board-games/sushi-go-party": "workspace:*",
         "@board-games/uno": "workspace:*",
         "socket.io-client": "^4.8.1",
       },
@@ -47,6 +53,17 @@
         "svelte-check": "^4.3.0",
         "typescript": "^5.9.0",
         "vite": "8.3.0",
+      },
+    },
+    "games/azul": {
+      "name": "@board-games/azul",
+      "version": "0.0.0",
+      "dependencies": {
+        "@board-games/game-core": "workspace:*",
+        "@board-games/shared": "workspace:*",
+      },
+      "peerDependencies": {
+        "svelte": "^5.0.0",
       },
     },
     "games/carcassonne": {
@@ -63,6 +80,27 @@
     "games/catan": {
       "name": "@board-games/catan",
       "version": "0.0.0",
+      "dependencies": {
+        "@board-games/game-core": "workspace:*",
+        "@board-games/shared": "workspace:*",
+      },
+      "peerDependencies": {
+        "svelte": "^5.0.0",
+      },
+    },
+    "games/codenames": {
+      "name": "@board-games/codenames",
+      "version": "0.0.0",
+      "dependencies": {
+        "@board-games/game-core": "workspace:*",
+        "@board-games/shared": "workspace:*",
+      },
+      "peerDependencies": {
+        "svelte": "^5.0.0",
+      },
+    },
+    "games/sushi-go-party": {
+      "name": "@board-games/sushi-go-party",
       "dependencies": {
         "@board-games/game-core": "workspace:*",
         "@board-games/shared": "workspace:*",
@@ -92,15 +130,21 @@
     },
   },
   "packages": {
+    "@board-games/azul": ["@board-games/azul@workspace:games/azul"],
+
     "@board-games/carcassonne": ["@board-games/carcassonne@workspace:games/carcassonne"],
 
     "@board-games/catan": ["@board-games/catan@workspace:games/catan"],
+
+    "@board-games/codenames": ["@board-games/codenames@workspace:games/codenames"],
 
     "@board-games/game-core": ["@board-games/game-core@workspace:packages/game-core"],
 
     "@board-games/server": ["@board-games/server@workspace:apps/server"],
 
     "@board-games/shared": ["@board-games/shared@workspace:packages/shared"],
+
+    "@board-games/sushi-go-party": ["@board-games/sushi-go-party@workspace:games/sushi-go-party"],
 
     "@board-games/uno": ["@board-games/uno@workspace:games/uno"],
 

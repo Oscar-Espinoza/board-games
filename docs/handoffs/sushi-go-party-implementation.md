@@ -471,4 +471,16 @@ claimed for them. These are external validation limits, not missing card types.
 
 ### Commit record
 
-Pending commit hashes are appended after the three scoped delivery commits.
+- `c503066` — complete game engine, table, practice, illustrated guide base,
+  tests, rule/ADR documentation and preserved browser evidence.
+- `930e46c` — English and Spanish messages only.
+- `d02059e` — server/web/catalog registration only; merge with sibling games by
+  intent. No lockfile is included.
+
+The earlier `79e4c79` is the local cherry-pick of coordinator `ef5a1be` and must
+not be applied to integration a second time. Later coordinator transport fixes
+remain owned by integration. The final practice/locale rerun passed all four
+Chromium/WebKit checks after the final fruit illustration correction; the final
+eight-seat rerun passed both engines after recipient-turn synchronization in the
+test helper. These focused reruns supplement the full-suite run rather than
+claiming a new all-tests-at-once browser run.

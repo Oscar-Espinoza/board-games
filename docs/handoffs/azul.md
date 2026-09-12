@@ -18,13 +18,13 @@ Directly verified rule facts: 20 of each of five tile colors; 5/7/9 factories of
 
 Independently transcribed wall, top-to-bottom and left-to-right, from the official setup illustration (not derived from an implementation formula):
 
-| Row | 1 | 2 | 3 | 4 | 5 |
-| --- | --- | --- | --- | --- | --- |
-| 1 | blue | yellow | red | black | white |
-| 2 | white | blue | yellow | red | black |
-| 3 | black | white | blue | yellow | red |
-| 4 | red | black | white | blue | yellow |
-| 5 | yellow | red | black | white | blue |
+| Row | 1      | 2      | 3      | 4      | 5      |
+| --- | ------ | ------ | ------ | ------ | ------ |
+| 1   | blue   | yellow | red    | black  | white  |
+| 2   | white  | blue   | yellow | red    | black  |
+| 3   | black  | white  | blue   | yellow | red    |
+| 4   | red    | black  | white  | blue   | yellow |
+| 5   | yellow | red    | black  | white  | blue   |
 
 Bounded clarification search completed using publisher/Plan B/Next Move queries for FAQ, full floor and marker. No publisher clarification was located for the following cases. Do not block implementation or claim an official ruling: retain the already proposed deterministic app conventions and label them in both rules docs and help.
 

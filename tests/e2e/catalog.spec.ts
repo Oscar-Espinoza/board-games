@@ -6,8 +6,11 @@ const manifest = JSON.parse(
     'utf8',
   ),
 );
-const chunk = (game: string) =>
-  manifest[`../../games/${game}/src/Board.svelte`].file;
+const unoChunk = manifest['../../games/uno/src/Board.svelte'].file;
+// Static practice imports can make a board a shared chunk without a source key.
+const boardChunks = Object.values(manifest)
+  .filter((entry: any) => entry.name === 'Board')
+  .map((entry: any) => entry.file as string);
 async function create(page: Page, game: string, name: string) {
   await page.goto('/');
   await page
@@ -32,6 +35,7 @@ async function join(browser: Browser, url: string, name: string) {
 test('catalog loads no game clients, English/Spanish persists', async ({
   page,
 }) => {
+  expect(boardChunks).toHaveLength(6);
   const requests: string[] = [];
   page.on('request', (request) => requests.push(request.url()));
   await page.goto('/');
@@ -51,12 +55,7 @@ test('catalog loads no game clients, English/Spanish persists', async ({
   expect(
     requests.some(
       (url) =>
-        url.endsWith(chunk('uno')) ||
-        url.endsWith(chunk('catan')) ||
-        url.endsWith(chunk('carcassonne')) ||
-        url.endsWith(chunk('azul')) ||
-        url.endsWith(chunk('codenames')) ||
-        url.endsWith(chunk('sushi-go-party')) ||
+        boardChunks.some((file) => url.endsWith(file)) ||
         url.includes('terrain-') ||
         url.endsWith('.wasm'),
     ),
@@ -66,6 +65,7 @@ test('UNO create/join/play/reload restores the same private hand', async ({
   page,
   browser,
 }) => {
+  expect(boardChunks).toHaveLength(6);
   const requests: string[] = [];
   page.on('request', (request) => requests.push(request.url()));
   const errors: string[] = [];
@@ -96,15 +96,11 @@ test('UNO create/join/play/reload restores the same private hand', async ({
   ).toEqual(original);
   await expect(guest.page.locator('.roster')).toContainText('Alice');
   expect(errors).toEqual([]);
-  expect(requests.some((url) => url.endsWith(chunk('uno')))).toBe(true);
+  expect(requests.some((url) => url.endsWith(unoChunk))).toBe(true);
   expect(
     requests.some(
       (url) =>
-        url.endsWith(chunk('catan')) ||
-        url.endsWith(chunk('carcassonne')) ||
-        url.endsWith(chunk('azul')) ||
-        url.endsWith(chunk('codenames')) ||
-        url.endsWith(chunk('sushi-go-party')) ||
+        boardChunks.some((file) => file !== unoChunk && url.endsWith(file)) ||
         url.endsWith('.wasm'),
     ),
   ).toBe(false);
