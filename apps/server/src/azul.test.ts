@@ -104,10 +104,11 @@ test('Azul room generations, deduplication, stale revisions, replacement and com
   expect((rooms.view(a.roomId, 'b').game as View).public.revision).toBe(0);
 });
 test('real Socket.IO views bind actor, reject concurrent stale moves, reconnect and omit future tile order', async () => {
+  let now = 0;
   const rooms = new Rooms(
       new Map([['azul', azul]]),
       1000,
-      Date.now,
+      () => now,
       () => 0.37,
     ),
     http = createServer(),
@@ -191,6 +192,28 @@ test('real Socket.IO views bind actor, reject concurrent stale moves, reconnect 
     await flush();
     expect((latest.get(restored)!.game as View).public).toEqual(board);
     for (const s of [restored, b]) privateSafe(latest.get(s)!.game as View);
+    restored.disconnect();
+    await flush();
+    now = 1001;
+    rooms.sweep();
+    const replacement = await client();
+    const replaced = await request<Credentials>(replacement, 'join', {
+      roomId: ca.roomId,
+      name: 'Clara',
+    });
+    if (!replaced.ok) throw Error(replaced.error);
+    expect(replaced.data.playerId).toBe(ca.playerId);
+    expect(replaced.data.token).not.toBe(ca.token);
+    await flush();
+    expect((latest.get(replacement)!.game as View).public).toEqual(board);
+    expect(latest.get(replacement)!.hostId).toBe(joined.data.playerId);
+    const revoked = await client();
+    expect(
+      (await request(revoked, 'join', { roomId: ca.roomId, token: ca.token }))
+        .ok,
+    ).toBe(false);
+    expect((await request(replacement, 'start', {})).ok).toBe(false);
+    privateSafe(latest.get(replacement)!.game as View);
   } finally {
     sockets.forEach((s) => s.disconnect());
     await new Promise<void>((r) => server.close(() => http.close(() => r())));

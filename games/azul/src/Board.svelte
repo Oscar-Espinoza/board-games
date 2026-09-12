@@ -482,12 +482,18 @@
         </div>{/if}
       <div class="explanations" aria-live="polite">
         {#each recent as event}{#if event.type === 'wall'}<p class="gain">
-              {m.azul_wall_gain({
-                name: name(event.player),
-                points: event.scoring.points,
-                horizontal: event.scoring.horizontal,
-                vertical: event.scoring.vertical,
-              })}
+              {event.scoring.points === 1
+                ? m.azul_isolated_gain({ name: name(event.player) })
+                : m.azul_wall_gain({
+                    name: name(event.player),
+                    points: event.scoring.points,
+                    horizontal:
+                      event.scoring.horizontal > 1
+                        ? event.scoring.horizontal
+                        : 0,
+                    vertical:
+                      event.scoring.vertical > 1 ? event.scoring.vertical : 0,
+                  })}
             </p>{:else if event.type === 'penalty'}<p>
               {m.azul_penalty({
                 name: name(event.player),
@@ -1036,7 +1042,7 @@
     opacity: 0.45;
   }
   .confirmation .skip {
-    min-height: 32px;
+    min-height: 44px;
     font-size: 11px;
     margin-top: 6px;
     padding: 5px 10px;
@@ -1133,6 +1139,7 @@
     display: flex;
     flex-direction: column;
     gap: 9px;
+    min-height: 44px;
     font-size: 14px;
   }
   .settings .toggle {
@@ -1146,7 +1153,7 @@
     accent-color: #245d78;
   }
   .settings input[type='range'] {
-    height: 30px;
+    height: 44px;
     accent-color: #245d78;
   }
   .settings select {
@@ -1228,11 +1235,15 @@
       height: 44px;
       top: max(10px, env(safe-area-inset-top));
     }
+    dialog {
+      width: calc(100vw - 20px);
+      padding: 14px;
+    }
     .book {
-      left: 10px;
+      left: max(10px, env(safe-area-inset-left));
     }
     .gear {
-      right: 10px;
+      right: max(10px, env(safe-area-inset-right));
     }
     .table-heading {
       padding: 0 44px;

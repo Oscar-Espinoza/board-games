@@ -30,6 +30,15 @@
     choose?: (d: Destination) => void;
     highlights?: [number, number][];
   } = $props();
+  const descriptionId = $props.id();
+  const colorLabels = {
+    blue: m.azul_blue,
+    yellow: m.azul_yellow,
+    red: m.azul_red,
+    black: m.azul_black,
+    white: m.azul_white,
+    marker: m.azul_marker,
+  };
   const issueLabel = (issue: string | null) =>
     issue === 'full'
       ? m.azul_full()
@@ -64,11 +73,14 @@
             destination.row === row}
           disabled={!choose || !color || !!issue}
           aria-label="{m.azul_line({ row: row + 1 })} · {pattern.count}/{row +
-            1} · {issueLabel(issue)}"
+            1} · {pattern.color
+            ? colorLabels[pattern.color]()
+            : m.azul_empty()} · {issueLabel(issue)}"
           title={issueLabel(issue)}
           onclick={() => choose?.({ kind: 'pattern', row })}
         >
           <span class="row-number">{row + 1}</span>
+          {#if issue}<span class="row-issue">{issueLabel(issue)}</span>{/if}
           {#each Array(row + 1) as _, slot}<span
               class="slot"
               data-azul-location="{id}/pattern/{row}/{slot}"
@@ -85,11 +97,23 @@
             class:scored={highlights.some(
               ([row, col]) => row === r && col === c,
             )}
+            role="img"
+            aria-label={m.azul_wall_cell({
+              row: r + 1,
+              column: c + 1,
+              color: colorLabels[wallColors[r][c]](),
+              status: occupied ? m.azul_occupied() : m.azul_empty(),
+            })}
             data-azul-location="{id}/wall/{r}/{c}"
             ><Tile color={wallColors[r][c]} ghost={!occupied} /></span
           >{/each}{/each}
     </div>
   </div>
+  <span id="{descriptionId}-floor" class="visually-hidden"
+    >{board.floor.length
+      ? board.floor.map((color) => colorLabels[color]()).join(', ')
+      : m.azul_empty()}</span
+  >
   <button
     class="floor"
     class:legal={color && choose}
@@ -97,6 +121,7 @@
     disabled={!choose || !color}
     onclick={() => choose?.({ kind: 'floor' })}
     aria-label={m.azul_floor()}
+    aria-describedby="{descriptionId}-floor"
   >
     <span class="floor-label">{m.azul_floor()}</span><span class="floor-slots"
       >{#each penalties as penalty, slot}<span class="floor-space"
@@ -113,6 +138,14 @@
 </section>
 
 <style>
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
   .player-board {
     --tile: 33px;
     --gap: 5px;
@@ -185,7 +218,8 @@
     border: 1px solid transparent;
     background: transparent;
     display: flex;
-    justify-content: flex-end;
+    flex-direction: row-reverse;
+    justify-content: flex-start;
     align-items: center;
     gap: var(--gap);
     padding: 2px;
@@ -194,6 +228,20 @@
     border-radius: 4px;
     min-height: 44px;
     color: inherit;
+  }
+  .row-issue {
+    position: absolute;
+    inset: 1px;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    padding: 2px 4px;
+    border-radius: 3px;
+    background: #fff8e8f0;
+    color: #5f4630;
+    font-size: 11px;
+    line-height: 1.2;
+    text-align: center;
   }
   .row-number {
     position: absolute;

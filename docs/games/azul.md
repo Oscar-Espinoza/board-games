@@ -6,7 +6,7 @@ Standard colored-wall Azul for 2–4 players. Each player builds a public wall b
 
 There are 100 tiles: 20 each of blue, yellow, red, black and white. Shuffle the bag using the injected random source. Put four tiles on each of 5/7/9 factories for 2/3/4 players, respectively. The first starter is uniformly random; turns proceed clockwise.
 
-Take every tile of one color from one factory or from the center. A factory's remaining colors move into the center. Choose one legal pattern line or send the whole selection directly to the floor. No split or partial selection is accepted. Pattern lines have capacities 1–5 and hold only one color; a line cannot accept a color already present in its wall row. Excess tiles fill the floor and then go directly to discard.
+Take every tile of one color from one factory or from the center. A factory's remaining colors move into the center. Choose one legal pattern line or send the whole selection directly to the floor. No split or partial selection is accepted. Pattern lines fill from right to left, have capacities 1–5 and hold only one color; a line cannot accept a color already present in its wall row. Excess tiles fill the floor and then go directly to discard.
 
 The first center pick claims the first player marker **before** placing its colored tiles. The marker occupies the next floor slot and its owner starts the following round. Floor slots deduct 1, 1, 2, 2, 2, 3, 3 points.
 
@@ -26,7 +26,7 @@ When all shared colored tiles are gone, resolve **every** player's completed pat
 
 An isolated tile scores 1 point. Otherwise score the contiguous horizontal connection, if any, and contiguous vertical connection, if any, separately. The new tile counts in both connected axes: lengths 4 and 3 score 7. Diagonals and gaps do not connect. Earlier placements in the round contribute to later placements.
 
-Apply floor deductions after wall points, stopping at zero. The ledger distinguishes printed deductions from actual score lost. Discard colored floor tiles and reset the marker. Refill factories, consuming the existing bag before shuffling recycled discards. On a total shortage, leave later factories partial or empty. Scores have no 100-point cap.
+Apply floor deductions after wall points, stopping at zero. The ledger distinguishes printed deductions from actual score lost. Discard colored floor tiles and reset the marker. Refill factories, consuming the existing bag before shuffling recycled discards. On a total shortage, leave later factories partial or empty. Scores have no 100-point cap. The scoring explanation shows contributions from connected axes only; an isolated tile is labeled separately.
 
 ## Ending and ties
 
@@ -52,7 +52,7 @@ This follows ADR 011's accepted-event boundary. A game-owned revision gate requi
 
 Audio is restrained, initially enabled at 25%, gesture-unlocked Web Audio. Unavailable audio and unavailable browser storage do not block play. Mute cancels scheduled sources. Reduced motion preserves canonical placement and scoring explanations without flights.
 
-`/practice/azul` imports a separate local entry using the same create/apply/view operations. Its seeded openings, marker overflow, scoring and shared-finish fixtures conserve every color. One human switches between seats in settings; there are no bots or multiplayer fixture actions. The route and guide load lazily, and catalog metadata imports no game code.
+`/practice/azul` imports a separate local entry using the same create/apply/view operations. Its seeded openings, marker overflow, scoring and shared-finish fixtures conserve every color. One human switches between seats in settings; there are no bots or multiplayer fixture actions. The route and guide load lazily, and catalog metadata imports no game code. Changing the local workshop language preserves its accepted state and establishes a fresh presentation baseline.
 
 ## Primary sources
 
@@ -64,6 +64,6 @@ Publisher evidence and the independently transcribed wall were locked during the
 
 ## Validation
 
-Rule tests include independent scoring examples, exact wall mapping, invalid payload/RNG immutability, every marker convention, partial refill, full conserved seeded games for all seat counts, final resolution and ties. Session tests exercise actual Socket.IO delivery, identity binding, concurrent intentions, request deduplication, reconnect, replacement/revoked credentials and rematch generations. Browser tests and inspected visual evidence are recorded in `docs/handoffs/azul.md`.
+Rule tests include independent scoring examples, exact wall mapping, invalid payload/RNG immutability, every marker convention, partial refill, full conserved seeded games for all seat counts, final resolution and ties. Session tests exercise actual Socket.IO delivery, identity binding, concurrent intentions, request deduplication, reconnect, replacement/revoked credentials and rematch generations. Browser tests and inspected visual evidence are recorded in `docs/handoffs/azul.md`; the independent final review and corrections are in [Azul review](../handoffs/azul-review.md).
 
 Actual Safari on macOS/iOS, device touch/audio quality, a multi-human game and fluent Spanish editorial review require human validation and are not established by WebKit automation.

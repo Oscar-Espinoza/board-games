@@ -32,7 +32,12 @@
 >
 {#each visible as lesson}<article>
     <h3>{lesson.title()}</h3>
-    <HelpScene scene={lesson.id} step={frames[lesson.id] ?? 2} />
+    <div
+      role="img"
+      aria-label="{lesson.title()} · {lesson.frames[frames[lesson.id] ?? 2]()}"
+    >
+      <HelpScene scene={lesson.id} step={frames[lesson.id] ?? 2} />
+    </div>
     <p>{lesson.explanation()}</p>
     <div class="frames">
       {#each lesson.frames as frame, i}<button

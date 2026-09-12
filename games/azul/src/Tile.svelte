@@ -122,10 +122,10 @@
     border-radius: 50%;
   }
   .ghost {
-    opacity: 0.22;
+    opacity: 1;
     box-shadow: none;
-    border: 1px solid #24465c;
-    background: transparent;
-    filter: grayscale(0.25);
+    border: 1px dashed #8a9b9e;
+    background: color-mix(in srgb, var(--glaze) 12%, #f6ebd2);
+    color: #386174;
   }
 </style>

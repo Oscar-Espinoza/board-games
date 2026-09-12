@@ -117,10 +117,16 @@ test('ceramic workshop: keyboard draft, actual flights, help focus, scoring and 
   await expect(help).toBeFocused();
   await scenario(page, 'scoring');
   await choose(page);
+  await expect(page.locator('.own-board .row-issue').first()).toContainText(
+    'This line is full.',
+  );
   await page
     .getByRole('button', { name: 'Confirm tiles', exact: true })
     .click();
   await expect(page.locator('.explanations')).toContainText('+6 wall points');
+  await expect(page.locator('.explanations')).toContainText(
+    '+2 wall points (0 horizontal + 2 vertical)',
+  );
   await expect(page.locator('.azul-flight')).toHaveCount(0);
   await page.screenshot({ path: info.outputPath('azul-scoring.png') });
   await scenario(page, 'finish');
@@ -183,6 +189,7 @@ test('phone and tablet: nine factories, marker overflow, silent reduced motion a
   await expect(page.locator('.azul-flight')).toHaveCount(0);
   await page.screenshot({ path: info.outputPath('azul-phone-overflow.png') });
   await noOverflow(page, 360);
+  const acceptedBoard = await page.locator('.own-board .mosaic').innerHTML();
   await settings(page);
   await page.getByLabel('Ceramic sounds').uncheck();
   await page.getByLabel('Volume').fill('0.1');
@@ -196,6 +203,13 @@ test('phone and tablet: nine factories, marker overflow, silent reduced motion a
     .click();
   await expect(page.getByLabel('Sonidos de cerámica')).not.toBeChecked();
   await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
+  await expect(page.locator('.azul-table')).toHaveAttribute(
+    'data-game-revision',
+    '1',
+  );
+  // Exact public piece positions survive a locale change; translated labels differ.
+  expect(await page.locator('.own-board .pattern .tile').count()).toBe(2);
+  expect(acceptedBoard).toContain('tile blue');
   await page.screenshot({ path: info.outputPath('azul-phone-spanish.png') });
   await noOverflow(page, 360);
 });
@@ -374,3 +388,111 @@ for (const count of [2, 4])
       await Promise.all(ownedBrowsers.map((b) => b.close()));
     }
   });
+
+test('review: right-to-left patterns, readable wall, compact touch targets and effect cancellation', async ({
+  browser,
+}, info) => {
+  const context = await browser.newContext({
+    viewport: { width: 360, height: 640 },
+    hasTouch: true,
+    recordVideo: { dir: info.outputPath('review-touch') },
+  });
+  const page = await context.newPage();
+  try {
+    await page.goto('/practice/azul');
+    await scenario(page, 'overflow');
+    const slots = page.locator('.own-board .pattern').nth(1).locator('.slot');
+    const right = await slots.nth(0).boundingBox(),
+      left = await slots.nth(1).boundingBox();
+    expect(right!.x).toBeGreaterThan(left!.x);
+    await expect(slots.nth(0).locator('.tile.blue')).toHaveCount(1);
+    await expect(slots.nth(1).locator('.empty-slot')).toHaveCount(1);
+    await expect(
+      page.getByRole('img', {
+        name: 'Wall row 1, column 1 · Blue diamond · Empty',
+        exact: true,
+      }),
+    ).toHaveCount(1);
+    await page.locator('.own-board').scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: info.outputPath('azul-review-readable-phone.png'),
+    });
+    await page.locator('.opponent').first().tap();
+    const dialog = page.getByRole('dialog');
+    expect(
+      await dialog.evaluate((e) => e.scrollWidth - e.clientWidth),
+    ).toBeLessThanOrEqual(1);
+    await page.screenshot({
+      path: info.outputPath('azul-review-phone-opponent.png'),
+    });
+    await close(page);
+    await page
+      .getByRole('button', {
+        name: 'Take 4 · Blue diamond · Center',
+        exact: true,
+      })
+      .tap();
+    for (const line of await page
+      .locator('.own-board .pattern:enabled')
+      .all()) {
+      expect((await line.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      await line.tap();
+    }
+    await page.getByRole('button', { name: 'Floor line', exact: true }).tap();
+    await expect(page.locator('.confirmation')).toContainText('4 to discard');
+    await page
+      .getByRole('button', { name: 'Confirm tiles', exact: true })
+      .tap();
+    await expect(page.locator('.azul-table')).toHaveAttribute(
+      'data-game-revision',
+      '1',
+    );
+    await noOverflow(page, 360);
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await scenario(page, 'scoring');
+    await choose(page);
+    await page
+      .getByRole('button', { name: 'Confirm tiles', exact: true })
+      .tap();
+    await expect(page.locator('.azul-flight').first()).toBeAttached();
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await expect(page.locator('.azul-flight')).toHaveCount(0);
+    await expect(page.locator('.explanations')).toContainText('+6 wall points');
+    await scenario(page, 'scoring');
+    await choose(page);
+    await page
+      .getByRole('button', { name: 'Confirm tiles', exact: true })
+      .tap();
+    await expect(page.locator('.azul-flight').first()).toBeAttached();
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'hidden', {
+        configurable: true,
+        value: true,
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+      Object.defineProperty(document, 'hidden', {
+        configurable: true,
+        value: false,
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect(page.locator('.azul-flight')).toHaveCount(0);
+    await expect(page.locator('.azul-table')).toHaveAttribute(
+      'data-game-revision',
+      '1',
+    );
+    await settings(page);
+    await page.getByLabel('Motion', { exact: true }).selectOption('reduced');
+    await close(page);
+    await expect(page.locator('.azul-flight')).toHaveCount(0);
+    await page.setViewportSize({ width: 720, height: 450 });
+    await scenario(page, 'start4');
+    await clearFactories(page);
+    await noOverflow(page, 720);
+    await page.screenshot({
+      path: info.outputPath('azul-review-zoom-reflow.png'),
+    });
+  } finally {
+    await context.close();
+  }
+});
