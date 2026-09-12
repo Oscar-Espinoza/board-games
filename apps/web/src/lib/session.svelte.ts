@@ -1,5 +1,11 @@
 import { io, type Socket } from 'socket.io-client';
-import type { Credentials, Reply, RoomView } from '@board-games/shared';
+import type {
+  Credentials,
+  Reply,
+  RoomView,
+  Synchronization,
+} from '@board-games/shared';
+import { deliverIntention, SocketReplyError } from './action-retry';
 export const session = $state({
   room: null as RoomView | null,
   connected: false,
@@ -43,9 +49,13 @@ export function request<T>(event: string, data: unknown): Promise<T> {
       .emit(event, data, (error: Error | null, reply: Reply<T>) => {
         if (error)
           reject(
-            new Error('Server did not respond. Reconnect to synchronize.'),
+            new SocketReplyError(
+              'Server did not respond. Reconnect to synchronize.',
+              'TIMEOUT',
+            ),
           );
-        else if (!reply.ok) reject(new Error(reply.error));
+        else if (!reply.ok)
+          reject(new SocketReplyError(reply.error, reply.code));
         else resolve(reply.data);
       });
   });
@@ -112,49 +122,25 @@ export async function send(action: unknown) {
   session.error = '';
   const initial = session.room;
   const id = crypto.randomUUID();
-  const ready = action as { type?: string; version?: number };
   try {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const revision: number = session.room?.revision ?? initial.revision;
-      try {
-        await request('action', { id, round: initial.round, revision, action });
-        break;
-      } catch (error) {
+    await deliverIntention(initial, action, id, {
+      current: () => session.room,
+      submit: (payload) => request('action', payload),
+      synchronize: async (payload) => {
+        const synchronized = await request<Synchronization>('sync', payload);
+        // Never overwrite a different room, match, or a newer pushed snapshot.
+        const live = session.room;
         if (
-          (error as Error).message !== 'Table updated; try again' ||
-          attempt === 2 ||
-          initial.gameId !== 'carcassonne' ||
-          ready.type !== 'ready'
-        )
-          throw error;
-        // The server publishes after its acknowledgement. Wait for that snapshot,
-        // then retry only readiness for the identical setup, with the same ID.
-        if (session.room?.revision === revision)
-          await new Promise<void>((resolve) => {
-            const done = () => {
-              clearTimeout(timer);
-              socket?.off('snapshot', done);
-              resolve();
-            };
-            const timer = setTimeout(done, 1000);
-            socket?.once('snapshot', done);
-          });
-        const room = session.room;
-        const pub = room?.game?.public as
-          | { phase?: string; setupVersion?: number; ready?: string[] }
-          | undefined;
-        if (
-          !room ||
-          room.id !== initial.id ||
-          room.round !== initial.round ||
-          pub?.phase !== 'setup' ||
-          pub.setupVersion !== ready.version ||
-          room.players.some((p) => !p.connected) ||
-          pub.ready?.includes(room.playerId)
-        )
-          throw error;
-      }
-    }
+          live?.id === synchronized.room.id &&
+          live.playerId === synchronized.room.playerId &&
+          live.round === synchronized.room.round &&
+          live.revision <= synchronized.room.revision
+        ) {
+          session.room = synchronized.room;
+        }
+        return synchronized;
+      },
+    });
   } catch (error) {
     session.error = (error as Error).message;
   } finally {

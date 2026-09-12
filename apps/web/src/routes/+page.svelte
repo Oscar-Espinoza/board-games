@@ -17,7 +17,8 @@
   let dialog: HTMLDialogElement;
   let opener: HTMLElement | null = null;
   let hoverTimer: ReturnType<typeof setTimeout>;
-  const game = $derived(catalog.find((g) => g.id === selected)!);
+  const selectedIndex = $derived(catalog.findIndex((g) => g.id === selected));
+  const game = $derived(catalog[selectedIndex]!);
   const summaries = {
     uno: m.library_uno_summary,
     catan: m.library_catan_summary,
@@ -156,7 +157,9 @@
       {#each catalog as item, i}<div
           class="game-box {item.id}"
           class:front={selected === item.id}
-          style="--slot:{i}"
+          class:previous={i ===
+            (selectedIndex + catalog.length - 1) % catalog.length}
+          class:next={i === (selectedIndex + 1) % catalog.length}
           data-box={item.id}
         >
           <BoxArt game={item.id} />
@@ -337,7 +340,7 @@
   .game-names {
     display: grid;
     gap: 4px;
-    margin-top: 40px;
+    margin-top: 24px;
     max-width: 360px;
   }
   .game-names button {
@@ -347,11 +350,12 @@
     gap: 14px;
     background: transparent;
     color: #8e7961;
-    padding: 15px 5px;
+    padding: 10px 5px;
+    min-height: 48px;
     border-radius: 0;
     border-bottom: 1px solid #aa88632c;
     font-family: Georgia, serif;
-    font-size: clamp(1.4rem, 2.5vw, 2.1rem);
+    font-size: clamp(1.3rem, 2.2vw, 1.85rem);
     font-weight: 400;
   }
   .game-names button.chosen {
@@ -396,54 +400,43 @@
     position: absolute;
     width: 270px;
     height: 300px;
-    left: calc(7% + var(--slot) * 20%);
-    top: calc(66px + var(--slot) * 20px);
-    transform: rotate(calc(-16deg + var(--slot) * 15deg)) scale(0.84);
+    left: 25%;
+    top: 100px;
+    transform: scale(0.75);
+    opacity: 0;
+    visibility: hidden;
     filter: drop-shadow(10px 18px 9px #51321b38);
     transition:
       transform 380ms cubic-bezier(0.2, 0.75, 0.25, 1),
       left 380ms,
       top 380ms,
-      filter 380ms;
-    z-index: calc(3 - var(--slot));
+      filter 380ms,
+      opacity 220ms;
+    z-index: 1;
     pointer-events: none;
   }
   .game-box.front {
+    opacity: 1;
+    visibility: visible;
     z-index: 5;
     left: 25%;
     top: 48px;
     transform: rotate(-5deg) scale(1.12);
     filter: drop-shadow(15px 29px 14px #51321b4a);
   }
-  .box-stage[data-selected='uno'] .catan {
-    left: 4%;
-    top: 128px;
-    transform: rotate(-18deg) scale(0.82);
-  }
-  .box-stage[data-selected='uno'] .carcassonne {
-    left: 53%;
-    top: 88px;
-    transform: rotate(15deg) scale(0.88);
-  }
-  .box-stage[data-selected='catan'] .uno {
+  .game-box.previous {
+    visibility: visible;
+    opacity: 1;
     left: 2%;
     top: 115px;
-    transform: rotate(-19deg) scale(0.8);
-  }
-  .box-stage[data-selected='catan'] .carcassonne {
-    left: 52%;
-    top: 91px;
-    transform: rotate(15deg) scale(0.88);
-  }
-  .box-stage[data-selected='carcassonne'] .uno {
-    left: 2%;
-    top: 75px;
     transform: rotate(-18deg) scale(0.8);
   }
-  .box-stage[data-selected='carcassonne'] .catan {
-    left: 53%;
-    top: 128px;
-    transform: rotate(17deg) scale(0.83);
+  .game-box.next {
+    visibility: visible;
+    opacity: 1;
+    left: 52%;
+    top: 91px;
+    transform: rotate(15deg) scale(0.86);
   }
   .spark {
     position: absolute;

@@ -1,6 +1,6 @@
 import { Server } from 'socket.io';
 import type { Server as HttpServer } from 'node:http';
-import { Rooms } from './rooms.js';
+import { RoomError, Rooms } from './rooms.js';
 import type { ActionRequest, Reply } from '@board-games/shared';
 export function attachSockets(server: HttpServer, rooms: Rooms) {
   const io = new Server(server, {
@@ -34,6 +34,9 @@ export function attachSockets(server: HttpServer, rooms: Rooms) {
           reply({
             ok: false,
             error: error instanceof Error ? error.message : 'Invalid request',
+            ...(error instanceof RoomError && error.code
+              ? { code: error.code }
+              : {}),
           });
         }
         if (roomId) publish(roomId);
@@ -55,6 +58,10 @@ export function attachSockets(server: HttpServer, rooms: Rooms) {
     handle('start', () => {
       if (!roomId) throw new Error('Join first');
       rooms.start(roomId, socket.id);
+    });
+    handle('sync', (request) => {
+      if (!roomId) throw new Error('Join first');
+      return rooms.synchronize(roomId, socket.id, request);
     });
     handle('action', (request: ActionRequest) => {
       if (!roomId) throw new Error('Join first');

@@ -1,6 +1,11 @@
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { GameDefinition } from '@board-games/game-core';
-import type { ActionRequest, Credentials, RoomView } from '@board-games/shared';
+import type {
+  ActionRequest,
+  Credentials,
+  RoomView,
+  ReplyErrorCode,
+} from '@board-games/shared';
 
 type Seat = {
   id: string;
@@ -24,8 +29,17 @@ type Room = {
   revision: number;
   touched: number;
 };
-const fail = (message: string): never => {
-  throw new Error(message);
+export class RoomError extends Error {
+  constructor(
+    message: string,
+    readonly code?: ReplyErrorCode,
+  ) {
+    super(message);
+    this.name = 'RoomError';
+  }
+}
+const fail = (message: string, code?: ReplyErrorCode): never => {
+  throw new RoomError(message, code);
 };
 function text(value: unknown, max: number): string {
   if (typeof value !== 'string' || !value.trim() || value.length > max)
@@ -201,9 +215,11 @@ export class Rooms {
     const room = this.room(roomId);
     const seat = this.seat(room, socketId);
     const id = text(request.id, 64);
-    if (request.round !== room.round) fail('Round changed; try again');
+    if (request.round !== room.round)
+      fail('Round changed; try again', 'MATCH_CHANGED');
     if (seat.accepted.has(id)) return;
-    if (request.revision !== room.revision) fail('Table updated; try again');
+    if (request.revision !== room.revision)
+      fail('Table updated; try again', 'STALE_REVISION');
     if (room.state === null) fail('Game has not started');
     room.state = room.definition.apply(
       room.state,
@@ -218,6 +234,21 @@ export class Rooms {
     seat.accepted.set(id, room.revision);
     if (seat.accepted.size > 256)
       seat.accepted.delete(seat.accepted.keys().next().value!);
+  }
+  synchronize(
+    roomId: string,
+    socketId: string,
+    request: { id?: unknown; round?: unknown },
+  ) {
+    const room = this.room(roomId);
+    const seat = this.seat(room, socketId);
+    return {
+      room: this.view(roomId, socketId),
+      accepted:
+        request.round === room.round &&
+        typeof request.id === 'string' &&
+        seat.accepted.has(request.id),
+    };
   }
   disconnect(socketId: string): string | null {
     for (const room of this.rooms.values()) {

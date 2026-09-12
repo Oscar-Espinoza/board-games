@@ -152,6 +152,40 @@ test(
       advanced.revision,
     );
     assert.equal((advanced.game?.private as any).hand.length, 8);
+    const stale = await host.socket
+      .timeout(5000)
+      .emitWithAck('action', { ...draw, id: 'fresh-id' });
+    assert.equal(stale.ok, false);
+    assert.equal(stale.code, 'STALE_REVISION');
+    const changed = await host.socket
+      .timeout(5000)
+      .emitWithAck('action', { ...draw, round: 0 });
+    assert.equal(changed.code, 'MATCH_CHANGED');
+    const synced = await request<{ room: RoomView; accepted: boolean }>(
+      host.socket,
+      'sync',
+      { id: draw.id, round: draw.round },
+    );
+    assert.equal(synced.accepted, true);
+    assert.deepEqual(
+      synced.room,
+      rooms.view(hostCredentials.roomId, host.socket.id!),
+    );
+    const other = await request<{ room: RoomView; accepted: boolean }>(
+      guest.socket,
+      'sync',
+      { id: draw.id, round: draw.round },
+    );
+    assert.equal(other.accepted, false);
+    assert.equal(JSON.stringify(other).includes(hostCredentials.token), false);
+    assert.deepEqual(
+      other.room.game?.private,
+      rooms.view(hostCredentials.roomId, guest.socket.id!).game?.private,
+    );
+    await assert.rejects(
+      request(spy.socket, 'sync', { id: draw.id, round: draw.round }),
+      /Join first/,
+    );
 
     const beforeReconnect = (g.game?.private as any).hand;
     guest.socket.disconnect();

@@ -28,6 +28,10 @@
     session.room?.id === page.params.id ? session.room : null,
   );
   const immersive = $derived(room?.game != null);
+  const cornerControls = $derived(
+    immersive &&
+      ['azul', 'codenames', 'sushi-go-party'].includes(room?.gameId ?? ''),
+  );
   const metadata = $derived(catalog.find((game) => game.id === room?.gameId));
   onMount(() => {
     try {
@@ -75,27 +79,35 @@
 <svelte:head
   ><title>{metadata?.name ?? m.join()} · {m.catalog()}</title></svelte:head
 >
-<main class="room" class:immersive>
-  <div class="room-toolbar">
-    <a href="/" onclick={() => leave()}>{m.back()}</a><span
-      class:online={session.connected}
-      class="connection"
-      role="status">{session.connected ? m.connected() : m.disconnected()}</span
-    >{#if room?.status === 'finished' && room.hostId === room.playerId && immersive}<button
-        onclick={start}>{m.rematch()}</button
-      >{/if}{#if !room?.practice}<button class="secondary" onclick={invite}
-        >{copied ? m.copied() : m.invite()}</button
-      >{:else}<span class="practice-label">{m.uno_practice_table()}</span>{/if}
-    {#if immersive && room?.gameId !== 'catan'}<select
-        class="room-language"
-        aria-label={m.language()}
-        value={getLocale()}
-        onchange={(event) => setLocale(event.currentTarget.value as Locale)}
-        >{#each locales as locale}<option value={locale}
-            >{locale.toUpperCase()}</option
-          >{/each}</select
-      >{/if}
-  </div>
+<main class="room" class:immersive class:corner-controls={cornerControls}>
+  {#if !cornerControls}<div class="room-toolbar">
+      <a href="/" onclick={() => leave()}>{m.back()}</a><span
+        class:online={session.connected}
+        class="connection"
+        role="status"
+        >{session.connected ? m.connected() : m.disconnected()}</span
+      >{#if room?.status === 'finished' && room.hostId === room.playerId && immersive}<button
+          onclick={start}>{m.rematch()}</button
+        >{/if}{#if !room?.practice}<button class="secondary" onclick={invite}
+          >{copied ? m.copied() : m.invite()}</button
+        >{:else}<span class="practice-label">{m.uno_practice_table()}</span
+        >{/if}
+      {#if immersive && room?.gameId !== 'catan'}<select
+          class="room-language"
+          aria-label={m.language()}
+          value={getLocale()}
+          onchange={(event) => setLocale(event.currentTarget.value as Locale)}
+          >{#each locales as locale}<option value={locale}
+              >{locale.toUpperCase()}</option
+            >{/each}</select
+        >{/if}
+    </div>{/if}
+  {#if cornerControls && !session.connected}<p
+      class="connection-failure"
+      role="status"
+    >
+      {m.disconnected()}
+    </p>{/if}
   {#if session.error}<p class="error" role="alert">
       {session.error}<button
         type="button"
@@ -149,10 +161,15 @@
             pending={session.pending}
             practice={room.practice}
             canConfigure={room.hostId === room.playerId}
-            >{#snippet settingsContent()}{#if room.gameId === 'carcassonne'}<a
+            canRematch={room.status === 'finished' &&
+              room.hostId === room.playerId}
+            rematch={start}
+            >{#snippet settingsContent()}{#if room.gameId === 'carcassonne' || cornerControls}<a
                   href="/"
                   onclick={() => leave()}>{m.back()}</a
-                ><button onclick={invite}>{m.invite()}</button><select
+                ><button onclick={invite}
+                  >{copied ? m.copied() : m.invite()}</button
+                ><select
                   aria-label={m.language()}
                   value={getLocale()}
                   onchange={(e) => setLocale(e.currentTarget.value as Locale)}
@@ -161,7 +178,7 @@
                 >{#if room.status === 'finished' && room.hostId === room.playerId}<button
                     onclick={start}>{m.rematch()}</button
                   >{/if}<span role="status"
-                  >{session.connected ? m.connected() : m.disconnected()}</span
+                  >{session.connected ? m.connected() : m.disconnected()} · {room.id}</span
                 >{/if}{/snippet}</Board
           >
         </div>{:else if loadingError}<p class="error">{loadingError}</p>
@@ -196,6 +213,26 @@
 </main>
 
 <style>
+  .connection-failure {
+    position: absolute;
+    z-index: 12;
+    top: max(12px, env(safe-area-inset-top));
+    left: 70px;
+    right: 70px;
+    margin: 0 auto;
+    width: fit-content;
+    max-width: calc(100% - 140px);
+    padding: 6px 12px;
+    border-radius: 12px;
+    background: #692b22;
+    color: #fff;
+    text-align: center;
+  }
+  .corner-controls :global(.board-container) {
+    width: 100%;
+    height: 100%;
+  }
+
   :global(body:has(.room.immersive) .site-header) {
     visibility: hidden;
   }

@@ -42,8 +42,10 @@ export type RoomView = {
   game: GameView | null;
 };
 export type Credentials = { roomId: string; playerId: string; token: string };
+export type ReplyErrorCode = 'STALE_REVISION' | 'MATCH_CHANGED';
 export type Reply<T = undefined> =
-  { ok: true; data: T } | { ok: false; error: string };
+  { ok: true; data: T } | { ok: false; error: string; code?: ReplyErrorCode };
+export type Synchronization = { room: RoomView; accepted: boolean };
 export type ActionRequest = {
   id: string;
   round: number;
