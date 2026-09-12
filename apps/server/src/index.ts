@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { resolve } from 'node:path';
 import sirv from 'sirv';
 import { uno } from '@board-games/uno/server';
+import { carcassonne } from '@board-games/carcassonne/server';
 import { catan } from '@board-games/catan/server';
 import type { GameDefinition } from '@board-games/game-core';
 import { Rooms } from './rooms.js';
@@ -13,6 +14,7 @@ const rooms = new Rooms(
   new Map<string, GameDefinition>([
     [uno.id, uno],
     [catan.id, catan],
+    [carcassonne.id, carcassonne],
   ]),
   grace,
 );

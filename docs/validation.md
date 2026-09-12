@@ -137,3 +137,116 @@ Chrome two-finger input also passed; equivalent WebKit multi-touch injection is
 unavailable. Seven focused browser cases passed, with that one WebKit-only skip.
 TypeScript/Svelte, production build and formatting passed. Actual Safari device
 validation remains manual.
+
+## Carcassonne Big Box 3.1 — September 11, 2026
+
+Added the 2–6 player catalog game, all eleven selectable modules, game-owned
+readiness, original SVG landscape, connected-feature inspection, pan/pinch/zoom,
+keyboard placement, distinct gesture-unlocked sounds, and English/Spanish controls.
+`/practice/carcassonne` offers an 18-draw learning game, ordinary full setup and
+focused expansion situations, automatically following the next required seat.
+
+The complete rule/session/development suite passed 112 tests before the last
+capacity/topology fixtures were added. The final Carcassonne-specific run passed
+49 tests, including Full Big Box matches with two, three and six seats. Three
+additional room/socket tests cover readiness after disconnection/replacement,
+action deduplication, stale revisions, impersonation, recipient privacy and
+restoration of a pending meeple choice. Inventory checks cover all 2,048 module
+combinations. Focused cases include all eight Messages, 3.1 unfinished scoring,
+builder consumption, pigs/farmer return, distinct-city field scoring, ferry graph
+splits, shared gold order, flight misses without rerolls, magic modifiers,
+Crop Circle order, score-track wrapping and non-chaining robbery.
+
+TypeScript/Svelte checks passed with zero errors and warnings. The production
+build and repository formatting check passed. The full Chromium/WebKit suite
+passed **65 browser checks**, with the existing native Catan pinch test skipped on
+WebKit. Carcassonne's six journeys cover a completed short practice game and
+reset, phone/keyboard/zoom/reduced motion, shared multiplayer setup and reconnect,
+expansion prompts, distinct Web Audio activation and unavailable/muted audio,
+and Spanish phone setup. All 12 Carcassonne browser checks passed again after the
+final ferry-connection and topology corrections. Catalog checks now
+also assert that Carcassonne does not load eagerly.
+
+The downloaded WebKit browser initially lacked libavif16. The temporary local
+wrapper described above was recreated with extracted libavif16, libgav1 and libyuv
+packages, without system installation. Use
+`WEBKIT_EXECUTABLE=/tmp/board-games-browser-deps/webkit` on this machine. These are
+browser-test dependencies only. Desktop, phone and Spanish screenshots were
+inspected; audio instrumentation checks actual source activation and differences,
+not subjective speaker quality.
+
+Actual macOS/iOS Safari, native Carcassonne two-finger device interaction, a real
+group Expanded Classic/Full Big Box playtest, and an independent printed-tile
+geometry audit remain **unverified**. The [rules document](games/carcassonne.md)
+records deterministic app conventions for unresolved combined timing. Automated
+seeded games are not a substitute for those checks.
+
+### Carcassonne interaction revision
+
+The landscape now fills the viewport with seats around it. Physical hand controls
+replace the sidebar; picking up a tile or meeple reveals only its legal targets.
+A tile drop remains a local preview, with rotation/confirmation beside it. Invalid
+and cancelled drags return without advancing canonical play. Settings contains
+sound, camera, history, locale and practice controls. A separate field guide covers
+turns, scoring, figures and expansions. All sound cues now use
+broad filtered noise textures, with no pitched oscillators or rotation tail beep.
+
+The revision passes `bun run check`, `bun run build`, `bun run format:check`, and
+all 119 rules/server tests. Chromium and WebKit cover eleven Carcassonne journeys:
+complete practice/scoring/reset; phone layout and settings; host-owned shared setup
+and multiplayer reconnect; expansion choices; audio source activation, mute and
+unavailable audio; Spanish; warm setup cards, bare controls, field guide and piece
+tooltips; the live board overview and feature focusing; physical tile/meeple dragging
+with invalid return and in-place rotation; cancelled gestures; and touch
+selection/placement. All 22 Carcassonne checks passed in Chromium and WebKit. Drag
+checks use real browser mouse input; touch checks use browser touchscreen taps.
+Native device touch dragging and final Safari/audio listening still need
+physical-device validation. Desktop and phone screenshots were visually inspected.
+A drag-test seat-position assertion was corrected to tolerate subpixel CSS rounding
+rather than requiring exact strings.
+
+Host ownership is enforced through server-supplied action context rather than a
+client field. Focused rules tests cover guest rejection and configuration after
+host transfer. The six Chromium catalog journeys passed after the shared contract
+change and again after the overview addition. Setup, guide and overview screenshots
+were inspected at desktop and 360px widths.
+
+The broader catalog run passed its other journeys, but the existing six-player
+Catan test timed out waiting for `End turn` after rolling. A focused retry passed
+in Chromium and timed out in WebKit. This unrelated browser journey is not claimed
+as passing for this revision; Carcassonne's own checks passed in both engines.
+
+## Illustrated library and rulebooks — September 11, 2026
+
+The catalog now uses three original illustrated game boxes and Start/Summary/Rules
+controls. The rulebooks contain 78 English/Spanish lessons, each with three
+manually selected frames. [Coverage and sources](games/library-guide-coverage.md)
+record the connection to the current rules. The guides load independently of game
+boards, rules engines, bots and practice fixtures.
+
+Validation performed for this change:
+
+- Full Bun suite: 125 passing rules/server/content tests. The six new content and
+  numerical-example checks also passed after the final lesson additions.
+- TypeScript/Svelte checks passed with zero errors or warnings; production build
+  and repository formatting checks passed.
+- Library and catalog journeys: 30 passing Chromium/WebKit checks after fixes,
+  including every scenario, all three room/practice flows, bilingual search,
+  keyboard/focus, touch, reduced motion, guide-load recovery and stale imports.
+- After correcting Catan's production illustration to show both existing buildings
+  before the roll, both Catan rulebook journeys passed again. Type checks, build,
+  and formatting also passed for the final source.
+- The full 94-case browser sweep initially reported 90 passing, three failures and
+  one existing skip. The failures were the stale six-player Catan test's removed
+  robber-location menu and guide import recovery in both engines. The targeted
+  30-case rerun passed after these were fixed. The remaining 63 game checks passed
+  in the full sweep; Catan's CDP-only two-finger pinch test remains skipped in WebKit.
+- Desktop 1440×900, tablet 768×1024 and phone 360×800 screenshots were inspected in
+  Chromium and WebKit. The selected boxes, dialogs, summaries and rule scenarios
+  remain readable without horizontal overflow. Preview images were saved outside
+  the repository in the task's visualization directory.
+
+Browser verification used Playwright's owned server on port 3100. The initially
+present user server on port 3000 was not terminated by the agent. All owned test
+servers stopped; a final listener check confirmed ports 3000 and 3100 were empty.
+Actual Safari hardware testing remains manual; WebKit automation does not replace it.

@@ -11,9 +11,11 @@ The catalog runs on Bun workspaces, TypeScript, SvelteKit, Bun and Socket.IO. Bu
 | `games/uno`          | UNO rules, private/public projection and lazily imported Svelte table                                       |
 | `games/catan`        | Catan board/rules, private/public projection and lazily imported Svelte table                               |
 
+| `games/carcassonne` | Big Box 3.1 tiles, connected features, resumable decisions and lazy SVG table |
+
 ## Authority and state delivery
 
-`GameDefinition` exposes `create`, `apply`, `view` and `isFinished`, plus game ID and player limits. Rules receive an explicit random source and do not depend on sockets, DOM, storage or rendering. Invalid actions must reject without changing state. Each game owns legal moves, turn rules, setup and victory; these differ enough that they are not forced into a universal turn framework.
+`GameDefinition` exposes `create`, `apply`, `view` and `isFinished`, plus game ID and player limits. Rules receive an explicit random source and an optional server-supplied action context containing the current room host. They do not depend on sockets, DOM, storage or rendering. Invalid actions must reject without changing state. Each game owns legal moves, turn rules, setup and victory; these differ enough that they are not forced into a universal turn framework.
 
 A socket joins a Socket.IO room and is bound to a verified seat. Action envelopes carry an action ID, round and expected revision. Bun derives the actor from this binding, rejects stale or invalid intentions, applies accepted changes and sends fresh recipient projections. Bounded accepted-action IDs prevent repeated application of retried actions. The room host controls starting a round; it has no privileged access to canonical game state and is not the rules authority.
 
@@ -77,3 +79,19 @@ setup, building, production, robber, Monopoly, trade, army awards and victory.
 Only the selected seat's projection reaches the board. Practice creates no room,
 uses no bots, has no persistence, and never changes multiplayer initialization.
 See [ADR 011](adr/011-catan-presentation.md).
+
+## Carcassonne landscape and practice
+
+Carcassonne owns expansion configuration and readiness inside its game state. A
+narrow optional `GameDefinition.presence` callback receives connected seat IDs
+and replacement identity from the room layer; it clears unconsumed readiness
+without rewriting a pending game choice. Only setup readiness can retry a stale
+revision for the identical configuration, using its original action ID.
+
+Road/city regions and field half-edges connect across rotated tile edges. The
+small feature graph is recomputed because ferries can split connections. Pending
+decisions store legal targets and the entitled actor. Deck/message order remains
+server-only; accepted presentation events carry no future information. The local
+`/practice/carcassonne` route follows the required seat and includes short-game
+and expansion fixtures. See [ADR 012](adr/012-carcassonne-table.md) and the
+[rules and app conventions](games/carcassonne.md).

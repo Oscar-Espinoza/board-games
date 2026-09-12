@@ -93,124 +93,12 @@ p {
   background: transparent;
   border: none;
 }
-.catalog {
-  max-width: 1100px;
-  margin: auto;
-  padding: 2.4rem 1.5rem 4rem;
-}
-.intro {
-  text-align: center;
-  max-width: 700px;
-  margin: auto;
-}
-.intro > p:last-child {
-  color: #667068;
-  font-size: 1.1rem;
-}
 .eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.14em;
   font-size: 0.72rem;
   font-weight: 700;
   color: #778073;
-}
-.name-field {
-  max-width: 320px;
-  margin: 1.8rem auto;
-}
-.game-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
-}
-.game-card {
-  background: #fffdf6;
-  border: 1px solid #e1dfd4;
-  border-radius: 18px;
-  overflow: hidden;
-}
-.game-art {
-  height: 185px;
-  background: #d9e0c8;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  position: relative;
-  overflow: hidden;
-}
-.uno .game-art {
-  background: #ece0ce;
-}
-.game-details {
-  padding: 1.5rem 1.8rem;
-}
-.game-details > p:not(.eyebrow) {
-  min-height: 3.2rem;
-  color: #687064;
-}
-.game-details > button {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  margin-top: 1rem;
-}
-.mini-card {
-  width: 78px;
-  height: 112px;
-  border: 6px solid #fff9ed;
-  border-radius: 12px;
-  box-shadow: 0 8px 12px #4e38222a;
-  display: grid;
-  place-items: center;
-  font-size: 2.7rem;
-  color: white;
-  font-weight: 700;
-  transform: rotate(-18deg);
-}
-.mini-card.blue {
-  background: #39778e;
-  transform: rotate(3deg);
-  z-index: 1;
-  margin: 0 -15px;
-}
-.mini-card.red {
-  background: #cb5844;
-}
-.mini-card.yellow {
-  background: #d6a03c;
-  transform: rotate(21deg);
-}
-.island {
-  font-size: 170px;
-  color: #8eab6e;
-  line-height: 1;
-  text-shadow: 5px 8px #68834e;
-}
-.island.small {
-  font-size: 115px;
-  color: #cfab69;
-  margin-left: -38px;
-  margin-top: 40px;
-}
-.setup {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.7rem;
-}
-.setup select {
-  padding: 0.4rem;
-}
-.join-form {
-  display: flex;
-  align-items: end;
-  justify-content: center;
-  gap: 1rem;
-  margin: 2rem 0;
-}
-.join-form label {
-  flex: 1;
-  max-width: 430px;
 }
 .secondary {
   background: transparent;
@@ -327,12 +215,6 @@ p {
   outline-offset: 3px;
 }
 @media (max-width: 650px) {
-  .game-grid {
-    grid-template-columns: 1fr;
-  }
-  .catalog {
-    padding: 1.5rem 1rem;
-  }
   .room {
     padding: 1rem;
   }

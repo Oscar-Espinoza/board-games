@@ -10,12 +10,13 @@ const chunk = (game: string) =>
   manifest[`../../games/${game}/src/Board.svelte`].file;
 async function create(page: Page, game: string, name: string) {
   await page.goto('/');
-  await page.getByLabel('Your name').fill(name);
   await page
-    .locator('article')
-    .filter({ has: page.getByRole('heading', { name: game, exact: true }) })
-    .getByRole('button', { name: 'Create room' })
+    .locator('.game-names')
+    .getByRole('button', { name: new RegExp(game) })
     .click();
+  await page.getByRole('button', { name: 'Start game', exact: true }).click();
+  await page.getByLabel('Your name').fill(name);
+  await page.getByRole('button', { name: /Create room/ }).click();
   await expect(page).toHaveURL(/\/room\//);
   return page.url();
 }
@@ -35,23 +36,24 @@ test('catalog loads no game clients, English/Spanish persists', async ({
   page.on('request', (request) => requests.push(request.url()));
   await page.goto('/');
   await expect(
-    page.getByRole('heading', { name: 'A table for friends' }),
+    page.getByRole('heading', { name: 'What shall we play?' }),
   ).toBeVisible();
   await page
     .getByRole('combobox', { name: 'Language', exact: true })
     .selectOption('es');
   await expect(
-    page.getByRole('heading', { name: 'Una mesa entre amigos' }),
+    page.getByRole('heading', { name: '¿A qué jugamos?' }),
   ).toBeVisible();
   await page.reload();
   await expect(
-    page.getByRole('heading', { name: 'Una mesa entre amigos' }),
+    page.getByRole('heading', { name: '¿A qué jugamos?' }),
   ).toBeVisible();
   expect(
     requests.some(
       (url) =>
         url.endsWith(chunk('uno')) ||
         url.endsWith(chunk('catan')) ||
+        url.endsWith(chunk('carcassonne')) ||
         url.includes('terrain-') ||
         url.endsWith('.wasm'),
     ),
@@ -94,7 +96,10 @@ test('UNO create/join/play/reload restores the same private hand', async ({
   expect(requests.some((url) => url.endsWith(chunk('uno')))).toBe(true);
   expect(
     requests.some(
-      (url) => url.endsWith(chunk('catan')) || url.endsWith('.wasm'),
+      (url) =>
+        url.endsWith(chunk('catan')) ||
+        url.endsWith(chunk('carcassonne')) ||
+        url.endsWith('.wasm'),
     ),
   ).toBe(false);
   await guest.context.close();
@@ -199,13 +204,14 @@ test('six-player beginner Catan advances to the paired action opportunity', asyn
   browser,
 }) => {
   await page.goto('/');
-  await page.getByLabel('Your name').fill('Alice');
-  await page.getByLabel('Island setup').selectOption('beginner');
   await page
-    .locator('article')
-    .filter({ has: page.getByRole('heading', { name: 'Catan', exact: true }) })
-    .getByRole('button', { name: 'Create room' })
+    .locator('.game-names')
+    .getByRole('button', { name: /Catan/ })
     .click();
+  await page.getByRole('button', { name: 'Start game', exact: true }).click();
+  await page.getByLabel('Your name').fill('Alice');
+  await page.getByRole('button', { name: 'Beginner', exact: true }).click();
+  await page.getByRole('button', { name: /Create room/ }).click();
   await expect(page).toHaveURL(/\/room\//);
   const guests = [];
   for (const name of ['Bob', 'Carol', 'Dan', 'Eve', 'Frank'])
@@ -236,9 +242,9 @@ test('six-player beginner Catan advances to the paired action opportunity', asyn
   await expect(
     actor.getByRole('button', { name: 'Roll dice', exact: true }),
   ).toHaveCount(0);
-  if (await actor.locator('.locations button').count()) {
-    await actor.locator('.locations summary').click();
-    await actor.locator('.locations button').first().click();
+  if ((await actor.locator('.phase').innerText()).includes('Move the robber')) {
+    await actor.locator('.table > svg .target').first().focus();
+    await actor.keyboard.press('Enter');
     await actor.getByRole('button', { name: 'Confirm', exact: true }).click();
     await expect(actor.locator('.confirm')).toHaveCount(0);
     const steal = actor.getByRole('button', { name: /Steal from/ });

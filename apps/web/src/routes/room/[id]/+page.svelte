@@ -27,9 +27,7 @@
   const room = $derived(
     session.room?.id === page.params.id ? session.room : null,
   );
-  const immersive = $derived(
-    (room?.gameId === 'uno' || room?.gameId === 'catan') && room.game !== null,
-  );
+  const immersive = $derived(room?.game != null);
   const metadata = $derived(catalog.find((game) => game.id === room?.gameId));
   onMount(() => {
     try {
@@ -150,7 +148,22 @@
             connected={session.connected}
             pending={session.pending}
             practice={room.practice}
-          />
+            canConfigure={room.hostId === room.playerId}
+            >{#snippet settingsContent()}{#if room.gameId === 'carcassonne'}<a
+                  href="/"
+                  onclick={() => leave()}>{m.back()}</a
+                ><button onclick={invite}>{m.invite()}</button><select
+                  aria-label={m.language()}
+                  value={getLocale()}
+                  onchange={(e) => setLocale(e.currentTarget.value as Locale)}
+                  ><option value="en">EN</option><option value="es">ES</option
+                  ></select
+                >{#if room.status === 'finished' && room.hostId === room.playerId}<button
+                    onclick={start}>{m.rematch()}</button
+                  >{/if}<span role="status"
+                  >{session.connected ? m.connected() : m.disconnected()}</span
+                >{/if}{/snippet}</Board
+          >
         </div>{:else if loadingError}<p class="error">{loadingError}</p>
         <button onclick={() => location.reload()}>{m.retry()}</button>{:else}<p
           role="status"
