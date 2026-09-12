@@ -10,7 +10,7 @@ Run `~/.local/bin/audit-agent-extensions` for an on-demand, read-only extension 
 
 ## Repository architecture
 
-This Bun/TypeScript workspace contains UNO, Catan and Carcassonne. SvelteKit supplies the browser SPA; Bun and Socket.IO own authoritative in-memory rooms. Use Paraglide for English/Spanish localization and CSS/SVG/Svelte for visuals. No Rust/Wasm, database, Redis, accounts or WebRTC belongs in this catalog. The explicit migration request supersedes the previous Rust-primary instructions; [ADR 009](docs/adr/009-typescript-catalog.md) records the decision. [ADR 010](docs/adr/010-bun-runtime.md) replaces pnpm/Node with Bun package management and runtime.
+This Bun/TypeScript workspace contains UNO, Catan, Carcassonne, Azul, Codenames and Sushi Go Party. SvelteKit supplies the browser SPA; Bun and Socket.IO own authoritative in-memory rooms. Use Paraglide for English/Spanish localization and CSS/SVG/Svelte for visuals. No Rust/Wasm, database, Redis, accounts or WebRTC belongs in this catalog. The explicit migration request supersedes the previous Rust-primary instructions; [ADR 009](docs/adr/009-typescript-catalog.md) records the decision. [ADR 010](docs/adr/010-bun-runtime.md) replaces pnpm/Node with Bun package management and runtime.
 
 Zombies is a separate sibling project at `../zombies-game`, retaining its Rust/Wasm architecture and independent instructions. Do not reintroduce its dependencies into this workspace.
 
@@ -36,3 +36,13 @@ merge-only cache: ferries disconnect roads. Preserve Big Box 3.1 builder/pig and
 unfinished-feature behavior. Keep `/practice/carcassonne` fixtures out of room
 initialization and catalog metadata. See [ADR 012](docs/adr/012-carcassonne-table.md)
 and [Carcassonne rules](docs/games/carcassonne.md).
+
+Azul, Codenames and Sushi Go Party own viewport tables with rules/settings corner
+controls. Preserve role-private Codenames keys and Sushi hands, picks and Menu
+offers in actual recipient payloads. Their practice fixtures stay separate from
+multiplayer initialization and catalog metadata. Only still-valid simultaneous
+readiness/picks retry coded stale errors, keeping the action ID through at most
+three total attempts; never retry Azul drafts or Codenames guesses automatically.
+See [ADR 013](docs/adr/013-three-game-delivery.md), [Azul rules](docs/games/azul.md),
+[Codenames rules](docs/games/codenames.md) and
+[Sushi Go Party rules](docs/games/sushi-go-party.md).

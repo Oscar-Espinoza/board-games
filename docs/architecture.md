@@ -2,16 +2,18 @@
 
 The catalog runs on Bun workspaces, TypeScript, SvelteKit, Bun and Socket.IO. Bun is the only game authority. This explicitly supersedes the former Rust/Wasm browser-hosted catalog architecture; [ADR 009](adr/009-typescript-catalog.md) records the migration and independent Zombies extraction. [ADR 010](adr/010-bun-runtime.md) records the subsequent Bun runtime and tooling migration.
 
-| Location             | Responsibility                                                                                              |
-| -------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `apps/web`           | SvelteKit SPA, catalog, room UI, shared session client and Paraglide localization                           |
-| `apps/server`        | In-memory rooms, token verification, connection ownership, action acceptance and same-origin static serving |
-| `packages/game-core` | Small game contract and common player/room/view types                                                       |
-| `packages/shared`    | Metadata-only catalog and shared message types                                                              |
-| `games/uno`          | UNO rules, private/public projection and lazily imported Svelte table                                       |
-| `games/catan`        | Catan board/rules, private/public projection and lazily imported Svelte table                               |
-
-| `games/carcassonne` | Big Box 3.1 tiles, connected features, resumable decisions and lazy SVG table |
+| Location               | Responsibility                                                                                              |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `apps/web`             | SvelteKit SPA, catalog, room UI, shared session client and Paraglide localization                           |
+| `apps/server`          | In-memory rooms, token verification, connection ownership, action acceptance and same-origin static serving |
+| `packages/game-core`   | Small game contract and common player/room/view types                                                       |
+| `packages/shared`      | Metadata-only catalog and shared message types                                                              |
+| `games/uno`            | UNO rules, private/public projection and lazily imported Svelte table                                       |
+| `games/catan`          | Catan board/rules, private/public projection and lazily imported Svelte table                               |
+| `games/carcassonne`    | Big Box 3.1 tiles, connected features, resumable decisions and lazy SVG table                               |
+| `games/azul`           | Standard-wall tile drafting, conservation, scoring and ceramic table                                        |
+| `games/codenames`      | Team/role setup, clue review, recipient-private key and dossier table                                       |
+| `games/sushi-go-party` | Simultaneous drafting, full standard menu, resumable effects and private hands                              |
 
 ## Authority and state delivery
 
@@ -95,3 +97,20 @@ server-only; accepted presentation events carry no future information. The local
 `/practice/carcassonne` route follows the required seat and includes short-game
 and expansion fixtures. See [ADR 012](adr/012-carcassonne-table.md) and the
 [rules and app conventions](games/carcassonne.md).
+
+## Azul, Codenames and Sushi Go Party
+
+The three games retain the same authoritative contract and game-owned rules,
+readiness, effects and private projections. Each fills the viewport with corner
+rules/settings overlays; room controls arrive through `settingsContent`, and host
+results use the optional `canRematch`/`rematch` props. Local practice routes and
+illustrated library lessons load separately from game initialization and metadata.
+
+The room protocol now preserves structured stale/match errors. An authenticated
+`sync` request returns the caller's own projected snapshot and acceptance of its
+own action ID. The client keeps that ID for at most three attempts, revalidating
+eligible Carcassonne/Codenames readiness and Sushi readiness/picks after each
+synchronization. Round/turn/prompt/ownership changes, commitment or disconnected
+seats stop retries. Azul drafts and Codenames guesses are never automatically
+reconfirmed. A missing acknowledgement is synchronized before any resubmission.
+See [ADR 013](adr/013-three-game-delivery.md) for the precise boundaries.
