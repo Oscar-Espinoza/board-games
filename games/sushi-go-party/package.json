@@ -1,0 +1,18 @@
+{
+  "name": "@board-games/sushi-go-party",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./server": "./src/index.ts",
+    "./Board.svelte": "./src/Board.svelte",
+    "./practice": "./src/practice.ts",
+    "./Dish.svelte": "./src/Dish.svelte"
+  },
+  "dependencies": {
+    "@board-games/game-core": "workspace:*",
+    "@board-games/shared": "workspace:*"
+  },
+  "peerDependencies": {
+    "svelte": "^5.0.0"
+  }
+}

@@ -1,6 +1,8 @@
 # Sushi Go Party! implementation plan
 
-Status: planned, not implemented. Researched September 11, 2026.
+Historical planning snapshot, researched September 11, 2026. The implementation
+is now described in [the game rules](sushi-go-party.md) and
+[the current handoff](../handoffs/sushi-go-party.md).
 
 This document is the only deliverable of this session. All implementation,
 dependency changes, artwork production, and application testing described below
