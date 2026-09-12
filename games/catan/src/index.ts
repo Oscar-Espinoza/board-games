@@ -311,7 +311,7 @@ function awards(s: State) {
     3,
   );
 }
-export function ratio(s: State, p: string, r: number) {
+function ratio(s: State, p: string, r: number) {
   return Math.min(
     4,
     ...s.board.ports
@@ -755,7 +755,6 @@ export function playerView(s: State, p: string) {
       roads: s.roads,
       robber: s.robber,
       bank: s.bank,
-      developmentLeft: s.deck.length,
       phase: s.phase,
       dice: s.dice,
       primary: s.players[s.primary],
@@ -813,4 +812,3 @@ export const catan: GameDefinition<State> = {
   view: playerView,
   isFinished: (s) => s.phase.type === 'finished',
 };
-export default catan;

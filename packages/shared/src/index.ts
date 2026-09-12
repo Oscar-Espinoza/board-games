@@ -7,7 +7,6 @@ export const catalog = [
     name: 'UNO',
     minPlayers: 2,
     maxPlayers: 8,
-    mark: '↺',
     description: m.uno_description,
     preview: 'cards',
     practice: true,
@@ -17,10 +16,17 @@ export const catalog = [
     name: 'Catan',
     minPlayers: 3,
     maxPlayers: 6,
-    mark: '⬡',
     description: m.catan_description,
     preview: 'hexes',
     setupModes: ['variable', 'beginner'],
+  },
+  {
+    id: 'carcassonne',
+    name: 'Carcassonne',
+    minPlayers: 2,
+    maxPlayers: 6,
+    description: m.carc_description,
+    preview: 'landscape',
   },
 ] as const;
 export type RoomView = {

@@ -74,7 +74,8 @@ async function observeEffects(page: Page) {
 }
 async function solo(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: /Play solo/ }).click();
+  await page.getByRole('button', { name: 'Start game', exact: true }).click();
+  await page.getByRole('button', { name: /Try on your own/ }).click();
   await expect(page.locator('.uno-table')).toBeVisible();
 }
 

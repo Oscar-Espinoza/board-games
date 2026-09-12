@@ -9,7 +9,7 @@ export const session = $state({
 });
 let socket: Socket | undefined;
 let current: Credentials | undefined;
-export function saved(roomId: string): Credentials | undefined {
+function saved(roomId: string): Credentials | undefined {
   try {
     const value = JSON.parse(
       localStorage.getItem(`board-games:room:${roomId}`) ?? 'null',
@@ -110,13 +110,51 @@ export async function send(action: unknown) {
   if (!session.room || session.pending) return;
   session.pending = true;
   session.error = '';
+  const initial = session.room;
+  const id = crypto.randomUUID();
+  const ready = action as { type?: string; version?: number };
   try {
-    await request('action', {
-      id: crypto.randomUUID(),
-      round: session.room.round,
-      revision: session.room.revision,
-      action,
-    });
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const revision: number = session.room?.revision ?? initial.revision;
+      try {
+        await request('action', { id, round: initial.round, revision, action });
+        break;
+      } catch (error) {
+        if (
+          (error as Error).message !== 'Table updated; try again' ||
+          attempt === 2 ||
+          initial.gameId !== 'carcassonne' ||
+          ready.type !== 'ready'
+        )
+          throw error;
+        // The server publishes after its acknowledgement. Wait for that snapshot,
+        // then retry only readiness for the identical setup, with the same ID.
+        if (session.room?.revision === revision)
+          await new Promise<void>((resolve) => {
+            const done = () => {
+              clearTimeout(timer);
+              socket?.off('snapshot', done);
+              resolve();
+            };
+            const timer = setTimeout(done, 1000);
+            socket?.once('snapshot', done);
+          });
+        const room = session.room;
+        const pub = room?.game?.public as
+          | { phase?: string; setupVersion?: number; ready?: string[] }
+          | undefined;
+        if (
+          !room ||
+          room.id !== initial.id ||
+          room.round !== initial.round ||
+          pub?.phase !== 'setup' ||
+          pub.setupVersion !== ready.version ||
+          room.players.some((p) => !p.connected) ||
+          pub.ready?.includes(room.playerId)
+        )
+          throw error;
+      }
+    }
   } catch (error) {
     session.error = (error as Error).message;
   } finally {

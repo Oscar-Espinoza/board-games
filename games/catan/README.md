@@ -1,11 +1,8 @@
 # CATAN
 
-The TypeScript rules preserve the previous Rust implementation's integer board
-IDs, terrain and number distributions, published beginner placements and hands,
-variable spiral setup, ports, component supplies and sixth-edition paired turns.
-Rules remain independent of transport, the DOM and browser effects. The server supplies
-randomness; starting player selection is uniform rather than animated tied dice
-rolls. Old ChaCha replay files are consequently not compatible.
+See the [Catan rules and controls](../../docs/games/catan.md) for retained game behavior.
+Rules remain independent of transport, the DOM and browser effects. Historical
+ChaCha replay files are not compatible with the TypeScript port.
 
 `src/index.ts` implements the shared game contract. `create` accepts optional
 `{ setup: 'variable' | 'beginner' }`; variable is the default. The ordinary legal

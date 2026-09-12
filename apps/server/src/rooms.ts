@@ -148,6 +148,7 @@ export class Rooms {
       seat.socketId = socketId;
       seat.reservedUntil = null;
       room.touched = this.now();
+      this.syncPresence(room);
       return { credentials: this.credentials(room, seat), replacedSocket };
     }
     if (room.practice) fail('Practice rooms are private');
@@ -169,6 +170,7 @@ export class Rooms {
         accepted: new Map(),
       });
     else room.seats.push(seat);
+    this.syncPresence(room, vacant?.id);
     this.promoteHost(room);
     room.revision++;
     room.touched = this.now();
@@ -208,6 +210,7 @@ export class Rooms {
       seat.id,
       request.action,
       this.random,
+      { hostId: room.hostId },
     );
     room.revision++;
     room.botAt = this.now() + 900;
@@ -222,12 +225,21 @@ export class Rooms {
       if (!seat) continue;
       seat.socketId = null;
       seat.reservedUntil = this.now() + this.graceMs;
+      this.syncPresence(room);
       room.revision++;
       room.touched = this.now();
       this.promoteHost(room);
       return room.id;
     }
     return null;
+  }
+  private syncPresence(room: Room, replacedPlayer?: string) {
+    if (room.state !== null && room.definition.presence)
+      room.state = room.definition.presence(
+        room.state,
+        room.seats.filter((s) => s.socketId || s.bot).map((s) => s.id),
+        replacedPlayer,
+      );
   }
   private promoteHost(room: Room) {
     if (!room.seats.some((s) => s.id === room.hostId && s.socketId))
@@ -280,6 +292,7 @@ export class Rooms {
           seat.id,
           action,
           this.random,
+          { hostId: room.hostId },
         );
         room.revision++;
         room.touched = this.now();

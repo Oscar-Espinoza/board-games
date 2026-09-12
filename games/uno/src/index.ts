@@ -280,7 +280,6 @@ function view(state: State, player: string) {
       penalty: state.penalty ? { ...state.penalty } : null,
       catchable: state.catchable,
       stockCount: state.stock.length,
-      discardCount: state.discards.length,
       revision: state.revision,
     },
     private: { hand: hand.map((card) => ({ ...card })), legalActions },
@@ -296,4 +295,3 @@ export const uno = {
   view,
   isFinished: (state: State) => state.phase === 'finished',
 } satisfies GameDefinition<State>;
-export default uno;
