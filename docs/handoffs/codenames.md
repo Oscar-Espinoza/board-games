@@ -395,3 +395,7 @@ and ES rules. Codenames worktree had no modifications when inspected; coordinato
 was already changing shared infrastructure in integration. This planning agent
 changed only this handoff. No application, browser or device checks were run.
 Prettier formatting and whitespace review passed for this handoff.
+
+## Implementation phase
+
+See [Medium implementation evidence and High-review checklist](codenames-implementation.md). High review is in progress in the Codenames worktree.
