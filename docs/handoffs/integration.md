@@ -58,3 +58,33 @@ AGENTS, rules/library coverage and validation with actual outcomes. Verify
 original checkout/index unchanged again before delivery. Actual Safari hardware,
 human group playtesting and fluent Spanish review remain separate, unverified
 unless real evidence becomes available.
+
+## Integration checkpoint
+
+Azul Medium implementation and wiring are on integration as `c15a022` / `2edae65`
+(from owner `f2eb656` / `a000b06`). Its original planning handoff is preserved;
+Medium evidence including `b0df8ea` is in `azul-implementation.md`, so skip the
+owner's separate handoff commit. High review is active in the Azul worktree.
+
+Codenames Medium implementation and wiring are on integration as `db7554b` /
+`86a96c4` (from `23aa459` / `ccb1c57`). Its Medium handoff `bf2b10d` was copied into
+integration via `b327de7`, so skip that owner handoff commit. High review is active.
+Shared catalog order preserves UNO/Catan/Carcassonne, then Azul/Codenames/Sushi.
+Expected conflicts in manifests, message catalogs and lazy registries were
+resolved by retaining each game's independent additions and shared error copy.
+
+Five-game integrated type/Svelte check passed with zero errors/warnings. A current
+uncommitted Bun lockfile reflects newly linked game packages; regenerate after
+Sushi wiring before committing it. New all-six library tests intentionally wait
+for Sushi's package/guide to land before their first run.
+
+Shared `3560bf3` freezes the JSON wire representation before attempt 1, preventing
+reactive selection edits from changing retained intentions. Nine retry-helper
+tests pass, including a proxied payload changed during synchronization. The
+existing real socket tests also passed earlier. Updated root catalog browser
+checks now guard all six board chunks against eager loading.
+
+Reviewer discovery propagated to all owners: Paraglide's default document reload
+loses local in-memory practice progress. Use `reload:false` with locale-reactive
+rendering, and verify an actual accepted action survives the locale switch.
+Multiplayer state remains server-backed across reload.
