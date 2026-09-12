@@ -54,6 +54,9 @@ test('catalog loads no game clients, English/Spanish persists', async ({
         url.endsWith(chunk('uno')) ||
         url.endsWith(chunk('catan')) ||
         url.endsWith(chunk('carcassonne')) ||
+        url.endsWith(chunk('azul')) ||
+        url.endsWith(chunk('codenames')) ||
+        url.endsWith(chunk('sushi-go-party')) ||
         url.includes('terrain-') ||
         url.endsWith('.wasm'),
     ),
@@ -99,6 +102,9 @@ test('UNO create/join/play/reload restores the same private hand', async ({
       (url) =>
         url.endsWith(chunk('catan')) ||
         url.endsWith(chunk('carcassonne')) ||
+        url.endsWith(chunk('azul')) ||
+        url.endsWith(chunk('codenames')) ||
+        url.endsWith(chunk('sushi-go-party')) ||
         url.endsWith('.wasm'),
     ),
   ).toBe(false);
