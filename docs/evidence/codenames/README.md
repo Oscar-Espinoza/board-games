@@ -4,6 +4,14 @@ Captured September 12, 2026 from the Codenames owner branch, including High fixe
 in `ded18f8`. These are disposable test rooms and explicitly local training cases.
 No publisher artwork is used.
 
+The final palette follow-up refreshes `operative-desktop.webp`,
+`spymaster-desktop.webp`, `assassin-result.webp`, `waiting-webkit.webp` and the
+320/360/390 phone images to the warm leather/wood surface. Added
+`warm-desktop-1440.webp` and `phone-390-webkit.webp` show the final table in both
+browser engines. Other images and the two original recordings retain the prior
+ink-blue surface as functional review evidence; their game behavior is unchanged.
+Warm-palette raw artifacts are in `/tmp/codenames-warm-final/`.
+
 - `operative-desktop.webp`, `spymaster-desktop.webp`: independent multiplayer roles.
 - `waiting-webkit.webp`: disconnected required spymaster and actual seat reservation.
 - `eight-seat-setup.webp`, `race-confirmation.webp`, `race-settled.webp`: eight independent

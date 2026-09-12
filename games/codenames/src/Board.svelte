@@ -414,7 +414,7 @@
         fill="#f5eedc"
         stroke="#b88b47"
         stroke-width="2"
-      /><path d="M16 7v21M7 11h5m-5 5h5m8-5h5m-5 5h5" stroke="#152532" /></svg
+      /><path d="M16 7v21M7 11h5m-5 5h5m8-5h5m-5 5h5" stroke="#30251e" /></svg
     ><span>{m.cn_rules()}</span></button
   >
   <button
@@ -800,7 +800,7 @@
     display: none;
   }
   :global(body:has(.cn-table)) {
-    background: #152532;
+    background: #30251e;
     color: #f5eedc;
     margin: 0;
   }
@@ -817,9 +817,10 @@
       max(12px, env(safe-area-inset-bottom))
       max(18px, env(safe-area-inset-left));
     background:
-      radial-gradient(ellipse at 50% 25%, #2b414d, transparent 70%),
-      repeating-linear-gradient(0deg, #ffffff02 0 1px, transparent 1px 4px),
-      #152532;
+      radial-gradient(ellipse at 50% 25%, #574235, transparent 70%),
+      repeating-linear-gradient(0deg, #f5eedc04 0 1px, transparent 1px 4px),
+      repeating-linear-gradient(92deg, #08040112 0 1px, transparent 1px 28px),
+      #30251e;
     color: var(--paper);
     font-family: var(--font-body, Arial, sans-serif);
   }
@@ -853,7 +854,7 @@
     position: absolute;
     z-index: 2;
     top: max(16px, env(safe-area-inset-top));
-    background: #213744;
+    background: #453429;
     color: #f5eedc;
     border-color: #8c815f;
     display: flex;
@@ -1055,7 +1056,7 @@
     align-items: center;
     justify-content: center;
     gap: 1rem;
-    background: #0b1a23aa;
+    background: #211a14cc;
     border: 1px solid #94846766;
     border-radius: 5px;
     overflow-wrap: anywhere;
@@ -1122,7 +1123,7 @@
     background: #f1d397;
   }
   .corner:hover:enabled {
-    background: #304d5e;
+    background: #604a38;
   }
   .dossier strong {
     font-size: clamp(0.78rem, 1.35vw, 1.2rem);
@@ -1273,7 +1274,7 @@
     flex-wrap: wrap;
   }
   .confirmation:has(button) {
-    background: #0b1a23;
+    background: #211a14;
     border: 1px solid #a99065;
     padding: 10px;
     border-radius: 7px;
@@ -1347,7 +1348,7 @@
     padding: 24px;
   }
   dialog::backdrop {
-    background: #071018c9;
+    background: #17100bc9;
   }
   dialog header {
     display: flex;
@@ -1492,7 +1493,7 @@
       background: #f1d397;
     }
     .corner:hover:enabled {
-      background: #304d5e;
+      background: #604a38;
     }
     .dossier strong {
       font-size: 0.76rem;
@@ -1594,7 +1595,7 @@
       background: #f1d397;
     }
     .corner:hover:enabled {
-      background: #304d5e;
+      background: #604a38;
     }
     .dossier strong {
       font-size: 0.7rem;

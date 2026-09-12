@@ -4,6 +4,38 @@ September 12, 2026. High review and fixes are complete in
 `/home/oscar/Projects/board-games-three-games/codenames`, branch `feature/codenames`.
 The owner used no nested agents, optional plugins or original-checkout edits.
 
+## Final warm-table presentation follow-up
+
+The coordinator's final visual review required a warm spy briefing table distinct
+from Azul's ink-blue table. This small follow-up changes only Codenames surface
+colors: dark leather/wood `#30251e`, a warm `#574235` light pool and subtle CSS grain,
+with matching brown corner buttons, clue strip, confirmation tray and backdrop.
+Ivory dossiers, crimson/cobalt identities, layout, rules and interaction logic are
+unchanged. High review opened the final Chromium operative desktop, 390px phone
+and WebKit spymaster desktop screenshots and confirmed the visual direction.
+
+Contrast calculations using WCAG relative luminance: paper/base table **12.88:1**,
+paper/lightest conservative grain bound **7.74:1**, muted hint/lightest bound
+**5.73:1**, paper/corner **10.22:1**, paper/hover **7.16:1**, paper/confirmation
+**14.84:1**, focus/lightest bound **5.85:1**. Dossier ink/paper remains **13.34:1**.
+The lightest bound `#5a4538` conservatively includes the pale grain overlay.
+
+Validation: production build passed; changed-source Prettier and `git diff --check`
+passed. Existing four-client round/reconnect/rematch and responsive screenshot
+journeys passed **4/4 in Chromium and WebKit** (32.8s), using:
+
+`PLAYWRIGHT_BROWSERS_PATH=/tmp/board-games-three-games-browsers WEBKIT_EXECUTABLE=/tmp/board-games-three-games-browsers/webkit TEST_PORT=3112 bun run test:e2e tests/e2e/codenames.spec.ts --grep 'four private|responsive practice' --output=/tmp/codenames-warm-final`
+
+Selected desktop/phone/result/reservation PNGs are refreshed in the evidence
+folder, with additional 1440px desktop and 390px WebKit images. The evidence index
+identifies remaining prior-palette functional captures. No logic/unit tests were
+added or rerun for this CSS-only follow-up. Earlier manual-device limits remain.
+
+Coordinator already integrated `ded18f8` and `8c25ee1` as `76fffbc` and `41d62cc`;
+apply only this new palette/evidence commit. The owner handoff is updated here;
+coordinator will integrate it by cherry-pick, avoiding an overwrite of the tracked
+integration handoff. `bun.lock` remains uncommitted.
+
 ## Integration commits
 
 Apply the existing Medium commits `23aa459` (game) and `ccb1c57` (wiring/messages),
