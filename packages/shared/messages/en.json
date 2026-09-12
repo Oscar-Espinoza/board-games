@@ -1070,7 +1070,7 @@
   "cn_clue": "Preparing a clue",
   "cn_clueReview": "Opponent reviews the clue",
   "cn_guessing": "Operatives are guessing",
-  "cn_penalty": "Opponent may reveal one own agent",
+  "cn_penalty": "Select one of your unrevealed agents, or skip the benefit.",
   "cn_finished": "Case closed",
   "cn_turn": "Turn {turn}",
   "cn_remaining": "{count} agents remaining",
@@ -1095,7 +1095,7 @@
   "cn_select": "Select {word}",
   "cn_revealed": "Revealed",
   "cn_unrevealed": "Unrevealed",
-  "cn_wait": "Waiting for the indicated player. Consult the team roster in settings.",
+  "cn_wait": "Waiting for {players} · {team} / {role}.",
   "cn_winner": "{team} wins",
   "cn_win_agents": "All of the winning team’s agents have been found.",
   "cn_win_assassin": "The other team revealed the assassin.",
@@ -1153,5 +1153,13 @@
   "cn_guide_finish_info": "Reveal every agent of your team to win, even if the opponent reveals your last one. The assassin awards victory to the other team. Finished boards show the key and stay inert. The host can start a new case: everyone chooses roles again and a fresh board is dealt. There are no bots, timers or in-app calls.",
   "cn_guide_finish_0": "One agent remains.",
   "cn_guide_finish_1": "Reveal that agent.",
-  "cn_guide_finish_2": "Your team wins."
+  "cn_guide_finish_2": "Your team wins.",
+  "cn_reserved": "Disconnected · seat reserved until {time}.",
+  "cn_vacant": "Disconnected · seat available for a replacement.",
+  "cn_guide_connection": "Reconnect & keep your role",
+  "cn_guide_connection_info": "A disconnected seat stays reserved briefly. Rejoin with the same browser to recover it. While a required spymaster is absent, their clue or review waits; connected operatives can continue legal guesses. After the reservation expires, a replacement keeps that seat’s team and role. During setup, replacement clears everyone’s readiness. Roles only change with a fresh board after rematch; host promotion never grants the secret key.",
+  "cn_guide_connection_0": "A seat disconnects; its role stays locked.",
+  "cn_guide_connection_1": "Reconnect, or replace the seat after its reservation.",
+  "cn_guide_connection_2": "Continue with the same team, role and board.",
+  "cn_penalty_phase": "Invalid-clue penalty"
 }

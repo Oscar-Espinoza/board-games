@@ -5,7 +5,41 @@
 
 <svg viewBox="0 0 420 190" role="img" aria-label={m.cn_rules()}>
   <rect width="420" height="190" rx="14" fill="#152532" />
-  {#if lesson.scene === 'setup'}
+  {#if lesson.scene === 'connection'}
+    <rect x="32" y="35" width="120" height="110" rx="8" fill="#f5eedc" />
+    <circle
+      cx="92"
+      cy="73"
+      r="17"
+      fill="#a93645"
+      opacity={step === 2 ? 1 : 0.4}
+    />
+    <path
+      d="M65 119q0-29 27-29t27 29"
+      fill="#a93645"
+      opacity={step === 2 ? 1 : 0.4}
+    />
+    <path
+      d="M176 90h57m-10-10 10 10-10 10"
+      fill="none"
+      stroke="#e5b863"
+      stroke-width="4"
+    />
+    <rect x="259" y="35" width="126" height="110" rx="8" fill="#f5eedc" />
+    <path
+      d="M291 89v-18a31 31 0 0 1 62 0v18"
+      fill="none"
+      stroke="#182631"
+      stroke-width="7"
+    />
+    <rect x="284" y="81" width="76" height="48" rx="5" fill="#a93645" />
+    <text x="322" y="114" text-anchor="middle" fill="#fff" font-size="28"
+      >{step === 2 ? '✓' : '·'}</text
+    >
+    <text x="210" y="174" text-anchor="middle" fill="#f5eedc" font-size="15"
+      >{m.cn_spymaster()}</text
+    >
+  {:else if lesson.scene === 'setup'}
     {#each [0, 1, 2, 3] as i}<g transform="translate({50 + i * 95} 60)"
         ><circle r="27" fill={i < 2 ? '#a93645' : '#245c97'} /><circle
           cy="-6"

@@ -1070,7 +1070,7 @@
   "cn_clue": "Preparando una pista",
   "cn_clueReview": "El rival revisa la pista",
   "cn_guessing": "Los agentes están adivinando",
-  "cn_penalty": "El rival puede revelar un agente propio",
+  "cn_penalty": "Selecciona un agente propio sin revelar, u omite el beneficio.",
   "cn_finished": "Caso cerrado",
   "cn_turn": "Turno {turn}",
   "cn_remaining": "{count} agentes restantes",
@@ -1095,7 +1095,7 @@
   "cn_select": "Seleccionar {word}",
   "cn_revealed": "Revelado",
   "cn_unrevealed": "Sin revelar",
-  "cn_wait": "Esperando al jugador indicado. Consulta los equipos en ajustes.",
+  "cn_wait": "Esperando a {players} · {team} / {role}.",
   "cn_winner": "Gana el {team}",
   "cn_win_agents": "Se encontraron todos los agentes del equipo ganador.",
   "cn_win_assassin": "El otro equipo reveló al asesino.",
@@ -1153,5 +1153,13 @@
   "cn_guide_finish_info": "Revelen todos sus agentes para ganar, incluso si el rival revela el último. El asesino da la victoria al otro equipo. Al terminar se muestra la clave y no se puede jugar más. El anfitrión puede iniciar otro caso: todos eligen roles y se reparte un tablero nuevo. No hay bots, temporizadores ni llamadas integradas.",
   "cn_guide_finish_0": "Queda un agente.",
   "cn_guide_finish_1": "Revelen ese agente.",
-  "cn_guide_finish_2": "Su equipo gana."
+  "cn_guide_finish_2": "Su equipo gana.",
+  "cn_reserved": "Sin conexión · asiento reservado hasta las {time}.",
+  "cn_vacant": "Sin conexión · asiento disponible para un reemplazo.",
+  "cn_guide_connection": "Reconectar y conservar el rol",
+  "cn_guide_connection_info": "Un asiento desconectado queda reservado por un tiempo. Vuelve con el mismo navegador para recuperarlo. Si falta el jefe de espías necesario, su pista o revisión espera; los agentes conectados pueden seguir adivinando cuando sea legal. Al vencer la reserva, el reemplazo conserva el equipo y rol del asiento. Durante la preparación, un reemplazo borra todas las confirmaciones. Los roles solo cambian con un tablero nuevo tras la revancha; ser anfitrión nunca otorga la clave secreta.",
+  "cn_guide_connection_0": "Un asiento se desconecta; conserva su rol.",
+  "cn_guide_connection_1": "Reconecta, o reemplaza el asiento al vencer la reserva.",
+  "cn_guide_connection_2": "Continúa con el mismo equipo, rol y tablero.",
+  "cn_penalty_phase": "Penalización por pista inválida"
 }

@@ -16,18 +16,24 @@
     round = $state(0),
     game = practice(),
     seat = $state(game.actor),
-    view = $state(game.view(game.actor));
-  const displaySeats = $derived(
-    seats.map((p, i) => ({
+    view = $state(game.view(game.actor)),
+    locale = $state(getLocale());
+  const displaySeats = $derived.by(() => {
+    locale;
+    return seats.map((p, i) => ({
       ...p,
       name: `${i < 2 ? m.cn_red() : m.cn_blue()} · ${(i % 2) + 1}`,
-    })),
-  );
+    }));
+  });
   function reset() {
-    game = practice(scenario, getLocale() === 'es' ? 'es' : 'en');
+    game = practice(scenario, locale === 'es' ? 'es' : 'en');
     seat = game.actor;
     view = game.view(seat);
     round++;
+  }
+  function changeLocale(next: Locale) {
+    setLocale(next, { reload: false });
+    locale = next;
   }
   function send(action: unknown) {
     game.send(seat, action);
@@ -36,51 +42,56 @@
   }
 </script>
 
-<svelte:head><title>Codenames · {m.cn_practice()}</title></svelte:head>
-<Board
-  {view}
-  playerId={seat}
-  players={displaySeats}
-  {send}
-  {round}
-  practice
-  canRematch
-  rematch={async () => reset()}
-  locale={getLocale()}
+<svelte:head
+  ><title>Codenames · {m.cn_practice({}, { locale })}</title></svelte:head
 >
-  {#snippet settingsContent()}<nav>
-      <a href="/">{m.back()}</a><label
-        >{m.cn_practice()}<select
-          aria-label={m.cn_practice()}
-          bind:value={scenario}
-          onchange={reset}
-          >{#each scenarios as id}<option value={id}
-              >{{
-                setup: m.cn_practice_setup,
-                match: m.cn_practice_match,
-                final: m.cn_practice_final,
-                assassin: m.cn_practice_assassin,
-              }[id]()}</option
-            >{/each}</select
-        ></label
-      ><label
-        >{m.cn_actor()}<select
-          aria-label={m.cn_actor()}
-          bind:value={seat}
-          onchange={() => (view = game.view(seat))}
-          >{#each displaySeats as p}<option value={p.id}>{p.name}</option
-            >{/each}</select
-        ></label
-      ><button onclick={reset}>{m.cn_reset()}</button><label
-        >{m.language()}<select
-          aria-label={m.language()}
-          value={getLocale()}
-          onchange={(e) => setLocale(e.currentTarget.value as Locale)}
-          ><option value="en">EN</option><option value="es">ES</option></select
-        ></label
-      >
-    </nav>{/snippet}
-</Board>
+{#key locale}
+  <Board
+    {view}
+    playerId={seat}
+    players={displaySeats}
+    {send}
+    {round}
+    practice
+    canRematch
+    rematch={async () => reset()}
+    {locale}
+  >
+    {#snippet settingsContent()}<nav>
+        <a href="/">{m.back()}</a><label
+          >{m.cn_practice()}<select
+            aria-label={m.cn_practice()}
+            bind:value={scenario}
+            onchange={reset}
+            >{#each scenarios as id}<option value={id}
+                >{{
+                  setup: m.cn_practice_setup,
+                  match: m.cn_practice_match,
+                  final: m.cn_practice_final,
+                  assassin: m.cn_practice_assassin,
+                }[id]()}</option
+              >{/each}</select
+          ></label
+        ><label
+          >{m.cn_actor()}<select
+            aria-label={m.cn_actor()}
+            bind:value={seat}
+            onchange={() => (view = game.view(seat))}
+            >{#each displaySeats as p}<option value={p.id}>{p.name}</option
+              >{/each}</select
+          ></label
+        ><button onclick={reset}>{m.cn_reset()}</button><label
+          >{m.language()}<select
+            aria-label={m.language()}
+            value={locale}
+            onchange={(e) => changeLocale(e.currentTarget.value as Locale)}
+            ><option value="en">EN</option><option value="es">ES</option
+            ></select
+          ></label
+        >
+      </nav>{/snippet}
+  </Board>
+{/key}
 
 <style>
   nav {

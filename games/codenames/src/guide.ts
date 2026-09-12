@@ -1,5 +1,13 @@
 import { m } from '@board-games/shared/messages';
-const ids = ['setup', 'clues', 'review', 'guess', 'budget', 'finish'] as const;
+const ids = [
+  'setup',
+  'clues',
+  'review',
+  'guess',
+  'budget',
+  'finish',
+  'connection',
+] as const;
 export default {
   title: m.cn_rules,
   chapters: ids.map((id) => ({

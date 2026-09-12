@@ -349,3 +349,107 @@ describe('Codenames authoritative rules', () => {
     ).toEqual([]);
   });
 });
+
+test('all finite counts, malformed options and every role/phase permission reject without mutation', () => {
+  for (const options of [
+    true,
+    [],
+    { boardLanguage: 'fr' },
+    { allowAbbreviations: 1 },
+    { allowMultiwordNames: 'yes' },
+  ])
+    expect(() => create(ids, seeded(1), options)).toThrow();
+  for (let count = 1; count <= 9; count++)
+    expect(guessing(dealt(), count).budget).toEqual({
+      kind: 'finite',
+      cap: count + 1,
+    });
+  const clue = dealt(),
+    review = action(clue, actor(clue), {
+      type: 'submitClue',
+      word: 'Sea',
+      count: 2,
+    }),
+    guess = guessing(clue),
+    penalty = action(review, actor(review, 'spymaster', true), {
+      type: 'reviewClue',
+      allow: false,
+    });
+  for (const state of [clue, review, guess, penalty]) {
+    const cases = [
+      {
+        input: { type: 'submitClue', word: 'Sea', count: 2 },
+        phase: 'clue',
+        role: 'spymaster',
+        opponent: false,
+      },
+      {
+        input: { type: 'reviewClue', allow: true },
+        phase: 'clueReview',
+        role: 'spymaster',
+        opponent: true,
+      },
+      {
+        input: { type: 'takePenalty', card: null },
+        phase: 'penalty',
+        role: 'spymaster',
+        opponent: true,
+      },
+      {
+        input: { type: 'guess', card: 0 },
+        phase: 'guessing',
+        role: 'operative',
+        opponent: false,
+      },
+    ];
+    for (const { input, phase, role, opponent } of cases)
+      for (const player of ids) {
+        if (state.phase === phase && player === actor(state, role, opponent))
+          continue;
+        reject(state, player, input);
+      }
+    for (const input of [null, [], 'guess', { type: 'undo' }])
+      reject(state, 'ro', input);
+    reject(state, 'unknown', { type: 'guess', card: 0 });
+    const changed = structuredClone(state);
+    const left = changed.board.findIndex((c) => !c.revealed),
+      right = changed.board.findIndex(
+        (c) => !c.revealed && c.identity !== changed.board[left]!.identity,
+      );
+    [changed.board[left]!.identity, changed.board[right]!.identity] = [
+      changed.board[right]!.identity,
+      changed.board[left]!.identity,
+    ];
+    for (const operative of ['ro', 'bo'])
+      expect(view(changed, operative)).toEqual(view(state, operative));
+    expect(view(changed, 'rs').private.key).not.toEqual(
+      view(state, 'rs').private.key,
+    );
+  }
+});
+
+test('presentation cancels active effects on discontinuities, but repeated snapshots leave live motion alone', () => {
+  let cancellations = 0;
+  const gate = eventGate(() => cancellations++);
+  gate.consume('round:seat:role', 1, [], true, {});
+  const first = cancellations;
+  gate.consume('round:seat:role', 1, [], true, {});
+  expect(cancellations).toBe(first);
+  gate.consume('round:seat:role', 4, [], true, {});
+  expect(cancellations).toBe(first + 1);
+  const event = {
+    type: 'turnEnded' as const,
+    team: 'red' as const,
+    sequence: 5,
+    index: 0,
+  };
+  expect(gate.consume('round:seat:role', 5, [event], true, {})).toEqual([
+    event,
+  ]);
+  gate.consume('round:seat:role', 3, [], true, {});
+  expect(cancellations).toBe(first + 2);
+  gate.consume('round:other-seat:role', 6, [], true, {});
+  expect(cancellations).toBe(first + 3);
+  gate.reset();
+  expect(cancellations).toBe(first + 4);
+});

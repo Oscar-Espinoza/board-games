@@ -109,6 +109,19 @@ test('four private clients finish an ordinary round, rematch, and lose to the as
     const spy = pages[active + 1]!,
       operative = pages[active]!,
       reviewer = pages[active === 0 ? 3 : 1]!;
+    await spy.context().setOffline(true);
+    await expect(operative.locator('.waiting')).toContainText(
+      active === 0 ? 'Red spymaster' : 'Blue spymaster',
+    );
+    await expect(operative.locator('.controls')).toContainText(
+      'seat reserved until',
+    );
+    await operative.screenshot({
+      animations: 'disabled',
+      path: info.outputPath('waiting-reserved-spymaster.png'),
+    });
+    await spy.context().setOffline(false);
+    await expect(spy.locator('.notice')).toHaveCount(0);
     await clue(spy, reviewer);
     const targets = await spy
       .locator(`.dossier[data-identity="${active === 0 ? 'red' : 'blue'}"]`)
@@ -150,7 +163,11 @@ test('four private clients finish an ordinary round, rematch, and lose to the as
           if (!cell.revealed && room.game.public.phase !== 'finished')
             expect(cell.identity).toBeUndefined();
       }
-    await host
+    const currentHostId = snapshots[0]!.at(-1).hostId;
+    const currentHost = pages.find(
+      (_, i) => snapshots[i]!.at(-1).playerId === currentHostId,
+    )!;
+    await currentHost
       .getByRole('button', { name: 'New case · choose teams again' })
       .click();
     await roles();
@@ -238,20 +255,77 @@ test('responsive practice, keyboard confirmation, searchable manual, settings an
   expect(await page.locator('.dossier strong').allTextContents()).toEqual(
     words,
   );
+  await expect(page.locator('.cn-table')).toHaveAttribute(
+    'data-phase',
+    'guessing',
+  );
+  await expect(page.locator('.clue-strip')).toContainText('Sea');
   await page.screenshot({
     animations: 'disabled',
     path: info.outputPath('spanish-operative.png'),
   });
   expect(errors).toEqual([]);
 });
-test('eight seats consent to visible creation agreements and fit the table', async ({
+test('eight seats consent, race distinct operative confirmations, and fit the table', async ({
   browser,
   baseURL,
 }, info) => {
   test.setTimeout(150000);
   const contexts = await Promise.all(
     Array.from({ length: 8 }, () =>
-      browser.newContext({ baseURL, viewport: { width: 768, height: 1024 } }),
+      browser.newContext({
+        baseURL,
+        viewport: { width: 768, height: 1024 },
+        recordVideo: {
+          dir: info.outputPath('videos'),
+          size: { width: 768, height: 1024 },
+        },
+      }),
+    ),
+  );
+  // Hold actual browser-produced confirmations so both carry the same revision.
+  // No game state or client intention is fabricated by this transport barrier.
+  await Promise.all(
+    contexts.map((c) =>
+      c.addInitScript(() => {
+        const race = {
+          hold: false,
+          queued: [] as { socket: WebSocket; data: string }[],
+          guesses: 0,
+          stale: 0,
+        };
+        (window as any).__cnRace = race;
+        const send = WebSocket.prototype.send;
+        const observed = new WeakSet<WebSocket>();
+        WebSocket.prototype.send = function (data) {
+          if (!observed.has(this)) {
+            observed.add(this);
+            this.addEventListener('message', (event) => {
+              if (
+                typeof event.data === 'string' &&
+                event.data.includes('STALE_REVISION')
+              )
+                race.stale++;
+            });
+          }
+          if (typeof data === 'string' && /^42\d*\["action"/.test(data)) {
+            const action = JSON.parse(data.slice(data.indexOf('[')))[1];
+            if (action.action?.type === 'guess') {
+              race.guesses++;
+              if (race.hold) {
+                race.queued.push({ socket: this, data });
+                return;
+              }
+            }
+          }
+          return send.call(this, data);
+        };
+        (window as any).__cnFlush = () => {
+          race.hold = false;
+          for (const item of race.queued.splice(0))
+            send.call(item.socket, item.data);
+        };
+      }),
     ),
   );
   const pages = await Promise.all(contexts.map((c) => c.newPage()));
@@ -303,6 +377,93 @@ test('eight seats consent to visible creation agreements and fit the table', asy
     await host.screenshot({
       animations: 'disabled',
       path: info.outputPath('eight-seat-tablet.png'),
+    });
+    const active = (await pages[1]!
+      .getByLabel('Clue word', { exact: true })
+      .count())
+      ? 0
+      : 4;
+    const spy = pages[active + 1]!,
+      reviewer = pages[active === 0 ? 5 : 1]!;
+    const operatives = [pages[active]!, pages[active + 2]!];
+    await clue(spy, reviewer, '3');
+    const targets = await spy
+      .locator(`.dossier[data-identity="${active === 0 ? 'red' : 'blue'}"]`)
+      .evaluateAll((es) =>
+        es.slice(0, 2).map((e) => e.getAttribute('data-card')!),
+      );
+    for (let i = 0; i < 2; i++) {
+      await expect(
+        operatives[i]!.getByRole('button', { name: 'End turn', exact: true }),
+      ).toBeDisabled();
+      await operatives[i]!.locator(`[data-card="${targets[i]}"]`).click();
+      expect(
+        await operatives[i]!.evaluate(() => (window as any).__cnRace.guesses),
+      ).toBe(0);
+      await operatives[i]!.evaluate(
+        () => ((window as any).__cnRace.hold = true),
+      );
+    }
+    await operatives[0]!.screenshot({
+      animations: 'disabled',
+      path: info.outputPath('race-confirmation.png'),
+    });
+    await Promise.all(
+      operatives.map((p) => p.locator('.confirmation .primary').click()),
+    );
+    for (const p of operatives)
+      await expect
+        .poll(() => p.evaluate(() => (window as any).__cnRace.queued.length))
+        .toBe(1);
+    const envelopes = await Promise.all(
+      operatives.map((p) =>
+        p.evaluate(() => {
+          const data = (window as any).__cnRace.queued[0].data;
+          return JSON.parse(data.slice(data.indexOf('[')))[1];
+        }),
+      ),
+    );
+    expect(envelopes[0].revision).toBe(envelopes[1].revision);
+    expect(envelopes[0].action.card).not.toBe(envelopes[1].action.card);
+    // Snapshot count plus one sent guess per browser proves no automatic replay.
+    await Promise.all(
+      operatives.map((p) => p.evaluate(() => (window as any).__cnFlush())),
+    );
+    await expect
+      .poll(async () =>
+        (
+          await Promise.all(
+            operatives.map((p) =>
+              p.evaluate(() => (window as any).__cnRace.stale),
+            ),
+          )
+        ).reduce((sum, count) => sum + count, 0),
+      )
+      .toBe(1);
+    for (const p of operatives) {
+      await expect(p.locator('.dossier.revealed')).toHaveCount(1);
+      await expect(p.locator('.confirmation button')).toHaveCount(0);
+      expect(await p.evaluate(() => (window as any).__cnRace.guesses)).toBe(1);
+      expect(
+        await p.locator('.dossier:not(.revealed)[data-identity]').count(),
+      ).toBe(0);
+    }
+    // The losing choice needs a new selection and explicit confirmation.
+    const remaining = await operatives[1]!
+      .locator('.dossier:not(.revealed)')
+      .evaluateAll(
+        (es, candidates) =>
+          es
+            .map((e) => e.getAttribute('data-card')!)
+            .find((id) => candidates.includes(id)),
+        targets,
+      );
+    await operatives[1]!.locator(`[data-card="${remaining}"]`).click();
+    await operatives[1]!.locator('.confirmation .primary').click();
+    await expect(host.locator('.dossier.revealed')).toHaveCount(2);
+    await host.screenshot({
+      animations: 'disabled',
+      path: info.outputPath('race-settled.png'),
     });
     await host.setViewportSize({ width: 320, height: 568 });
     await host
@@ -386,10 +547,35 @@ test('accepted public effects play once after gesture, cancel on resize, and mut
     .poll(() => page.evaluate(() => (window as any).__cnEffects.sounds))
     .toBeGreaterThan(0);
   await page.setViewportSize({ width: 390, height: 844 });
+  // Resize/visibility settle immediately: the next new accepted reveal still animates.
+  const nextTarget = await page
+    .locator('.dossier:not(.revealed)')
+    .first()
+    .getAttribute('data-card');
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      value: true,
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      value: false,
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await page.locator(`[data-card="${nextTarget}"]`).click();
+  await page.locator('.confirmation .primary').click();
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__cnEffects.flips))
+    .toBe(2);
   const sounds = await page.evaluate(() => (window as any).__cnEffects.sounds);
   await settings(page);
   await page.getByLabel('Sound', { exact: true }).uncheck();
   await page.getByLabel('Reduce motion', { exact: true }).check();
+  await page.getByLabel('Volume', { exact: true }).focus();
+  await page.keyboard.press('Home');
+  for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowRight');
   await close(page);
   expect(await page.evaluate(() => (window as any).__cnEffects.sounds)).toBe(
     sounds,
@@ -398,6 +584,24 @@ test('accepted public effects play once after gesture, cancel on resize, and mut
     path: info.outputPath('accepted-reveal.png'),
     animations: 'disabled',
   });
+  await page.getByRole('button', { name: 'End turn', exact: true }).click();
+  await page.getByLabel('Clue word', { exact: true }).fill('Quiet');
+  await page.getByRole('button', { name: 'Send clue for review' }).click();
+  expect(await page.evaluate(() => (window as any).__cnEffects.sounds)).toBe(
+    sounds,
+  );
+  expect(await page.evaluate(() => (window as any).__cnEffects.flips)).toBe(2);
+  const preferences = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('codenames:preferences')!),
+  );
+  expect(preferences).toEqual({ sound: false, volume: 0.25, reduced: true });
+  await page.reload();
+  await settings(page);
+  await expect(page.getByLabel('Sound', { exact: true })).not.toBeChecked();
+  await expect(page.getByLabel('Reduce motion', { exact: true })).toBeChecked();
+  expect(await page.evaluate(() => (window as any).__cnEffects.contexts)).toBe(
+    0,
+  );
 });
 test('unavailable audio never blocks clue review or card confirmation', async ({
   page,
@@ -416,4 +620,182 @@ test('unavailable audio never blocks clue review or card confirmation', async ({
   await page.locator(`[data-card="${target}"]`).click();
   await page.locator('.confirmation .primary').click();
   await expect(page.locator(`[data-card="${target}"]`)).toHaveClass(/revealed/);
+});
+
+test('review rejection, penalty benefit and skip, wrong reveals and finite budgets explain the journey', async ({
+  browser,
+  baseURL,
+}, info) => {
+  const context = await browser.newContext({
+    baseURL,
+    viewport: { width: 1440, height: 900 },
+    recordVideo: {
+      dir: info.outputPath('videos'),
+      size: { width: 1440, height: 900 },
+    },
+  });
+  const page = await context.newPage();
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  try {
+    await page.goto('/practice/codenames');
+    await expect(page.locator('.dossier.key')).toHaveCount(25);
+    const key = await page.locator('.dossier').evaluateAll((es) =>
+      es.map((e) => ({
+        card: e.getAttribute('data-card')!,
+        identity: e.getAttribute('data-identity')!,
+      })),
+    );
+    const target = (identity: string, offset = 0) =>
+      key.filter((c) => c.identity === identity)[offset]!.card;
+    async function submit(count = '1') {
+      await page.getByLabel('Clue word', { exact: true }).fill('Ocean');
+      await page.getByLabel('Count', { exact: true }).selectOption(count);
+      await page.getByRole('button', { name: 'Send clue for review' }).click();
+    }
+    async function reveal(card: string) {
+      await page.locator(`[data-card="${card}"]`).click();
+      await page.locator('.confirmation .primary').click();
+      await expect(page.locator(`[data-card="${card}"]`)).toHaveClass(
+        /revealed/,
+      );
+    }
+    await submit();
+    await expect(page.locator('.cn-table')).toHaveAttribute(
+      'data-phase',
+      'clueReview',
+    );
+    await expect(page.locator('.dossier:enabled')).toHaveCount(0);
+    await page.screenshot({
+      animations: 'disabled',
+      path: info.outputPath('review.png'),
+    });
+    await page
+      .getByRole('button', { name: 'Invalid clue', exact: true })
+      .click();
+    await expect(page.locator('.cn-table')).toHaveAttribute(
+      'data-phase',
+      'penalty',
+    );
+    expect(
+      await page
+        .locator('.dossier:enabled')
+        .evaluateAll((es) =>
+          es.every((e) => e.getAttribute('data-identity') === 'red'),
+        ),
+    ).toBe(true);
+    await page.locator(`[data-card="${target('red')}"]`).click();
+    await page.screenshot({
+      animations: 'disabled',
+      path: info.outputPath('penalty-selection.png'),
+    });
+    await page.locator('.confirmation .primary').click();
+    await expect(page.locator('.cn-table')).toHaveAttribute(
+      'data-phase',
+      'clue',
+    );
+    await expect(page.locator('.side.red > strong')).toHaveText('7');
+    await submit();
+    await page
+      .getByRole('button', { name: 'Invalid clue', exact: true })
+      .click();
+    await page
+      .getByRole('button', { name: 'Skip benefit', exact: true })
+      .click();
+    await expect(page.locator('.dossier.revealed')).toHaveCount(1);
+    await submit('1');
+    await page.getByRole('button', { name: 'Allow clue', exact: true }).click();
+    await expect(
+      page.getByRole('button', { name: 'End turn', exact: true }),
+    ).toBeDisabled();
+    await reveal(target('blue'));
+    await expect(
+      page.getByRole('button', { name: 'End turn', exact: true }),
+    ).toBeEnabled();
+    await reveal(target('blue', 1));
+    await expect(page.locator('.cn-table')).toHaveAttribute(
+      'data-phase',
+      'clue',
+    );
+    await submit('0');
+    await page.getByRole('button', { name: 'Allow clue', exact: true }).click();
+    await expect(page.locator('.controls')).toContainText('∞');
+    await reveal(target('civilian'));
+    await expect(page.locator('.cn-table')).toHaveAttribute(
+      'data-phase',
+      'clue',
+    );
+    await page.screenshot({
+      animations: 'disabled',
+      path: info.outputPath('civilian-handoff.png'),
+    });
+    await submit('unlimited');
+    await page.getByRole('button', { name: 'Allow clue', exact: true }).click();
+    await reveal(target('red', 1));
+    await expect(page.locator('.cn-table')).toHaveAttribute(
+      'data-phase',
+      'clue',
+    );
+    await expect(page.locator('.side.red > strong')).toHaveText('6');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+      animations: 'disabled',
+      path: info.outputPath('enemy-handoff-phone.png'),
+    });
+    await settings(page);
+    await expect(page.locator('.history')).toContainText('rejected');
+    for (const label of await page.locator('.preferences label').all())
+      expect((await label.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await page.screenshot({
+      animations: 'disabled',
+      path: info.outputPath('history-settings-phone.png'),
+    });
+    await page
+      .getByLabel('Local training · all roles', { exact: true })
+      .selectOption('final');
+    await close(page);
+    const final = await page
+      .locator('.dossier.key.blue')
+      .first()
+      .getAttribute('data-card');
+    await submit();
+    await page.getByRole('button', { name: 'Allow clue', exact: true }).click();
+    await reveal(final!);
+    await expect(page.locator('.result')).toContainText('Blue team wins');
+    await expect(page.locator('.dossier:enabled')).toHaveCount(0);
+    await page.screenshot({
+      animations: 'disabled',
+      path: info.outputPath('final-agent-phone.png'),
+    });
+    await settings(page);
+    await page
+      .locator('dialog')
+      .getByLabel('Language', { exact: true })
+      .selectOption('es');
+    await page
+      .getByRole('button', { name: 'Manual de campo', exact: true })
+      .click();
+    await expect(page.locator('.cn-table')).toHaveAttribute(
+      'data-phase',
+      'finished',
+    );
+    await page.getByLabel('Buscar en el manual de campo').fill('reconectar');
+    await expect(page.locator('dialog details')).toHaveCount(1);
+    await expect(page.locator('dialog')).toContainText('conserva');
+    await page.screenshot({
+      animations: 'disabled',
+      path: info.outputPath('spanish-connection-guide-phone.png'),
+    });
+    await page
+      .getByLabel('Buscar en el manual de campo')
+      .fill('penalizaciones');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.screenshot({
+      animations: 'disabled',
+      path: info.outputPath('spanish-review-guide.png'),
+    });
+    expect(errors).toEqual([]);
+  } finally {
+    await context.close();
+  }
 });

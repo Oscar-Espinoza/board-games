@@ -9,15 +9,24 @@ export function soundEffects() {
         if (context.state === 'suspended') await context.resume();
       } catch {}
     },
-    play(volume: number, finished = false) {
+    play(volume: number, cue: 'clue' | 'reveal' | 'handoff' | 'finish') {
       try {
         if (!context || context.state !== 'running') return;
         const oscillator = context.createOscillator(),
           gain = context.createGain();
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(
-          finished ? 440 : 330,
-          context.currentTime,
+        // Brief original cues depend only on accepted public event types.
+        const [start, end, duration] = {
+          clue: [900, 300, 0.09],
+          reveal: [150, 75, 0.16],
+          handoff: [220, 280, 0.16],
+          finish: [440, 660, 0.28],
+        }[cue];
+        oscillator.type =
+          cue === 'clue' || cue === 'handoff' ? 'triangle' : 'sine';
+        oscillator.frequency.setValueAtTime(start!, context.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(
+          end!,
+          context.currentTime + duration!,
         );
         gain.gain.setValueAtTime(0, context.currentTime);
         gain.gain.linearRampToValueAtTime(
@@ -26,7 +35,7 @@ export function soundEffects() {
         );
         gain.gain.exponentialRampToValueAtTime(
           0.0001,
-          context.currentTime + 0.18,
+          context.currentTime + duration!,
         );
         oscillator.connect(gain);
         gain.connect(context.destination);
@@ -37,7 +46,7 @@ export function soundEffects() {
           gain.disconnect();
         };
         oscillator.start();
-        oscillator.stop(context.currentTime + 0.2);
+        oscillator.stop(context.currentTime + duration! + 0.02);
       } catch {}
     },
     cancel() {

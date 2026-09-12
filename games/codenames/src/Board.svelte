@@ -23,7 +23,12 @@
   }: {
     view: View;
     playerId: string;
-    players: { id: string; name: string; connected: boolean }[];
+    players: {
+      id: string;
+      name: string;
+      connected: boolean;
+      reservedUntil?: number | null;
+    }[];
     send: (action: unknown) => unknown;
     locale?: string;
     round?: number;
@@ -54,11 +59,28 @@
       clue: m.cn_clue,
       clueReview: m.cn_clueReview,
       guessing: m.cn_guessing,
-      penalty: m.cn_penalty,
+      penalty: m.cn_penalty_phase,
       finished: m.cn_finished,
     }[s.phase](),
   );
   const disabled = $derived(!connected || pending);
+  const responsibleTeam = $derived(
+    s.phase === 'clueReview' || s.phase === 'penalty'
+      ? s.activeTeam === 'red'
+        ? 'blue'
+        : 'red'
+      : s.activeTeam,
+  );
+  const responsibleRole = $derived(
+    s.phase === 'guessing' ? 'operative' : 'spymaster',
+  );
+  const responsiblePlayers = $derived(
+    players.filter(
+      (p) =>
+        s.assignments[p.id]?.team === responsibleTeam &&
+        s.assignments[p.id]?.role === responsibleRole,
+    ),
+  );
   const guessing = $derived(
     s.phase === 'guessing' &&
       mine?.team === s.activeTeam &&
@@ -105,7 +127,7 @@
     systemReduced = $state(false),
     mounted = $state(false);
   let root: HTMLElement;
-  const gate = eventGate(),
+  const gate = eventGate(stopEffects),
     audio = soundEffects();
   const animations = new Set<Animation>();
   const warning = $derived(
@@ -123,11 +145,23 @@
                 .toLocaleLowerCase(s.options.boardLanguage),
         )),
   );
-  function cancelEffects() {
-    gate.reset();
+  function stopEffects() {
     for (const animation of animations) animation.cancel();
     animations.clear();
     audio.cancel();
+  }
+  function cancelEffects() {
+    gate.reset();
+  }
+  function settleEffects() {
+    cancelEffects();
+    gate.consume(
+      `${round}:${playerId}:${mine?.role ?? ''}`,
+      s.actionSequence,
+      [],
+      connected,
+      s,
+    );
   }
   function gesture() {
     if (sound) void audio.unlock();
@@ -196,6 +230,15 @@
     animation.onfinish = () => animations.delete(animation);
   }
   $effect(() => {
+    const seat = playerId,
+      r = round;
+    untrack(() => {
+      word = '';
+      count = '1';
+      localError = '';
+    });
+  });
+  $effect(() => {
     const seq = s.actionSequence,
       seat = playerId,
       r = round,
@@ -204,7 +247,7 @@
       code = errorCode;
     untrack(() => {
       selected = null;
-      if (!online || code) cancelEffects();
+      if (!online || code) settleEffects();
     });
   });
   $effect(() => {
@@ -269,6 +312,12 @@
             ],
             220,
           );
+        if (event.type === 'turnEnded')
+          animate(
+            root?.querySelector('.phase'),
+            [{ opacity: 0.4 }, { opacity: 1 }],
+            240,
+          );
         if (event.type === 'gameFinished')
           animate(
             root?.querySelector('.result'),
@@ -276,22 +325,22 @@
             450,
           );
       }
-      if (
-        sound &&
-        accepted.some(
-          (e) => e.type === 'cardRevealed' || e.type === 'clueSubmitted',
-        )
-      )
-        audio.play(
-          volume,
-          accepted.some((e) => e.type === 'gameFinished'),
-        );
+      const cue = accepted.some((e) => e.type === 'gameFinished')
+        ? 'finish'
+        : accepted.some((e) => e.type === 'cardRevealed')
+          ? 'reveal'
+          : accepted.some((e) => e.type === 'turnEnded')
+            ? 'handoff'
+            : accepted.some((e) => e.type === 'clueSubmitted')
+              ? 'clue'
+              : null;
+      if (sound && cue) audio.play(volume, cue);
     });
   });
   $effect(() => {
     const motion = reduced,
       preference = systemReduced;
-    untrack(cancelEffects);
+    untrack(settleEffects);
   });
   $effect(() => {
     if (mounted) {
@@ -321,7 +370,7 @@
     };
     query.addEventListener('change', media);
     const reset = () => {
-      cancelEffects();
+      settleEffects();
       selected = null;
     };
     window.addEventListener('resize', reset);
@@ -463,10 +512,10 @@
       </aside>
       <main class="table-center">
         <div class="phase" aria-live="polite">
-          <span class="team-dot {s.activeTeam}"></span><strong
+          <span class="team-dot {responsibleTeam}"></span><strong
             >{s.result
               ? m.cn_winner({ team: teamLabel(s.result.team) })
-              : teamLabel(s.activeTeam)}</strong
+              : teamLabel(responsibleTeam)}</strong
           ><span>{phaseLabel}</span>
         </div>
         <div class="mobile-counters">
@@ -638,7 +687,25 @@
                 ? m.cn_spymaster_hint()
                 : m.cn_operative_hint()}
             </p>
-            <p class="hint">{m.cn_wait()}</p>{/if}
+            <p class="hint waiting" role="status">
+              {m.cn_wait({
+                players: responsiblePlayers.map((p) => p.name).join(' · '),
+                team: teamLabel(responsibleTeam),
+                role: roleLabel(responsibleRole),
+              })}
+            </p>
+            {#each responsiblePlayers.filter((p) => !p.connected) as p}<p
+                class="hint"
+              >
+                {p.name} · {p.reservedUntil
+                  ? m.cn_reserved({
+                      time: new Intl.DateTimeFormat(locale, {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      }).format(p.reservedUntil),
+                    })
+                  : m.cn_vacant()}
+              </p>{/each}{/if}
           <div class="confirmation" aria-live="polite">
             {#if selected !== null && s.board[selected] && (guessing || penalizing)}<div
               >
@@ -1306,6 +1373,8 @@
     margin: 1rem 0 2rem;
   }
   .preferences label {
+    min-height: 44px;
+    cursor: pointer;
     display: flex;
     gap: 0.7rem;
     align-items: center;

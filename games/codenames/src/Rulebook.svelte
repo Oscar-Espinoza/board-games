@@ -42,9 +42,17 @@
     gap: 0.5rem;
   }
   input {
+    box-sizing: border-box;
+    min-height: 44px;
     padding: 0.7rem;
     font: inherit;
     min-width: 0;
+  }
+  input:focus-visible,
+  summary:focus-visible,
+  a:focus-visible {
+    outline: 3px solid #245c97;
+    outline-offset: 3px;
   }
   summary {
     cursor: pointer;
