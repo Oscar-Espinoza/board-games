@@ -10,6 +10,7 @@
   import type { GameId } from '$lib/catalog/types';
   let selected = $state<GameId>('uno');
   let panel = $state<'start' | 'summary' | 'rules' | 'join' | null>(null);
+  let secretPowers = $state(false);
   let boardLanguage = $state('en'),
     allowAbbreviations = $state(false),
     allowMultiwordNames = $state(false);
@@ -23,6 +24,7 @@
   const selectedIndex = $derived(catalog.findIndex((g) => g.id === selected));
   const game = $derived(catalog[selectedIndex]!);
   const summaries = {
+    'little-secret': m.ls_summary,
     azul: m.library_azul_summary,
     codenames: m.library_cn_summary,
     'sushi-go-party': m.sgp_summary,
@@ -31,6 +33,7 @@
     carcassonne: m.library_carcassonne_summary,
   };
   const loops = {
+    'little-secret': [m.ls_loop_0, m.ls_loop_1, m.ls_loop_2],
     azul: [m.library_azul_loop_0, m.library_azul_loop_1, m.library_azul_loop_2],
     codenames: [m.library_cn_loop_0, m.library_cn_loop_1, m.library_cn_loop_2],
     'sushi-go-party': [m.sgp_loop_0, m.sgp_loop_1, m.sgp_loop_2],
@@ -124,9 +127,11 @@
       const credentials = await create(
         selected,
         practice ? name.trim() || 'Player' : name.trim(),
-        selected === 'codenames'
-          ? { boardLanguage, allowAbbreviations, allowMultiwordNames }
-          : { setup, practice },
+        selected === 'little-secret'
+          ? { wordLanguage: boardLanguage, powers: secretPowers }
+          : selected === 'codenames'
+            ? { boardLanguage, allowAbbreviations, allowMultiwordNames }
+            : { setup, practice },
       );
       await goto(`/room/${credentials.roomId}`);
     } catch (error) {
@@ -238,6 +243,21 @@
           placeholder="Alex"
         /></label
       >
+      {#if selected === 'little-secret'}<fieldset>
+          <legend>{m.ls_language()}</legend><select
+            bind:value={boardLanguage}
+            aria-label={m.ls_language()}
+            ><option value="en">English</option><option value="es"
+              >Español</option
+            ></select
+          ><label
+            ><input
+              type="checkbox"
+              bind:checked={secretPowers}
+            />{m.ls_powers()}</label
+          >
+          <p>{m.ls_conversation()}</p>
+        </fieldset>{/if}
       {#if selected === 'codenames'}<fieldset>
           <legend>{m.cn_language()}</legend><select
             bind:value={boardLanguage}
@@ -380,7 +400,7 @@
     gap: 14px;
     background: transparent;
     color: #8e7961;
-    padding: 10px 5px;
+    padding: 8px 5px;
     min-height: 48px;
     border-radius: 0;
     border-bottom: 1px solid #aa88632c;

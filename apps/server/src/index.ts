@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { resolve } from 'node:path';
 import sirv from 'sirv';
+import { littleSecret } from '@board-games/little-secret/server';
 import { azul } from '@board-games/azul/server';
 import { codenames } from '@board-games/codenames/server';
 import { sushiGoParty } from '@board-games/sushi-go-party/server';
@@ -16,6 +17,7 @@ if (!Number.isFinite(grace) || grace < 0)
 const rooms = new Rooms(
   new Map<string, GameDefinition>([
     [uno.id, uno],
+    [littleSecret.id, littleSecret],
     [azul.id, azul],
     [codenames.id, codenames],
     [sushiGoParty.id, sushiGoParty],

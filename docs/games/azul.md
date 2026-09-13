@@ -66,4 +66,8 @@ Publisher evidence and the independently transcribed wall were locked during the
 
 Rule tests include independent scoring examples, exact wall mapping, invalid payload/RNG immutability, every marker convention, partial refill, full conserved seeded games for all seat counts, final resolution and ties. Session tests exercise actual Socket.IO delivery, identity binding, concurrent intentions, request deduplication, reconnect, replacement/revoked credentials and rematch generations. Browser tests and inspected visual evidence are recorded in `docs/handoffs/azul.md`; the independent final review and corrections are in [Azul review](../handoffs/azul-review.md).
 
+## Table presentation
+
+The accepted visual direction for the table is Table Light, recorded in [ADR 017](../adr/017-azul-table-light.md) with the migration, tokens, components, motion and mobile layout in [Azul redesign](../azul-redesign/README.md). It changes presentation only: the rules, conventions and boundaries above are unaffected. Two rulebook details it depends on are worth repeating here, because both are easy to get backwards: the retail player board is flat printed cardboard with nothing recessed, and the faded tile motifs are printed on the wall rather than on the pattern lines.
+
 Actual Safari on macOS/iOS, device touch/audio quality, a multi-human game and fluent Spanish editorial review require human validation and are not established by WebKit automation.

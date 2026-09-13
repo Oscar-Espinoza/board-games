@@ -114,3 +114,26 @@ synchronization. Round/turn/prompt/ownership changes, commitment or disconnected
 seats stop retries. Azul drafts and Codenames guesses are never automatically
 reconfirmed. A missing acknowledgement is synchronized before any resubmission.
 See [ADR 013](adr/013-three-game-delivery.md) for the precise boundaries.
+
+Azul's table presentation is being reworked to Table Light, recorded in
+[ADR 017](adr/017-azul-table-light.md) with tokens, components, motion and mobile
+layout in [Azul redesign](azul-redesign/README.md). It changes no rules, no
+projection and no event, and the game keeps its colours in a game-owned palette
+module rather than in shared packages.
+
+## Little Secret
+
+The seventh game uses a pure content-injected engine with explicit randomness.
+Its server entry alone imports production word packs; practice supplies a small
+independent teaching collection. Canonical roles, word orientation, aliases,
+content IDs and incomplete commitments never cross the player projection.
+Public powers are independent of factions. Journalist and Revenant reactions
+are resumable actor-owned prompts, resolved before terminal scoring, with
+solutions withheld from actors until their reactions finish.
+
+The existing room transport handles identity, host transfer, deduplication and
+replacement. Its retry predicate additionally permits unchanged, uncommitted
+Little Secret readiness, continuation, ballots and RPS, preserving the original
+action ID and the existing three-attempt limit. Other actions never retry
+automatically. See [ADR 014](adr/014-little-secret.md) and
+[Little Secret rules](games/little-secret.md).

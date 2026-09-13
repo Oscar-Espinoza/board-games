@@ -21,6 +21,7 @@
         "@board-games/catan": "workspace:*",
         "@board-games/codenames": "workspace:*",
         "@board-games/game-core": "workspace:*",
+        "@board-games/little-secret": "workspace:*",
         "@board-games/shared": "workspace:*",
         "@board-games/sushi-go-party": "workspace:*",
         "@board-games/uno": "workspace:*",
@@ -39,6 +40,7 @@
         "@board-games/catan": "workspace:*",
         "@board-games/codenames": "workspace:*",
         "@board-games/game-core": "workspace:*",
+        "@board-games/little-secret": "workspace:*",
         "@board-games/shared": "workspace:*",
         "@board-games/sushi-go-party": "workspace:*",
         "@board-games/uno": "workspace:*",
@@ -99,6 +101,17 @@
         "svelte": "^5.0.0",
       },
     },
+    "games/little-secret": {
+      "name": "@board-games/little-secret",
+      "version": "0.0.0",
+      "dependencies": {
+        "@board-games/game-core": "workspace:*",
+        "@board-games/shared": "workspace:*",
+      },
+      "peerDependencies": {
+        "svelte": "^5.0.0",
+      },
+    },
     "games/sushi-go-party": {
       "name": "@board-games/sushi-go-party",
       "dependencies": {
@@ -139,6 +152,8 @@
     "@board-games/codenames": ["@board-games/codenames@workspace:games/codenames"],
 
     "@board-games/game-core": ["@board-games/game-core@workspace:packages/game-core"],
+
+    "@board-games/little-secret": ["@board-games/little-secret@workspace:games/little-secret"],
 
     "@board-games/server": ["@board-games/server@workspace:apps/server"],
 

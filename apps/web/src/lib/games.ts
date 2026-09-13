@@ -1,5 +1,6 @@
 /** Only this registry knows client module paths. Imports run after room selection. */
 export const gameClients = {
+  'little-secret': () => import('@board-games/little-secret/Board.svelte'),
   azul: () => import('@board-games/azul/Board.svelte'),
   codenames: () => import('@board-games/codenames/Board.svelte'),
   'sushi-go-party': () => import('@board-games/sushi-go-party/Board.svelte'),

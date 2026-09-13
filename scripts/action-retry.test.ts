@@ -256,3 +256,64 @@ test('editing the local selection during synchronization does not change the ret
   expect(calls[0].action).toEqual(pick);
   expect(calls[1].action).toEqual(pick);
 });
+
+test('Little Secret retries only unchanged uncommitted readiness, continuation, ballots and RPS', () => {
+  for (const [phase, action, committed] of [
+    ['setup', { type: 'ready', version: 2 }, 'ready'],
+    ['missionResult', { type: 'continue', mission: 1 }, 'continued'],
+    ['vote', { type: 'vote', ballotId: 'ballot-1', target: 'b' }, 'committed'],
+    ['tie', { type: 'rps', rpsId: 'rps-1', symbol: 'rock' }, 'rpsCommitted'],
+  ] as const) {
+    const initial = room('little-secret');
+    initial.game!.public = {
+      phase,
+      players: ['a', 'b', 'c'],
+      mission: 1,
+      setupVersion: 2,
+      ready: [],
+      continued: [],
+      committed: [],
+      rpsCommitted: [],
+      eliminated: [],
+      candidates: ['a', 'b'],
+      ballotId: 'ballot-1',
+      rpsId: 'rps-1',
+      prompt: null,
+    };
+    const current = structuredClone(initial);
+    current.revision++;
+    expect(canRetryIntention(initial, current, action)).toBe(true);
+    (current.game!.public as any)[committed].push('a');
+    expect(canRetryIntention(initial, current, action)).toBe(false);
+    (current.game!.public as any)[committed] = [];
+    for (const change of [
+      { mission: 2 },
+      { phase: 'clues' },
+      ...(phase === 'vote'
+        ? [{ ballotId: 'ballot-2' }, { eliminated: ['b'] }]
+        : []),
+      ...(phase === 'tie'
+        ? [
+            { rpsId: 'rps-2' },
+            { candidates: ['b', 'c'] },
+            { prompt: { kind: 'sage' } },
+          ]
+        : []),
+    ]) {
+      const changed = structuredClone(current);
+      Object.assign(changed.game!.public!, change);
+      expect(canRetryIntention(initial, changed, action)).toBe(false);
+    }
+    for (const type of [
+      'guess',
+      'revenant',
+      'resolveTie',
+      'volunteer',
+      'clue',
+      'openVote',
+    ])
+      expect(canRetryIntention(initial, current, { ...action, type })).toBe(
+        false,
+      );
+  }
+});

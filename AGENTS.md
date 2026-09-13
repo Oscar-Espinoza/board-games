@@ -10,7 +10,7 @@ Run `~/.local/bin/audit-agent-extensions` for an on-demand, read-only extension 
 
 ## Repository architecture
 
-This Bun/TypeScript workspace contains UNO, Catan, Carcassonne, Azul, Codenames and Sushi Go Party. SvelteKit supplies the browser SPA; Bun and Socket.IO own authoritative in-memory rooms. Use Paraglide for English/Spanish localization and CSS/SVG/Svelte for visuals. No Rust/Wasm, database, Redis, accounts or WebRTC belongs in this catalog. The explicit migration request supersedes the previous Rust-primary instructions; [ADR 009](docs/adr/009-typescript-catalog.md) records the decision. [ADR 010](docs/adr/010-bun-runtime.md) replaces pnpm/Node with Bun package management and runtime.
+This Bun/TypeScript workspace contains UNO, Catan, Carcassonne, Azul, Codenames, Sushi Go Party and Little Secret. SvelteKit supplies the browser SPA; Bun and Socket.IO own authoritative in-memory rooms. Use Paraglide for English/Spanish localization and CSS/SVG/Svelte for visuals. No Rust/Wasm, database, Redis, accounts or WebRTC belongs in this catalog. The explicit migration request supersedes the previous Rust-primary instructions; [ADR 009](docs/adr/009-typescript-catalog.md) records the decision. [ADR 010](docs/adr/010-bun-runtime.md) replaces pnpm/Node with Bun package management and runtime.
 
 Zombies is a separate sibling project at `../zombies-game`, retaining its Rust/Wasm architecture and independent instructions. Do not reintroduce its dependencies into this workspace.
 
@@ -46,3 +46,21 @@ three total attempts; never retry Azul drafts or Codenames guesses automatically
 See [ADR 013](docs/adr/013-three-game-delivery.md), [Azul rules](docs/games/azul.md),
 [Codenames rules](docs/games/codenames.md) and
 [Sushi Go Party rules](docs/games/sushi-go-party.md).
+
+Azul's accepted table presentation is Table Light: one circle of factory displays
+at every player count, a loose centre pool inside it, opponents rendered as real
+boards rather than text, and a 0–100 score track. Take colours from the game-owned
+palette module rather than restating hex values, and keep every
+`data-azul-location` anchor — a missing or zero-sized anchor drops its flight
+silently, and the flying tile is styled in JavaScript outside the component tree.
+This is presentation only. See [ADR 017](docs/adr/017-azul-table-light.md) and the
+[Azul redesign](docs/azul-redesign/README.md) migration documents.
+
+Little Secret uses Spanish classic 3–9-player rules and the pinned seven-type
+classic power set. Keep production words and selection server-only; practice
+imports the pure engine with its own pack. Living password-holders never receive
+their faction; pending Journalist/Revenant actors do not receive solutions.
+Reveal ballots and RPS only after all required commitments. Preserve resumable
+actor-owned reactions and explicit host context. Retry only unchanged,
+uncommitted readiness, continuation, ballots and RPS. See
+[ADR 014](docs/adr/014-little-secret.md) and [rules](docs/games/little-secret.md).

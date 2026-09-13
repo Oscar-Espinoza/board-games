@@ -335,3 +335,73 @@ no process listening on allocated backend ports 3011–3013, frontend ports
 5181–5183 or browser ports 3110–3113. The original checkout remains clean on
 `7d69ad1`; its source tree still exactly matches the captured baseline. The
 completed integration is committed separately on `integration/three-games`.
+
+## Little Secret delivery — September 12, 2026
+
+Little Secret is the seventh catalog game, using Spanish classic 3–9-player rules,
+the seven named classic powers, 300 original pairs per language, a 16-lesson
+bilingual illustrated guide and eight local training scenarios. See
+[game rules and edition scope](games/little-secret.md) and
+[ADR 014](adr/014-little-secret.md).
+
+Completed validation:
+
+- `bun install` registered the workspace dependencies; `bun install --frozen-lockfile`
+  passed afterward.
+- `bun run check` passed with zero Svelte errors or warnings and a clean root
+  TypeScript check.
+- `bun run test` passed **296 tests across 25 files**. Little Secret coverage
+  includes all seat distributions, deterministic randomness, setup authority,
+  private views, immutable/weighted voting, Sage and multi-candidate RPS,
+  reactions, exact aliases, scoring, retained powers, fresh missions/rematches,
+  content structure, bounded history, and minimum/maximum complete matches.
+- Independent Socket.IO clients completed 3- and 9-seat matches. Tests verify
+  forged actors, competing revisions, duplicate IDs, lost-acknowledgement
+  synchronization, private serialized snapshots/sync replies, reconnects during
+  votes, a forced RPS tie and a forced Journalist reaction, host transfer,
+  replacement credentials, and rematch boundaries. Test clients are paced to
+  respect the unchanged production rate limiter.
+- `bun run build` passed. Inspection of all **73 production JavaScript assets**
+  found none of the **600 production word-pair IDs**. Catalog loading also
+  asserts seven Board chunks and no eager game client requests.
+- **12 distinct targeted browser cases passed across Chromium and WebKit**, in
+  focused runs: 3- and 9-seat complete UI matches, forced RPS/Journalist reconnects,
+  envelope concealment, interface-language changes retaining words, local
+  reactions and shared victory, illustrated/searchable bilingual guides,
+  seven-cover library sizing and lazy catalog loading. This is coverage across
+  those runs, not an unfiltered full-catalog E2E run.
+- Captures were inspected at desktop 1440×900, tablet 768×1024 and phone 360×640.
+  Layout checks assert nine seats, no horizontal overflow and no seat/action
+  overlap. A separate phone check verifies the primary action dock stays outside
+  the scrolling content. Library checks also include 390×844. Keyboard focus
+  return, reduced motion and unavailable audio are exercised.
+- A development server on frontend port 5175/backend port 3015 was tested with
+  three independent browser clients in **both engines**. Creation, joining,
+  dealing and clue advancement succeeded through the `/socket.io` Vite proxy.
+- `bun run format:check` and `git diff --check` passed. All servers started for
+  this verification were stopped; pre-existing development processes were left
+  alone.
+
+Browser command (use the existing machine-specific codec wrapper):
+
+```sh
+PLAYWRIGHT_BROWSERS_PATH=/tmp/board-games-three-games-browsers \
+WEBKIT_EXECUTABLE=/tmp/board-games-three-games-browsers/webkit \
+TEST_PORT=3114 bun run test:e2e \
+  tests/e2e/little-secret.spec.ts \
+  tests/e2e/three-games-library.spec.ts \
+  tests/e2e/catalog.spec.ts \
+  --grep 'independent browser|bilingual illustrated guide|seven|catalog loads no game clients'
+```
+
+Initial browser failures exposed missing immersive-header styling, ambiguous
+select labels, a mobile sticky-button overlap, an extra desktop catalog row
+exceeding the height budget, and decorative guide SVGs with redundant image
+roles. These were fixed and the affected cases passed. One intermediate sweep
+was invalidated by rebuilding its static assets while it was running; subsequent
+focused runs used stable assets and passed. No browser dependency failure was
+counted as a pass.
+
+Still manual and **not verified**: physical Safari/iOS, a real group voice/video
+playtest, fluent Spanish review, and human ambiguity/difficulty review of both
+word collections. Structural uniqueness tests do not establish semantic quality.

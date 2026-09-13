@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
+import littleSecret from '../apps/web/src/lib/catalog/guides/little-secret';
 import azul from '../apps/web/src/lib/catalog/guides/azul';
 import codenames from '../apps/web/src/lib/catalog/guides/codenames';
 import sushi from '../apps/web/src/lib/catalog/guides/sushi-go-party';
@@ -8,6 +9,7 @@ const en = JSON.parse(readFileSync('packages/shared/messages/en.json', 'utf8'));
 const es = JSON.parse(readFileSync('packages/shared/messages/es.json', 'utf8'));
 
 for (const [game, guide] of Object.entries({
+  'little-secret': littleSecret,
   azul,
   codenames,
   'sushi-go-party': sushi,
@@ -37,7 +39,7 @@ for (const [game, guide] of Object.entries({
 
 test('new game, card, library and transport copy has matching English and Spanish keys', () => {
   const included = (key: string) =>
-    /^(azul_|cn_|sgp_|learn_azul_|learn_codenames_|learn_sushi_|library_azul_|library_codenames_|library_sushi_|library_cn_|library_sgp_|action_)/.test(
+    /^(ls_|azul_|cn_|sgp_|learn_azul_|learn_codenames_|learn_sushi_|library_azul_|library_codenames_|library_sushi_|library_cn_|library_sgp_|action_)/.test(
       key,
     );
   const english = Object.keys(en).filter(included).sort();

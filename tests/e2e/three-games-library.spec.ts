@@ -1,19 +1,20 @@
 import { test, expect } from '@playwright/test';
 
 const additions = [
+  { id: 'little-secret', name: 'Little Secret' },
   { id: 'azul', name: 'Azul' },
   { id: 'codenames', name: 'Codenames' },
   { id: 'sushi-go-party', name: 'Sushi Go Party' },
 ];
 
-test('six-game library opens each new bilingual illustrated guide and local practice', async ({
+test('seven-game library opens each new bilingual illustrated guide and local practice', async ({
   page,
 }) => {
   test.setTimeout(120_000);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
-  await expect(page.locator('.game-names button')).toHaveCount(6);
+  await expect(page.locator('.game-names button')).toHaveCount(7);
   for (const game of additions) {
     const button = page
       .locator('.game-names')
@@ -65,7 +66,7 @@ test('six-game library opens each new bilingual illustrated guide and local prac
   expect(errors).toEqual([]);
 });
 
-test('all six covers fit desktop, tablet and phones with keyboard and touch-sized selectors', async ({
+test('all seven covers fit desktop, tablet and phones with keyboard and touch-sized selectors', async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -79,8 +80,8 @@ test('all six covers fit desktop, tablet and phones with keyboard and touch-size
     await page.setViewportSize({ width, height });
     await page.goto('/');
     const names = page.locator('.game-names button');
-    await expect(names).toHaveCount(6);
-    for (let i = 0; i < 6; i++) {
+    await expect(names).toHaveCount(7);
+    for (let i = 0; i < 7; i++) {
       await names.nth(i).focus();
       await page.keyboard.press('Enter');
       await expect(names.nth(i)).toHaveAttribute('aria-pressed', 'true');
@@ -94,7 +95,7 @@ test('all six covers fit desktop, tablet and phones with keyboard and touch-size
       ).toBe(true);
     }
     await page.screenshot({
-      path: test.info().outputPath(`six-game-library-${width}.png`),
+      path: test.info().outputPath(`seven-game-library-${width}.png`),
       fullPage: true,
     });
     if (width === 1440)

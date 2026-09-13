@@ -41,6 +41,66 @@ export function canRetryIntention(
   const before = record(initial.game?.public);
   const after = record(current.game?.public);
   if (!action || !before || !after) return false;
+  if (initial.gameId === 'little-secret') {
+    if (
+      before.mission !== after.mission ||
+      !Array.isArray(after.players) ||
+      !after.players.includes(current.playerId)
+    )
+      return false;
+    if (action.type === 'ready')
+      return (
+        before.phase === 'setup' &&
+        after.phase === 'setup' &&
+        Number.isInteger(action.version) &&
+        action.version === before.setupVersion &&
+        action.version === after.setupVersion &&
+        Array.isArray(after.ready) &&
+        !after.ready.includes(current.playerId)
+      );
+    if (action.type === 'continue')
+      return (
+        before.phase === 'missionResult' &&
+        after.phase === 'missionResult' &&
+        action.mission === before.mission &&
+        Array.isArray(after.continued) &&
+        !after.continued.includes(current.playerId)
+      );
+    if (
+      !Array.isArray(after.eliminated) ||
+      after.eliminated.includes(current.playerId)
+    )
+      return false;
+    if (action.type === 'vote')
+      return (
+        before.phase === 'vote' &&
+        after.phase === 'vote' &&
+        typeof action.ballotId === 'string' &&
+        action.ballotId === before.ballotId &&
+        action.ballotId === after.ballotId &&
+        Array.isArray(after.committed) &&
+        !after.committed.includes(current.playerId) &&
+        action.target !== current.playerId &&
+        after.players.includes(action.target) &&
+        !after.eliminated.includes(action.target)
+      );
+    if (action.type === 'rps')
+      return (
+        before.phase === 'tie' &&
+        after.phase === 'tie' &&
+        !before.prompt &&
+        !after.prompt &&
+        typeof action.rpsId === 'string' &&
+        action.rpsId === before.rpsId &&
+        action.rpsId === after.rpsId &&
+        Array.isArray(after.candidates) &&
+        after.candidates.includes(current.playerId) &&
+        Array.isArray(after.rpsCommitted) &&
+        !after.rpsCommitted.includes(current.playerId) &&
+        ['rock', 'paper', 'scissors'].includes(action.symbol)
+      );
+    return false;
+  }
   if (['carcassonne', 'codenames'].includes(initial.gameId)) {
     return (
       action.type === 'ready' &&

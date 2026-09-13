@@ -1,0 +1,3006 @@
+{
+  "en": [
+    {
+      "id": "f9f48c784b3b",
+      "words": ["cat", "dog"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "859c1bc33399",
+      "words": ["lion", "tiger"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9678b90da3f3",
+      "words": ["horse", "donkey"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "0b52c1234232",
+      "words": ["cow", "goat"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b75b6184348b",
+      "words": ["sheep", "llama"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "ccc0b42ae226",
+      "words": ["rabbit", "hare"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e8f2fb20e943",
+      "words": ["mouse", "rat"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c7c6ef70b8a3",
+      "words": ["squirrel", "chipmunk"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "bd48777cc50a",
+      "words": ["fox", "wolf"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "45403aa5933a",
+      "words": ["bear", "panda"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b768a4cd04a6",
+      "words": ["zebra", "giraffe"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "66110dc0fc3b",
+      "words": ["elephant", "rhinoceros"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b2bbbdb7d47f",
+      "words": ["hippopotamus", "buffalo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b7e42f9ce47b",
+      "words": ["deer", "moose"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "0e2ceb9d361b",
+      "words": ["camel", "dromedary"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "030d5688dc77",
+      "words": ["pig", "boar"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "1eb9cfc1c09a",
+      "words": ["hedgehog", "porcupine"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "50834221f2fa",
+      "words": ["mole", "shrew"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "1692968b8b39",
+      "words": ["badger", "raccoon"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "23c7501f996d",
+      "words": ["otter", "beaver"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a93dbfca0cd1",
+      "words": ["seal", "walrus"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c0f9f3c7ca32",
+      "words": ["dolphin", "whale"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "419fb18dbb89",
+      "words": ["shark", "swordfish"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "0e07246ebb08",
+      "words": ["salmon", "trout"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3a5669d802db",
+      "words": ["tuna", "sardine"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "964067b00dbc",
+      "words": ["crab", "lobster"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "88a5a170e7bb",
+      "words": ["crayfish", "prawn"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "62cacc083a83",
+      "words": ["octopus", "squid"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "7d1c27d8e291",
+      "words": ["clam", "mussel"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "0c4813428aab",
+      "words": ["jellyfish", "starfish"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "ee43bd7ad6ad",
+      "words": ["frog", "toad"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f190b818ac7d",
+      "words": ["crocodile", "alligator"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "ecc3d7b56273",
+      "words": ["lizard", "iguana"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "ceba963dd0aa",
+      "words": ["turtle", "tortoise"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "77aee184ea41",
+      "words": ["python", "cobra"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "7adbdfc6d7cf",
+      "words": ["sparrow", "finch"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "48f11f7738ef",
+      "words": ["robin", "blackbird"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "23d864f4232c",
+      "words": ["eagle", "hawk"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "ed65e1075c06",
+      "words": ["owl", "falcon"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "83663bd359fb",
+      "words": ["parrot", "parakeet"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "bce0e536b223",
+      "words": ["duck", "goose"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "95fa384dcd75",
+      "words": ["hen", "turkey"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "6a9f6fe3785b",
+      "words": ["swan", "flamingo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "14944d2792de",
+      "words": ["penguin", "puffin"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e36ca415ce01",
+      "words": ["peacock", "pheasant"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "838ff91c775d",
+      "words": ["bee", "wasp"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c81429aed3d7",
+      "words": ["butterfly", "moth"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a845c4d9086e",
+      "words": ["ant", "termite"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e7e625eb1a73",
+      "words": ["beetle", "ladybird"],
+      "aliases": [[], ["ladybug"]]
+    },
+    {
+      "id": "7cd728c4cb1b",
+      "words": ["grasshopper", "cricket"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "067ed3923b68",
+      "words": ["apple", "pear"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "5352621eed0c",
+      "words": ["peach", "apricot"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3c8e8997e6a9",
+      "words": ["plum", "cherry"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "18279abe5769",
+      "words": ["orange", "mandarin"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a217613d89a8",
+      "words": ["lemon", "lime"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "4ede5eab218c",
+      "words": ["melon", "watermelon"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "450754a72dcf",
+      "words": ["strawberry", "raspberry"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "31e6997563db",
+      "words": ["blueberry", "blackberry"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b9fb8feb488f",
+      "words": ["pineapple", "mango"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "2ceb843afad3",
+      "words": ["banana", "plantain"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "30bd3dafbe99",
+      "words": ["coconut", "papaya"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9d3708fbf16b",
+      "words": ["fig", "date"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9cc1f00ac4d7",
+      "words": ["raisin", "prune"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e4514a3a8086",
+      "words": ["almond", "hazelnut"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "727bbbda6808",
+      "words": ["walnut", "pecan"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "cc0b6e2e8e82",
+      "words": ["peanut", "cashew"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "7462076d6a48",
+      "words": ["carrot", "parsnip"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e8c7d674c792",
+      "words": ["potato", "yam"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "77376deec087",
+      "words": ["onion", "shallot"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "710be5cd4b41",
+      "words": ["garlic", "ginger"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "52d1ce6f5a84",
+      "words": ["lettuce", "cabbage"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "4fce4fdee2e2",
+      "words": ["spinach", "chard"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "98b058755ea9",
+      "words": ["broccoli", "cauliflower"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "4f27e0b79a04",
+      "words": ["cucumber", "courgette"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "292022473a06",
+      "words": ["pumpkin", "squash"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "7c4fd666a7c6",
+      "words": ["pea", "bean"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c5439afbae05",
+      "words": ["lentil", "chickpea"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "d4d740cc552d",
+      "words": ["radish", "beetroot"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "42dad79d318a",
+      "words": ["celery", "leek"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "26570c0f6fc3",
+      "words": ["basil", "parsley"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b3a15025d03c",
+      "words": ["mint", "coriander"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "13f52352bcb5",
+      "words": ["thyme", "rosemary"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "6a79ccd2f153",
+      "words": ["cinnamon", "nutmeg"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f03372698d55",
+      "words": ["pepper", "chilli"],
+      "aliases": [[], ["chili"]]
+    },
+    {
+      "id": "050bbc69d34f",
+      "words": ["rice", "couscous"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "20081a352aad",
+      "words": ["spaghetti", "noodles"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f71b1d9805c9",
+      "words": ["bread", "toast"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "7098e5aba985",
+      "words": ["bagel", "pretzel"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e42c20f9d934",
+      "words": ["croissant", "brioche"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "7cb4f14d4387",
+      "words": ["pancake", "waffle"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "5f7ff3851955",
+      "words": ["cake", "cupcake"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "7a5ceb60d31f",
+      "words": ["biscuit", "cracker"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "7b3b0dca41e7",
+      "words": ["muffin", "scone"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "1ff7d8d23634",
+      "words": ["pie", "tart"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "4880316d40f8",
+      "words": ["chocolate", "caramel"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "47e86e1e26e8",
+      "words": ["honey", "syrup"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "fcaf5d83de43",
+      "words": ["jam", "marmalade"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "73f6319e0cae",
+      "words": ["butter", "margarine"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "5aaf7d70beff",
+      "words": ["yogurt", "custard"],
+      "aliases": [["yoghurt"], []]
+    },
+    {
+      "id": "e6ef0ad6685f",
+      "words": ["cream", "milk"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b8df4a32132f",
+      "words": ["water", "juice"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "d46a0b52b81f",
+      "words": ["tea", "coffee"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c08e09dc1018",
+      "words": ["lemonade", "soda"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "32bfef2f8623",
+      "words": ["smoothie", "milkshake"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "7cb407133284",
+      "words": ["soup", "stew"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "1aa7fca4ecf4",
+      "words": ["pizza", "focaccia"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "46412a975442",
+      "words": ["sandwich", "wrap"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "69aef7236ab6",
+      "words": ["burger", "hotdog"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "278dd58b7f81",
+      "words": ["omelette", "quiche"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c24830fabc03",
+      "words": ["sausage", "bacon"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "51bcd54fcb4b",
+      "words": ["ham", "salami"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "1e365a99cd62",
+      "words": ["cheddar", "mozzarella"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "4f6e92f9f379",
+      "words": ["tofu", "tempeh"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "0bbe2bd82678",
+      "words": ["sushi", "sashimi"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3e5ffd2c80aa",
+      "words": ["taco", "burrito"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "59a970b77d37",
+      "words": ["dumpling", "ravioli"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "896f87bce1be",
+      "words": ["ketchup", "mustard"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "55d3abbb39b6",
+      "words": ["mayonnaise", "vinaigrette"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "7dec4fe99f58",
+      "words": ["vinegar", "oil"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "1f971a6105d7",
+      "words": ["sugar", "salt"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e6cfb7ceb89d",
+      "words": ["plate", "bowl"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "55b459d609d0",
+      "words": ["cup", "mug"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "6dfa5b865094",
+      "words": ["glass", "goblet"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "093f94c814fc",
+      "words": ["fork", "spoon"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a2e30f0025df",
+      "words": ["knife", "peeler"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "fe7be8d6309f",
+      "words": ["saucepan", "skillet"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e42df6e0a6ad",
+      "words": ["kettle", "teapot"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "8ac0126c3162",
+      "words": ["oven", "microwave"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9f995e6875d4",
+      "words": ["fridge", "freezer"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "4543d8e60e67",
+      "words": ["toaster", "blender"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "bfc1cfd00f9e",
+      "words": ["sieve", "colander"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3f442531d41e",
+      "words": ["whisk", "spatula"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "314bd2426928",
+      "words": ["ladle", "tongs"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "4fbe707eff0d",
+      "words": ["tray", "platter"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "018180cea959",
+      "words": ["napkin", "tablecloth"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "2292179c957e",
+      "words": ["bottle", "jug"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f3165c51042b",
+      "words": ["jar", "tin"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "14c1f17683c6",
+      "words": ["cork", "lid"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "4c007efa3f90",
+      "words": ["straw", "funnel"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c8ff38ec02cb",
+      "words": ["apron", "bib"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e20a2e56beea",
+      "words": ["chair", "stool"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "de786c8db145",
+      "words": ["sofa", "armchair"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "85afe0c8967d",
+      "words": ["bed", "bunk"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e60621de7f26",
+      "words": ["pillow", "cushion"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "72dbcecb7e6f",
+      "words": ["blanket", "duvet"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "4f84816d2464",
+      "words": ["sheet", "quilt"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "8d898dff14bb",
+      "words": ["desk", "table"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "d014db18b41d",
+      "words": ["wardrobe", "dresser"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3bb62c283f72",
+      "words": ["shelf", "bookcase"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9f55692f581b",
+      "words": ["cupboard", "cabinet"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "bf298bc02f03",
+      "words": ["door", "gate"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "52607ff78a8a",
+      "words": ["window", "skylight"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3e2c3681bf28",
+      "words": ["curtain", "blind"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "43b53f0f6261",
+      "words": ["carpet", "rug"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "988323758d51",
+      "words": ["lamp", "lantern"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "fe437f42507f",
+      "words": ["candle", "torch"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3fb85bbc4f07",
+      "words": ["mirror", "portrait"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "8b3a8737cdb8",
+      "words": ["vase", "urn"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "6fed6054b734",
+      "words": ["basket", "hamper"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9243549d9834",
+      "words": ["box", "crate"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9902efffe80a",
+      "words": ["roof", "ceiling"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "25f2ccead8c5",
+      "words": ["wall", "fence"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9fd2030bbc85",
+      "words": ["staircase", "ladder"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b5e03263a5ef",
+      "words": ["balcony", "terrace"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "50cdd4b55b9d",
+      "words": ["cellar", "attic"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "16b56727f9b0",
+      "words": ["garage", "carport"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "5d0ce4c640cd",
+      "words": ["chimney", "vent"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9ebd4d926a84",
+      "words": ["sink", "basin"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a68e94034035",
+      "words": ["bath", "shower"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "061702b41982",
+      "words": ["tap", "pump"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "d41b2378ea52",
+      "words": ["soap", "shampoo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "df6f25362016",
+      "words": ["towel", "flannel"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "6b8a25b66307",
+      "words": ["comb", "hairbrush"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "6b053fbf64e4",
+      "words": ["razor", "scissors"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a161ba022818",
+      "words": ["perfume", "deodorant"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "7862204c129d",
+      "words": ["broom", "mop"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "6b935d3d28f5",
+      "words": ["bucket", "watering can"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e2ef845e9e0d",
+      "words": ["sponge", "cloth"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f9442fdd6f7a",
+      "words": ["hammer", "mallet"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b0a78db259b3",
+      "words": ["screw", "nail"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f9f69dbf3450",
+      "words": ["bolt", "rivet"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b884eb9331cd",
+      "words": ["drill", "screwdriver"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9dd3c752c961",
+      "words": ["saw", "chisel"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "2f54e3c347f8",
+      "words": ["spanner", "pliers"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "11c47b74a2cc",
+      "words": ["shovel", "spade"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "099a32f8bb47",
+      "words": ["rake", "hoe"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a33e3c1bcf30",
+      "words": ["rope", "string"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "701ee15d695a",
+      "words": ["chain", "cable"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "5edc670737d5",
+      "words": ["glue", "tape"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "fd5f606d5eb1",
+      "words": ["needle", "pin"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e537778a4820",
+      "words": ["shirt", "blouse"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "6756038963da",
+      "words": ["trousers", "shorts"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "898acc9dfef2",
+      "words": ["skirt", "dress"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "03205d2e04af",
+      "words": ["coat", "jacket"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "8df2292dc099",
+      "words": ["jumper", "cardigan"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "027489aaa187",
+      "words": ["suit", "tuxedo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "d221c485dc7c",
+      "words": ["hat", "cap"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "8ad3ed8e3d2f",
+      "words": ["scarf", "shawl"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "82d832bbb942",
+      "words": ["glove", "mitten"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3fc36a97e174",
+      "words": ["sock", "stocking"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "31d76f25aefe",
+      "words": ["boot", "shoe"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "66e494fd855e",
+      "words": ["sandal", "slipper"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "30db95bcb68c",
+      "words": ["belt", "braces"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "706ef15401fd",
+      "words": ["tie", "bowtie"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "157e57bcb9d5",
+      "words": ["necklace", "bracelet"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "351d52d53577",
+      "words": ["ring", "earring"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e4db4bcd4d3f",
+      "words": ["brooch", "badge"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3ed0acd7e347",
+      "words": ["button", "zip"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "74cdbb938b0c",
+      "words": ["pocket", "pouch"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "5c8056036ded",
+      "words": ["wallet", "purse"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b8e992e00153",
+      "words": ["suitcase", "backpack"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "8eae11efea8d",
+      "words": ["umbrella", "parasol"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "5ea831139065",
+      "words": ["helmet", "crown"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "ece38c0c46d0",
+      "words": ["spectacles", "goggles"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "62d4d6fac08f",
+      "words": ["watch", "clock"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "01ae2940b6d6",
+      "words": ["pen", "pencil"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "699398772bda",
+      "words": ["crayon", "marker"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a11192bca4d3",
+      "words": ["chalk", "charcoal"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f6641df00778",
+      "words": ["paper", "cardboard"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c0dbac7bea8a",
+      "words": ["notebook", "diary"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "84245daff8e0",
+      "words": ["book", "magazine"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "8fbc8d0a0f44",
+      "words": ["newspaper", "leaflet"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "5c00462b48f7",
+      "words": ["letter", "postcard"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "71af38ab525f",
+      "words": ["envelope", "parcel"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "10d4f49e10d5",
+      "words": ["stamp", "sticker"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "84939147f55c",
+      "words": ["ruler", "protractor"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "209987356b44",
+      "words": ["eraser", "sharpener"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "21e7990d0df8",
+      "words": ["map", "atlas"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3746483072fe",
+      "words": ["calendar", "timetable"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "6b4600beacae",
+      "words": ["photograph", "drawing"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a68f5c0c0ee9",
+      "words": ["camera", "camcorder"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "4903be06f32e",
+      "words": ["telephone", "radio"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e450fed34d86",
+      "words": ["television", "projector"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "8b872b9cd446",
+      "words": ["keyboard", "keypad"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9d6187173492",
+      "words": ["screen", "monitor"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "d391e9e01ea5",
+      "words": ["speaker", "headphones"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "243f8e3f1055",
+      "words": ["battery", "charger"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "bb60ecc99f51",
+      "words": ["socket", "plug"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9215716dd33b",
+      "words": ["printer", "scanner"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "6c615d759a3a",
+      "words": ["computer", "tablet"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "84448170634f",
+      "words": ["car", "van"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "8f970ff4d8f1",
+      "words": ["bus", "coach"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c2a3a8c6cd59",
+      "words": ["truck", "tractor"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "964ba06156f2",
+      "words": ["bicycle", "tricycle"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3117ad94acee",
+      "words": ["scooter", "motorbike"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a44467005712",
+      "words": ["train", "tram"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "bd722424c54f",
+      "words": ["subway", "monorail"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "1eb9e4bf301f",
+      "words": ["boat", "canoe"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "64c85f00e47f",
+      "words": ["kayak", "dinghy"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "bfba90b41593",
+      "words": ["ship", "ferry"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "cfb8d4197e0d",
+      "words": ["yacht", "sailboat"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "707f3dac87e7",
+      "words": ["raft", "barge"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "83af87eed278",
+      "words": ["submarine", "lifeboat"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "826025835aff",
+      "words": ["plane", "helicopter"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "8eac7ff5e54d",
+      "words": ["glider", "balloon"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "909ced2a5fc3",
+      "words": ["rocket", "shuttle"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "af6a706e6270",
+      "words": ["wheel", "tyre"],
+      "aliases": [[], ["tire"]]
+    },
+    {
+      "id": "d041dc49cc59",
+      "words": ["engine", "motor"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e19ce9d08379",
+      "words": ["brake", "pedal"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "844dfed232c4",
+      "words": ["anchor", "rudder"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "d73c68cd1317",
+      "words": ["road", "street"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f442ba753330",
+      "words": ["path", "trail"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "457085002327",
+      "words": ["bridge", "tunnel"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9f3bb036404b",
+      "words": ["station", "airport"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "aa7fc72d2a83",
+      "words": ["harbour", "marina"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "16de7dacd45f",
+      "words": ["castle", "palace"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "025c55a09119",
+      "words": ["cottage", "cabin"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f087d0adfced",
+      "words": ["house", "bungalow"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a95d15240569",
+      "words": ["hotel", "hostel"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "0f90a802edb4",
+      "words": ["school", "college"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "997c0ab49529",
+      "words": ["library", "museum"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "26e9e34bfa32",
+      "words": ["cinema", "theatre"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "218c253d7b9a",
+      "words": ["stadium", "arena"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "0654a4787fb4",
+      "words": ["hospital", "clinic"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "88afdd992fd1",
+      "words": ["bakery", "patisserie"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "6bd91209cc83",
+      "words": ["market", "supermarket"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "84a73f7c7f6d",
+      "words": ["restaurant", "cafe"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "72cb504f60ea",
+      "words": ["park", "garden"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c9e89650702b",
+      "words": ["forest", "jungle"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "ad2410df98ed",
+      "words": ["meadow", "pasture"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3942d3e43943",
+      "words": ["mountain", "hill"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "29e0090ee02e",
+      "words": ["valley", "canyon"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "35d5492725a7",
+      "words": ["river", "stream"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9aae694c77ab",
+      "words": ["lake", "pond"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "d942110464e4",
+      "words": ["sea", "ocean"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "76d9a1235cf5",
+      "words": ["beach", "shore"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a30a150029b1",
+      "words": ["island", "peninsula"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "cc4cf23a253a",
+      "words": ["desert", "dune"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "da7afc56ed47",
+      "words": ["cave", "grotto"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "4644f6c490b3",
+      "words": ["volcano", "geyser"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9004ba0bf226",
+      "words": ["rain", "drizzle"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "18c1620773c8",
+      "words": ["snow", "hail"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "530553f0f994",
+      "words": ["fog", "mist"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9f265b3f1d2d",
+      "words": ["thunder", "lightning"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "424f14f173e1",
+      "words": ["breeze", "gust"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e7b366e6e339",
+      "words": ["sunrise", "sunset"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "339de5927d71",
+      "words": ["moon", "sun"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f1d6fdba0ce0",
+      "words": ["star", "planet"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "7d89a9bff252",
+      "words": ["comet", "meteor"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "421b75c47c49",
+      "words": ["spring", "autumn"],
+      "aliases": [[], []]
+    }
+  ],
+  "es": [
+    {
+      "id": "cbd61e149155",
+      "words": ["perro", "gato"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "cc2af1fc1019",
+      "words": ["león", "tigre"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a3b9d371f429",
+      "words": ["caballo", "burro"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "aab374aaaa50",
+      "words": ["vaca", "cabra"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9a677a0e3a4d",
+      "words": ["oveja", "llama"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "dfee5b524b9b",
+      "words": ["conejo", "liebre"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "129b1c01025d",
+      "words": ["ratón", "rata"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f47c25222ea0",
+      "words": ["ardilla", "marmota"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a77aeaae8540",
+      "words": ["zorro", "lobo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9f6c6a31cec3",
+      "words": ["oso", "panda"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "beba56731aaf",
+      "words": ["cebra", "jirafa"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "d1fb01bfef59",
+      "words": ["elefante", "rinoceronte"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "29dd781e8e79",
+      "words": ["hipopótamo", "búfalo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f34c368747e2",
+      "words": ["ciervo", "alce"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f59f104c8a4b",
+      "words": ["camello", "dromedario"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "8b632db5467e",
+      "words": ["cerdo", "jabalí"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c6e10e6c2b4e",
+      "words": ["erizo", "puercoespín"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "63fe5d11ac7e",
+      "words": ["topo", "musaraña"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "4cdb9d012395",
+      "words": ["tejón", "mapache"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "d1672ecee24b",
+      "words": ["nutria", "castor"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "656e922f500d",
+      "words": ["foca", "morsa"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "35e9979239d2",
+      "words": ["delfín", "ballena"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b13229b7693d",
+      "words": ["tiburón", "pez espada"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "d0375c9bcde6",
+      "words": ["salmón", "trucha"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9979b0ea82d3",
+      "words": ["atún", "sardina"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "2e3477bda8ad",
+      "words": ["cangrejo", "langosta"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "0729a2a66366",
+      "words": ["gamba", "langostino"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f68def4a318a",
+      "words": ["pulpo", "calamar"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f5bfaa247e42",
+      "words": ["almeja", "mejillón"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "03facf0a72b5",
+      "words": ["medusa", "estrella de mar"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f45227a901c3",
+      "words": ["rana", "sapo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "abcf5bbde051",
+      "words": ["cocodrilo", "caimán"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "6801753e5dc1",
+      "words": ["lagarto", "iguana"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f523d1da89b8",
+      "words": ["tortuga", "galápago"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "1bc071dcb79b",
+      "words": ["pitón", "cobra"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f2e9e87ff9a3",
+      "words": ["gorrión", "jilguero"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "73d1fad38cca",
+      "words": ["petirrojo", "mirlo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c8eec9e0dc43",
+      "words": ["águila", "halcón"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "0717799c75e4",
+      "words": ["búho", "lechuza"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "5a3ecf983390",
+      "words": ["loro", "periquito"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "cb9392401e8b",
+      "words": ["pato", "ganso"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a9cd5cb2347a",
+      "words": ["gallina", "pavo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "8fb967e7a551",
+      "words": ["cisne", "flamenco"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "0739215cb3a1",
+      "words": ["pingüino", "frailecillo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "90afa82ad050",
+      "words": ["pavo real", "faisán"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "1798ab4c577e",
+      "words": ["abeja", "avispa"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "db91e46970c5",
+      "words": ["mariposa", "polilla"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f85abf2ea312",
+      "words": ["hormiga", "termita"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b56020740188",
+      "words": ["escarabajo", "mariquita"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a9e03aeabaf2",
+      "words": ["saltamontes", "grillo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a0dda93fa43d",
+      "words": ["manzana", "pera"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3282635e7c5a",
+      "words": ["melocotón", "albaricoque"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "8a69292ac33f",
+      "words": ["ciruela", "cereza"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "47a0f3f23053",
+      "words": ["naranja", "mandarina"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "d36e0dcb91bf",
+      "words": ["limón", "lima"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "72ff2b39da39",
+      "words": ["melón", "sandía"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "536d3c30b8a3",
+      "words": ["fresa", "frambuesa"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e0e575a7f663",
+      "words": ["arándano", "mora"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9fef97a4c134",
+      "words": ["piña", "mango"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c0c6ef133f37",
+      "words": ["kiwi", "granada"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "453f6d3777de",
+      "words": ["coco", "papaya"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "740e96409c3a",
+      "words": ["higo", "dátil"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b2ec4310e44b",
+      "words": ["uva", "pasa"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c43106468a9e",
+      "words": ["almendra", "avellana"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "4f3ba9110b52",
+      "words": ["nuez", "pistacho"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "569e5712b10a",
+      "words": ["cacahuete", "anacardo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "de006f00206c",
+      "words": ["zanahoria", "chirivía"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3539fe9ef0bc",
+      "words": ["patata", "batata"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "80c44d6399fa",
+      "words": ["cebolla", "chalota"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "644076d2fb42",
+      "words": ["ajo", "jengibre"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "ff057b2dc144",
+      "words": ["lechuga", "repollo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9614cc0d8a46",
+      "words": ["espinaca", "acelga"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "af7119c6ba06",
+      "words": ["brócoli", "coliflor"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f802a3f85239",
+      "words": ["pepino", "calabacín"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "2cb6b82009ce",
+      "words": ["calabaza", "berenjena"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e78dcbbb2dc5",
+      "words": ["guisante", "judía"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c354338df6c9",
+      "words": ["lenteja", "garbanzo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "8cc7f134dfc4",
+      "words": ["rábano", "remolacha"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "adc981f50763",
+      "words": ["apio", "puerro"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f1e75a502153",
+      "words": ["albahaca", "perejil"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "15d8a292dbfb",
+      "words": ["menta", "cilantro"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a9a64777c3c6",
+      "words": ["tomillo", "romero"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f0aea0c2ec3d",
+      "words": ["canela", "nuez moscada"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e270121deac8",
+      "words": ["pimienta", "guindilla"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "cdc5752dfc61",
+      "words": ["arroz", "cuscús"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a9e1b4b1279a",
+      "words": ["espagueti", "fideo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3764cdac3f9d",
+      "words": ["pan", "tostada"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "48ad48702a52",
+      "words": ["rosquilla", "churro"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "8b0432ecb848",
+      "words": ["cruasán", "ensaimada"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "fc43a3feee73",
+      "words": ["tortita", "gofre"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "27f6b99ee8aa",
+      "words": ["bizcocho", "magdalena"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "5a7674725e33",
+      "words": ["galleta", "barquillo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "0d6811b64cb0",
+      "words": ["buñuelo", "pestiño"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9944321549d1",
+      "words": ["empanada", "empanadilla"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "19d5e950778f",
+      "words": ["chocolate", "caramelo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "5af54a294f6c",
+      "words": ["miel", "sirope"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "1b77daf3383a",
+      "words": ["mermelada", "confitura"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "99e862f32052",
+      "words": ["mantequilla", "margarina"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "951fd3671d56",
+      "words": ["yogur", "natillas"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "4c9f64bc7e51",
+      "words": ["nata", "leche"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "696e69e21f6a",
+      "words": ["agua", "zumo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "1e1f2422676b",
+      "words": ["té", "café"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "6832dae0e809",
+      "words": ["limonada", "gaseosa"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "5aa8f9595273",
+      "words": ["batido", "granizado"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "2c899a12d1a1",
+      "words": ["sopa", "potaje"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "2a3697af32db",
+      "words": ["pizza", "coca"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "94290f2f88e6",
+      "words": ["bocadillo", "sándwich"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "2ced46b27235",
+      "words": ["hamburguesa", "perrito caliente"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "015f88175892",
+      "words": ["tortilla", "revuelto"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "7f6e4cd125d9",
+      "words": ["salchicha", "panceta"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b775766a1b33",
+      "words": ["jamón", "salchichón"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "1af351976592",
+      "words": ["queso", "requesón"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f2e675956d27",
+      "words": ["tofu", "seitán"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "1b549dcbad72",
+      "words": ["sushi", "sashimi"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "d10bad942921",
+      "words": ["taco", "burrito"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "df3c6d95d546",
+      "words": ["ravioli", "lasaña"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a638857a6920",
+      "words": ["kétchup", "mostaza"],
+      "aliases": [["ketchup"], []]
+    },
+    {
+      "id": "fd11a1874119",
+      "words": ["mayonesa", "vinagreta"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b1d5b0e4c752",
+      "words": ["vinagre", "aceite"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3172eed9d4b4",
+      "words": ["azúcar", "sal"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e355aed3696b",
+      "words": ["plato", "cuenco"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "2e3ef87f1746",
+      "words": ["taza", "tazón"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "0fc7271c3481",
+      "words": ["vaso", "copa"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c028acb4ee7b",
+      "words": ["tenedor", "cuchara"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "ad95aee250dc",
+      "words": ["cuchillo", "pelador"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "20606633b576",
+      "words": ["cazo", "sartén"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "ec5c8aeaf5cf",
+      "words": ["tetera", "cafetera"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "77eebef98942",
+      "words": ["horno", "microondas"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "5a23860461ef",
+      "words": ["nevera", "congelador"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "bf18c3c6f7c4",
+      "words": ["tostadora", "batidora"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "03c5abb9f862",
+      "words": ["tamiz", "colador"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a5aadb5cdfd3",
+      "words": ["varilla", "espátula"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "5c22849a6359",
+      "words": ["cucharón", "pinzas"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "d4a31e48e4fd",
+      "words": ["bandeja", "fuente"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9d9c542e04e2",
+      "words": ["servilleta", "mantel"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "0169f428e228",
+      "words": ["botella", "jarra"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "10c571d5d92b",
+      "words": ["tarro", "lata"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "d3332d5fa17a",
+      "words": ["corcho", "tapón"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "053da4a29ae2",
+      "words": ["pajita", "embudo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "7a745d9dd16c",
+      "words": ["delantal", "babero"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e27f28fd3fde",
+      "words": ["silla", "taburete"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "2dcad071a7f9",
+      "words": ["sofá", "sillón"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "fd7a6d79c96a",
+      "words": ["cama", "litera"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "564ad275b2a7",
+      "words": ["almohada", "cojín"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "19a860a2eeb0",
+      "words": ["manta", "edredón"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "385ff5d00e55",
+      "words": ["sábana", "colcha"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "70cd9ce0b736",
+      "words": ["escritorio", "mesa"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b6b13923fdfb",
+      "words": ["armario", "cómoda"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "1e36d9792475",
+      "words": ["estante", "estantería"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "900561f16c34",
+      "words": ["alacena", "aparador"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "02ecdbfd32ae",
+      "words": ["puerta", "portón"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "704914eda097",
+      "words": ["ventana", "tragaluz"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "8e417b4192dc",
+      "words": ["cortina", "persiana"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "7bc746202848",
+      "words": ["alfombra", "felpudo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a406f01878d5",
+      "words": ["lámpara", "farol"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3de7d2799d0f",
+      "words": ["vela", "linterna"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "869b7c1cee26",
+      "words": ["espejo", "retrato"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "02641b94f11a",
+      "words": ["jarrón", "maceta"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "17857e112749",
+      "words": ["cesta", "capazo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "268689413624",
+      "words": ["caja", "cajón"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "d70e3920ef0b",
+      "words": ["tejado", "techo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "44651d632d4e",
+      "words": ["pared", "valla"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "70c0d324d798",
+      "words": ["escalera", "rampa"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c9d00938c1b8",
+      "words": ["balcón", "terraza"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "ac8129e4cd24",
+      "words": ["sótano", "buhardilla"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c439f4baae51",
+      "words": ["garaje", "cobertizo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "bafb3daee3f1",
+      "words": ["chimenea", "estufa"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "559874db4cd3",
+      "words": ["fregadero", "lavabo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "0ad6e2225ef1",
+      "words": ["bañera", "ducha"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "040e326e7545",
+      "words": ["grifo", "bomba"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "36361c6f5a76",
+      "words": ["jabón", "champú"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "bbc6a8d8d55c",
+      "words": ["toalla", "albornoz"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c198f9250948",
+      "words": ["peine", "cepillo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "ea939fdaef36",
+      "words": ["maquinilla", "tijeras"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "4f330b9cf323",
+      "words": ["perfume", "desodorante"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "40d869a1b3a8",
+      "words": ["escoba", "fregona"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b0e8e5d50e73",
+      "words": ["cubo", "barreño"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "804e3ced9059",
+      "words": ["esponja", "bayeta"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "871130ac09fc",
+      "words": ["martillo", "mazo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b9c10cdfc355",
+      "words": ["tornillo", "clavo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "acb632c613a6",
+      "words": ["perno", "remache"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "5275f1277aa5",
+      "words": ["taladro", "destornillador"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "daeaddd0e531",
+      "words": ["sierra", "cincel"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a0e5341f9c29",
+      "words": ["llave inglesa", "alicates"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "107cbd0ee06e",
+      "words": ["pala", "azada"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c36cbc7ed1aa",
+      "words": ["rastrillo", "horca"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3ddd16d13eed",
+      "words": ["cuerda", "cordel"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f861b4885c59",
+      "words": ["cadena", "cable"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "46157954dba5",
+      "words": ["pegamento", "cinta adhesiva"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "68eaabc9440e",
+      "words": ["aguja", "alfiler"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "dd12f320352f",
+      "words": ["camisa", "blusa"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9c3b580619f7",
+      "words": ["pantalón", "bermudas"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "981440ccdb5d",
+      "words": ["falda", "vestido"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "7038ad3bd0d1",
+      "words": ["abrigo", "chaqueta"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "378e8257e141",
+      "words": ["jersey", "rebeca"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "481cc1deee2d",
+      "words": ["traje", "esmoquin"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "08dc6beab967",
+      "words": ["sombrero", "gorra"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b4caf4c78fb2",
+      "words": ["bufanda", "chal"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "931fcdab80a9",
+      "words": ["guante", "manopla"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f091e8dae1d2",
+      "words": ["calcetín", "media"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "1bef5097188f",
+      "words": ["bota", "zapato"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "6ca45fafa349",
+      "words": ["sandalia", "zapatilla"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f20e8b68fdc1",
+      "words": ["cinturón", "tirantes"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "0b4d92563718",
+      "words": ["corbata", "pajarita"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3a5a6b10728b",
+      "words": ["collar", "pulsera"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "30dc02f864f5",
+      "words": ["anillo", "pendiente"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "86bbd1a7e061",
+      "words": ["broche", "insignia"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "eebf1018cb36",
+      "words": ["botón", "cremallera"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "cd939d105523",
+      "words": ["bolsillo", "bolsa"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "29d59ed051f8",
+      "words": ["cartera", "monedero"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "da3203d11dd6",
+      "words": ["maleta", "mochila"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "6f4723458e79",
+      "words": ["paraguas", "sombrilla"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "8f6315ac4a39",
+      "words": ["casco", "corona"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "96d6a7d82862",
+      "words": ["gafas", "lupa"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "0d6b0a0f300c",
+      "words": ["reloj", "cronómetro"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "bdbb5b476197",
+      "words": ["bolígrafo", "lápiz"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "36382d56e3bf",
+      "words": ["acuarela", "rotulador"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "24c7e8d02caa",
+      "words": ["tiza", "carboncillo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c6eea46ecee3",
+      "words": ["papel", "cartón"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "39c01f9339c8",
+      "words": ["cuaderno", "diario"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f88016938b89",
+      "words": ["libro", "revista"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "ee8b0021a71d",
+      "words": ["periódico", "folleto"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c1932f947680",
+      "words": ["carta", "postal"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9139549ccfae",
+      "words": ["sobre", "paquete"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "bf121f3f997e",
+      "words": ["sello", "pegatina"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "298fb2489cab",
+      "words": ["regla", "escuadra"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f001cccc42eb",
+      "words": ["goma", "sacapuntas"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f7e34a999c49",
+      "words": ["mapa", "atlas"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "66e0e1d57b72",
+      "words": ["calendario", "horario"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "2b9b2a977b11",
+      "words": ["fotografía", "dibujo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "4b139f919db0",
+      "words": ["cámara", "videocámara"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "1277dca91355",
+      "words": ["teléfono", "radio"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "cd17b10d2a11",
+      "words": ["televisor", "proyector"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "60a85f4e9f7b",
+      "words": ["teclado", "mando"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "6051925923ea",
+      "words": ["pantalla", "monitor"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "84e2202e9949",
+      "words": ["altavoz", "auriculares"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "706a7a197197",
+      "words": ["batería", "cargador"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3a80bbe9f605",
+      "words": ["enchufe", "interruptor"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "1c80d157c5c4",
+      "words": ["impresora", "escáner"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "07fc332e1911",
+      "words": ["ordenador", "tableta"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f36ac7fa56c8",
+      "words": ["coche", "furgoneta"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "08b1225d95f6",
+      "words": ["autobús", "autocar"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "96a34b6f5700",
+      "words": ["camión", "camioneta"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "603a9e526229",
+      "words": ["bicicleta", "triciclo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "3fe3fa399a67",
+      "words": ["patinete", "motocicleta"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b9967eb38a86",
+      "words": ["tren", "tranvía"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "8c5159d31402",
+      "words": ["metro", "monorraíl"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "4d12f2c9f6de",
+      "words": ["lancha", "canoa"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b91c99a73cf7",
+      "words": ["kayak", "piragua"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "150f952f8893",
+      "words": ["barco", "transbordador"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "2971543b020d",
+      "words": ["yate", "velero"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e7114dc2a81b",
+      "words": ["balsa", "barcaza"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "bcdd5b63cf75",
+      "words": ["submarino", "batiscafo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e2463dc36206",
+      "words": ["avión", "helicóptero"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "07e2ec04f0f7",
+      "words": ["planeador", "globo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "8df86e107f90",
+      "words": ["cohete", "transbordador espacial"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a9a0089adce6",
+      "words": ["rueda", "neumático"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "5132fbacf512",
+      "words": ["motor", "turbina"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "8b0d4f56842f",
+      "words": ["freno", "pedal"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "6da0ec4ac6b1",
+      "words": ["ancla", "timón"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "91eb079f99e4",
+      "words": ["carretera", "calle"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f0cb715a7390",
+      "words": ["camino", "sendero"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "14305253d001",
+      "words": ["puente", "túnel"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e08c2d1a167d",
+      "words": ["estación", "aeropuerto"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "98543601a9a2",
+      "words": ["puerto", "embarcadero"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "0e2554855177",
+      "words": ["castillo", "palacio"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "72d9fe920861",
+      "words": ["cabaña", "choza"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b80a56efc1b1",
+      "words": ["casa", "chalé"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "bab4bc97b3f5",
+      "words": ["hotel", "albergue"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "6a8e64e8f2c1",
+      "words": ["escuela", "instituto"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "d4ddb6993b3d",
+      "words": ["biblioteca", "museo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "4cbce98d4090",
+      "words": ["cine", "teatro"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "ce2f89ef62c6",
+      "words": ["estadio", "pabellón"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "33e19f4cc57d",
+      "words": ["hospital", "clínica"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "ed4ad211ce68",
+      "words": ["panadería", "pastelería"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "df11d1a263c9",
+      "words": ["mercado", "supermercado"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b31d1bf476e5",
+      "words": ["restaurante", "cafetería"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "6310557b9190",
+      "words": ["parque", "jardín"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "36262e9325a2",
+      "words": ["bosque", "selva"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "7999c0488e4d",
+      "words": ["prado", "pastizal"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "c00a8b5bcd6c",
+      "words": ["montaña", "colina"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "6962faf69f73",
+      "words": ["valle", "cañón"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "0d274cbf8510",
+      "words": ["río", "arroyo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "d97c58ab9b95",
+      "words": ["lago", "estanque"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9ae803f45fbb",
+      "words": ["mar", "océano"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "a139e3ee620e",
+      "words": ["playa", "costa"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "cb9c032a6081",
+      "words": ["isla", "península"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "472b085f971b",
+      "words": ["desierto", "duna"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "412f04c09057",
+      "words": ["cueva", "gruta"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "ccf981e487de",
+      "words": ["volcán", "géiser"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "9273c0422e10",
+      "words": ["lluvia", "llovizna"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "883cd901c0c1",
+      "words": ["nieve", "granizo"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "dc2d265714df",
+      "words": ["niebla", "neblina"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "f058332cf96a",
+      "words": ["trueno", "relámpago"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "272e4e974a34",
+      "words": ["brisa", "ráfaga"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "91de70ca8161",
+      "words": ["amanecer", "atardecer"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "04d3c1661fcb",
+      "words": ["luna", "sol"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "12d1c43aca58",
+      "words": ["estrella", "planeta"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "e0637544bbf2",
+      "words": ["cometa", "meteoro"],
+      "aliases": [[], []]
+    },
+    {
+      "id": "b66597c06c71",
+      "words": ["primavera", "otoño"],
+      "aliases": [[], []]
+    }
+  ]
+}

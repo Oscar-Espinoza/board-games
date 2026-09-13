@@ -35,7 +35,7 @@ async function join(browser: Browser, url: string, name: string) {
 test('catalog loads no game clients, English/Spanish persists', async ({
   page,
 }) => {
-  expect(boardChunks).toHaveLength(6);
+  expect(boardChunks).toHaveLength(7);
   const requests: string[] = [];
   page.on('request', (request) => requests.push(request.url()));
   await page.goto('/');
@@ -65,7 +65,7 @@ test('UNO create/join/play/reload restores the same private hand', async ({
   page,
   browser,
 }) => {
-  expect(boardChunks).toHaveLength(6);
+  expect(boardChunks).toHaveLength(7);
   const requests: string[] = [];
   page.on('request', (request) => requests.push(request.url()));
   const errors: string[] = [];

@@ -52,6 +52,14 @@ export const catalog = [
     description: m.sgp_description,
     preview: 'sushi',
   },
+  {
+    id: 'little-secret',
+    name: 'Little Secret',
+    minPlayers: 3,
+    maxPlayers: 9,
+    description: m.ls_description,
+    preview: 'envelopes',
+  },
 ] as const;
 export type RoomView = {
   id: string;

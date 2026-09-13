@@ -30,7 +30,9 @@
   const immersive = $derived(room?.game != null);
   const cornerControls = $derived(
     immersive &&
-      ['azul', 'codenames', 'sushi-go-party'].includes(room?.gameId ?? ''),
+      ['azul', 'codenames', 'sushi-go-party', 'little-secret'].includes(
+        room?.gameId ?? '',
+      ),
   );
   const metadata = $derived(catalog.find((game) => game.id === room?.gameId));
   onMount(() => {
@@ -58,7 +60,7 @@
     const key = session.error.startsWith('AZUL_')
       ? 'azul_error'
       : session.error;
-    if (/^(azul_|cn_|sgp_)/.test(key)) {
+    if (/^(azul_|cn_|sgp_|ls_)/.test(key)) {
       const translated = (
         m as unknown as Record<string, (() => string) | undefined>
       )[key];
