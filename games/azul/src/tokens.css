@@ -1,0 +1,41 @@
+@font-face {
+  font-family: 'Azul Marcellus';
+  src: url('/fonts/azul/marcellus.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Azul Karla';
+  src: url('/fonts/azul/karla.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+}
+.azul-table {
+  --azul-title: 'Azul Marcellus', Georgia, serif;
+  --azul-body: 'Azul Karla', Arial, sans-serif;
+  --azul-ink: #293c40;
+  --azul-soft-ink: #514c40;
+  --azul-table-ink: #fff4dc;
+  --azul-table-soft: #f0dfbd;
+  --azul-board: linear-gradient(158deg, #fdf7e8, #f5ead3 52%, #eddfc2);
+  --azul-board-edge: #c9b28c;
+  --azul-board-shadow:
+    0 20px 32px -15px #0009, 0 5px 12px #0005, inset 0 1px #fffdf4;
+  --azul-disc: radial-gradient(
+    circle at 36% 28%,
+    #fdf5e2,
+    #f0e3c4 56%,
+    #dbc79c
+  );
+  --azul-disc-shadow:
+    0 12px 20px -10px #000a, 0 4px 7px #0005, inset 0 1px #fffdf3;
+  --azul-wood: radial-gradient(
+    ellipse at 50% 30%,
+    #6d4b2c,
+    #513723 38%,
+    #31210f 72%,
+    #1c1208
+  );
+}

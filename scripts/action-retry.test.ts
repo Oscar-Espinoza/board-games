@@ -317,3 +317,35 @@ test('Little Secret retries only unchanged uncommitted readiness, continuation, 
       );
   }
 });
+
+test('Codenames clue, guess and end-turn never retry stale or unaccepted timeout responses', async () => {
+  for (const type of ['submitClue', 'guess', 'endTurn'])
+    for (const code of ['STALE_REVISION', 'TIMEOUT'] as const) {
+      const initial = room('codenames');
+      initial.game!.public = {
+        phase: type === 'submitClue' ? 'clue' : 'guessing',
+        turn: 1,
+        setupVersion: 4,
+        ready: [],
+      };
+      const latest = structuredClone(initial);
+      latest.revision++;
+      let calls = 0;
+      await expect(
+        deliverIntention(
+          initial,
+          { type, word: 'Ocean', count: 2, card: 0 },
+          'same-id',
+          {
+            current: () => latest,
+            submit: async () => {
+              calls++;
+              throw new SocketReplyError('unaccepted', code);
+            },
+            synchronize: async () => ({ room: latest, accepted: false }),
+          },
+        ),
+      ).rejects.toThrow('unaccepted');
+      expect(calls).toBe(1);
+    }
+});

@@ -405,3 +405,237 @@ counted as a pass.
 Still manual and **not verified**: physical Safari/iOS, a real group voice/video
 playtest, fluent Spanish review, and human ambiguity/difficulty review of both
 word collections. Structural uniqueness tests do not establish semantic quality.
+
+## Azul Table Light — September 13, 2026
+
+The corrected Table Light implementation keeps public rules, actions, projections,
+accepted events, networking and retry policy unchanged. It adds a phone factory
+colour chooser, collision-checked circular supply, explicit compact opponent boards,
+scoped materials/fonts, uncapped scores with a decorative rail, and a pure local
+accepted-event scoring/cleanup timeline. The first iteration allowed vertical scrolling;
+the viewport-fit revision below supersedes that layout.
+
+Validation completed:
+
+- `bun run check`: zero errors and zero warnings; root TypeScript check passed.
+- `bun run test`: 316 tests passed, including conserved practice fixtures, five/seven/nine
+  factory geometry, final-draft reconstruction, floor-only rounds, capped loss,
+  marker return and scores above 100.
+- `bun run build`: passed before browser runs.
+- `tests/e2e/azul.spec.ts`: 24 journeys passed across Chromium and WebKit. Coverage
+  includes 360×640, 390×844, 768×1024, 1100×700, 1440×900 and 720×450; doubled text
+  with non-overlapping rail numerals; phone picker keyboard focus/cancel/play;
+  crowded-centre controls; unique nonzero anchors; full-size inspection without
+  duplicate anchors; actual SVG flight endpoints/scales; staged cleanup; scroll,
+  resize, visibility, reduced-motion and dialog cancellation; silent audio fallback;
+  English/Spanish; and real two/four-seat acceptance, reconnect and final results.
+- `tests/e2e/three-games-library.spec.ts`: four Chromium/WebKit checks passed for
+  bilingual guides, practice entry points and all seven unchanged catalog covers.
+- The final marker accessibility adjustment was rebuilt, type-checked and checked
+  with the 360×640 geometry/interaction journey in both browsers.
+- `bun run format:check` and `git diff --check`: passed.
+
+On this machine WebKit first failed to launch because codec dependencies were
+absent. Ubuntu libavif16, libgav1 and libyuv packages were downloaded and extracted
+under `/tmp/azul-webkit-libs/`, without system package changes. The temporary
+`WEBKIT_EXECUTABLE=/tmp/azul-webkit-libs/webkit` wrapper supplies those libraries to
+the installed Playwright WebKit binary. This is test infrastructure only.
+
+[Before/design/after comparison](azul-redesign/screenshots.md) and
+[recordings, captures and contrast results](evidence/azul/table-light/README.md)
+document explicit visual review. The suite does not compare screenshot baselines.
+Physical Safari, real-device touch/audio and fluent Spanish review remain unverified.
+
+### Azul fixed viewport follow-up
+
+The main table now has no scroll range. Desktop places supply and the full board
+side by side below all opponents; compact and short landscape layouts use a local
+board overview plus colour/destination dialogs. Round details and results open in
+dialogs. Confirmation remains visible and playable rows remain at least 44px high.
+This supersedes the earlier scrolling layout and desktop side-column proposal.
+
+- Built before browser verification. `bun run check` passed with zero errors and
+  warnings; `bun run format:check` and `git diff --check` passed.
+- `bun run test`: all 316 tests passed. An earlier concurrent run hit the existing
+  five-second Catan full-game timeout; the standalone rerun passed without code changes.
+- The combined `azul.spec.ts` and `azul-viewport.spec.ts` suites passed all 40
+  Chromium/WebKit journeys. The seven sizes are 360×640, 390×844, 768×1024,
+  1100×700, 1440×900, 720×450 and 1280×720. The viewport suite checks two/three/four
+  players, floor overflow, actual zero scroll range, contained table regions,
+  visible confirmation, and compact selection cancellation/focus across resize.
+- Existing coverage still passes for actual flight endpoints and scales, cleanup,
+  scores over 100, keyboard/touch emulation, 200% computed text, unavailable audio,
+  English/Spanish, opponent inspection and real two/four-seat acceptance/reconnect.
+  Endpoint assertions now compare directly with stable table geometry, without
+  allowing a scrolling offset.
+- New [screenshots and motion evidence](evidence/azul/table-light/viewport-fit/README.md)
+  preserve the earlier images and label the latest fixed layout separately. Phone,
+  short landscape confirmation, desktop, enlarged text and motion frames were
+  inspected explicitly; screenshot-baseline comparison is still not automated.
+
+Physical Safari, actual device touch/audio and fluent Spanish review remain
+unverified. All browser test servers started for this work are stopped afterward.
+
+## Codenames voice-led tabletop (2026-09-13)
+
+[ADR 018](adr/018-codenames-voice-table.md) replaces recorded clues, mandatory
+review, penalties and enforced turns with group-managed voice play. The fixed
+5×5 wooden table has original illustrated reveals and Rules/Settings corners.
+Role consent, recipient-private keys and authoritative confirmed reveals remain.
+
+Validation completed:
+
+- `bun run check`: zero Svelte errors/warnings; root TypeScript check passed.
+- `bun run test`: 315 tests passed. Focused Codenames rules/socket coverage passed
+  15 tests, including either operative team, actor-attributed assassin losses,
+  either team's final agent, malformed actions, immutable state, key permutations,
+  operative-host privacy, stale/duplicate races, replacement and reconnect/rematch.
+- `bun run build`: passed before browser verification and after final changes.
+- `tests/e2e/codenames.spec.ts` plus `three-games-library.spec.ts`: all 16 initial
+  Chromium/WebKit journeys passed. These cover real four/eight-seat play, explicit
+  confirmation races without automatic replay, actual operative payload privacy,
+  rematches, silent audio fallback, keyboard dialogs, five viewport sizes with no
+  scrolling/clipped cards, enlarged text and bilingual rules/practice entry points.
+- After the final audio and artwork safeguards, six focused Chromium/WebKit checks
+  passed for accepted effects, illustrated reveals/results and a finished board's
+  locale remount without automatic audio unlock. Four additional focused checks
+  passed after ensuring ordinary snapshot changes preserve result dismissal,
+  including responsive layout and locale remounts in both browsers.
+- Following obsolete-copy removal, the five library/localization tests passed.
+- `bun run format:check` and `git diff --check`: passed.
+
+[Desktop, phone, spymaster and assassin captures](evidence/codenames/voice-table/README.md)
+were inspected explicitly. No automated screenshot baselines are claimed.
+WebKit required a temporary `/tmp/cn-webkit-libs/webkit` wrapper with extracted
+Ubuntu codec libraries; no system packages were changed. Physical Safari/iOS,
+real-device touch/audio, fluent Spanish review and a human voice-call playtest
+remain unverified. Local verification servers were stopped afterward.
+
+## Codenames table and authoritative turns — 2026-09-13
+
+[ADR 019](adr/019-codenames-table-turns.md) replaces the voice-only turn protocol
+and introduces the accepted table migration. Client and server were built together;
+deploy both together. Other games' pre-existing workspace changes were preserved.
+
+- `bun run test`: **320 passed**, 0 failed, across 25 game/server/script files.
+  Targeted Codenames rules, socket and retry coverage: **30 passed**. The subsequent
+  explicit forged end-turn socket assertion also passed (both socket journeys).
+- `bun run check`: TypeScript and Svelte checks passed, with zero Svelte errors or
+  warnings. `bun run build` produced the SPA and Bun server successfully.
+- `bun run format:check`: passed. Local Markdown links for the changed architecture,
+  rules, migration, ADR and evidence documents resolve.
+- Codenames plus catalog/library: **18 distinct Chromium/WebKit cases passed across
+  the final runs**. The main run passed 16 gameplay/layout/library cases; the two
+  added texture-contrast cases first exposed a test data-URL parsing issue and then
+  an actual 4.22:1 textured red-card minimum. After correcting the parser and
+  darkening red/blue fills and the blue panel, all four affected contrast/viewport
+  cases passed. No application code changed after that production build.
+- Both browsers exercised all six viewports: 1440×900, 1280×720, 768×1024, 390×844,
+  360×640 and 320×568, in English/Spanish, with eight players and 200% text. The
+  composer/missing-artwork journey also checks each viewport at enlarged text.
+  Checks include native dialogs, keyboard selection/confirmation and focus return,
+  operative payload privacy, role-key display persistence, handoffs, finite/zero/
+  unlimited rules, normal/assassin results, host rematch, reconnect cancellation,
+  eight-seat stale races with no automatic guess retry, and accepted-only effects.
+  Existing gesture-unlocked audio, mute, reduced motion and silent fallback pass.
+- Browser pixel tests composite the actual paper SVG texture over the computed
+  gradient stops for red/blue word faces and both team panels; all now meet 4.5:1
+  small-text contrast in Chromium and WebKit. Header/dialog contrast uses the
+  scoped dark panel palette with lifted secondary text. No new sounds were added.
+- [Thirteen WebP review captures](evidence/codenames/table-redesign/README.md) cover
+  desktop, every compact size, Spanish, spymaster, history and WebKit. Reviewed
+  against the realistic reference for wood, lighting, foliage, ceramic/cork, blank
+  props and thin paper edges; structure follows the migration. These are review
+  images, not automated screenshot baselines. Six original generated local WebP
+  assets total 516,586 bytes; no runtime dependencies or generation were added.
+
+Final browser commands:
+
+```sh
+WEBKIT_EXECUTABLE=/tmp/cn-webkit-libs/webkit bun run test:e2e \
+  tests/e2e/codenames.spec.ts tests/e2e/three-games-library.spec.ts
+WEBKIT_EXECUTABLE=/tmp/cn-webkit-libs/webkit bun run test:e2e \
+  tests/e2e/codenames.spec.ts --grep 'paper texture|six viewports'
+```
+
+The existing temporary WebKit wrapper supplies this Ubuntu machine's extracted
+codec libraries; it is not an application dependency. Review capture generation
+uses installed `cwebp`. Physical Safari/iOS, real-device touch/audio and fluent
+Spanish review remain **unverified**.
+
+## Codenames wood, panels and card finish — September 13, 2026
+
+- Imported wood now uses Vite's asset pipeline. The asset browser test verifies
+  HTTP 200, WebP content type and successful decoding for wood plus five props in
+  development and production, in Chromium and WebKit. Development checks used
+  `CODENAMES_DEV_URL=http://127.0.0.1:5173` against the existing Vite server.
+- Team tints expose the grain without paper noise. Dark panels use 68–73% opacity
+  and no blur, with thin borders and softer contact shadows. Filled coral/blue
+  icons, mirrored count captions and restrained turn gradients follow the reference.
+- Contrast tests now measure rendered pixels under text with ink hidden, including
+  wood, props, lighting, translucent panels and paper. Both turn colours and small
+  metadata require 4.5:1. Invalid/empty/non-finite measurements fail. Brighter
+  metadata and correct-guess colours resolve the bright book behind history.
+- The subsequent card close-up request removes dashed inner frames and inset
+  highlights, including from spymaster cards, and adds multiplied paper grain,
+  subtle surface lighting and external edge/contact shadows. Private payloads,
+  rules, identity symbols, exterior keyboard focus and responsive structure remain.
+- `bun run check`, all 320 tests (78,814 assertions), production build and formatting
+  passed. All 16 distinct Codenames browser cases passed across the stable full
+  run and focused keyboard rerun. A prior run was interrupted by an overlapping
+  rebuild; it is not counted as passing evidence. The keyboard helper now waits
+  for the native dialog close event before subsequent input.
+- Following the card changes, the production build and TypeScript check passed;
+  all eight targeted Chromium/WebKit cases passed (six viewports in English and
+  Spanish, eight players, 200% text, missing artwork/clue access, keyboard flow,
+  rendered contrast and absence of inset card frames). Fresh WebP screenshots
+  are in [table evidence](evidence/codenames/table-redesign/README.md).
+
+WebKit used `/tmp/cn-webkit-libs/webkit`. Physical Safari/iOS, real-device touch/audio
+and fluent Spanish review remain unverified.
+
+## Codenames opaque teams, word-only cards and glass — September 13, 2026
+
+The latest team/glass reference supersedes the earlier transparent team treatment.
+Red and blue team panels are opaque with soft mottled texture. All existing glass
+surfaces share a partially transparent smoked fill, 0.65px backdrop blur, brightness
+and saturation filtering, warm edge reflections and short contact shadows. Native
+dialogs retain their opaque surface. Word cards show only the word; private
+spymaster colours, mini-key symbols and accessible identity labels remain.
+Roboto Condensed is locally bundled as a closer visual approximation of the
+reference, whose exact font is unknown. Latin/Latin-extended faces and OFL license
+are recorded in the [font provenance](../apps/web/static/fonts/codenames/README.md).
+The CSS approach and its primary reference are in [material tokens](codenames-redesign/tokens.md).
+
+Type/Svelte checks, all 320 game/server tests (78,814 assertions), production build
+and formatting passed. All 16 distinct Chromium/WebKit Codenames cases passed
+across the full run and final four-case material/viewport rerun. WebKit's brighter
+compositing over the book required the history round label to use primary text
+colour. Tests check actual composited contrast, opaque team fills, filtered glass,
+loaded typography, word-only cards, six viewport sizes, English/Spanish, eight
+players and 200% text. Existing keyboard, privacy, session, audio and asset-loading
+cases also passed. [Updated WebP evidence](evidence/codenames/table-redesign/README.md)
+includes desktop, spymaster, phones, history, cards and the team row.
+
+Physical Safari/iOS and real-device touch/audio remain unverified.
+
+## Codenames centred desktop composition — September 13, 2026
+
+Desktop mode starts at 1024px. The table caps at 1120×680px; the header stays close
+above it and shares a 1440px maximum scene with the decorative props. History is
+vertically centred beside the word grid for empty and populated states, with
+internal scrolling when needed. The team/grid/bottom alignment is retained. Short
+laptop windows have smaller panel spacing and a side-by-side key treatment; phones,
+tablets below 1024px and enlarged text retain compact controls.
+
+Type/Svelte checks, all 320 unit/server tests, production build and formatting
+passed. All 18 distinct Chromium/WebKit Codenames cases passed across the full run
+and final six-case rerun. New geometry assertions cover 1024×600 through 2560×1440,
+with eight players, all key cells visible, bounded dimensions, a centred group,
+header proximity, no overlapping rows and centred history. Existing six-size
+English/Spanish, 200%-text, privacy, session, keyboard and sound tests passed.
+The initial new test needed its Seats selector scoped to the settings dialog;
+WebKit contrast required a slightly brighter brand over the repositioned foliage.
+Final [WebP captures](evidence/codenames/table-redesign/README.md) include short
+laptops, 1920px desktop, 2560px ultrawide and empty history. Physical Safari/iOS
+remains unverified.

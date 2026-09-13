@@ -1,41 +1,367 @@
 import { test, expect, type Page } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 test.use({ actionTimeout: 15000 });
 async function settings(page: Page) {
-  await page
-    .getByRole('button', { name: 'Table settings', exact: true })
-    .click();
+  await page.locator('.tools button').last().click();
 }
 async function close(page: Page) {
-  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  // Native close events restore focus asynchronously; wait before the next input.
+  await Promise.all([
+    page.locator('dialog[open]').evaluate(
+      (dialog) =>
+        new Promise<void>((resolve) => {
+          dialog.addEventListener('close', () => resolve(), { once: true });
+        }),
+    ),
+    page.locator('dialog[open] > header .close').click(),
+  ]);
 }
-async function clue(spy: Page, reviewer: Page, count = 'unlimited') {
-  await spy.getByLabel('Clue word', { exact: true }).fill('Ocean');
-  await spy.getByLabel('Count', { exact: true }).selectOption(count);
-  await spy.getByRole('button', { name: 'Send clue for review' }).click();
-  await reviewer
-    .getByRole('button', { name: 'Allow clue', exact: true })
-    .click();
+async function scenario(page: Page, value: string) {
+  await settings(page);
+  await page.locator('dialog select').first().selectOption(value);
+  await close(page);
 }
-test('four private clients finish an ordinary round, rematch, and lose to the assassin', async ({
+async function clue(page: Page, word = 'Ocean', count = 'unlimited') {
+  await page.locator('.give-clue').click();
+  await page.locator('.clue-form input').fill(word);
+  await page.locator('.clue-form select').selectOption(count);
+  await page.locator('.clue-form button').click();
+  await expect(page.locator('.cn-table')).toHaveAttribute(
+    'data-phase',
+    'guessing',
+  );
+}
+async function practiceKey(page: Page) {
+  if ((await page.locator('.cn-table').getAttribute('data-phase')) === 'clue')
+    await clue(page);
+  await settings(page);
+  const seat = await page
+    .getByLabel('Training seat', { exact: true })
+    .inputValue();
+  await page
+    .getByLabel('Training seat', { exact: true })
+    .selectOption('training-0');
+  await close(page);
+  const key = await page.locator('.dossier').evaluateAll((es) =>
+    es.map((e) => ({
+      card: e.getAttribute('data-card')!,
+      identity: e.getAttribute('data-identity')!,
+    })),
+  );
+  await expect(page.locator('.dossier:enabled')).toHaveCount(0);
+  await settings(page);
+  await page.getByLabel('Training seat', { exact: true }).selectOption(seat);
+  await close(page);
+  return key;
+}
+async function reveal(page: Page, card: string) {
+  await page.locator(`[data-card="${card}"]`).click();
+  await expect(page.locator('dialog.confirmation')).toBeVisible();
+  await page.locator('.confirmation .primary').click();
+  await expect(page.locator(`[data-card="${card}"]`)).toHaveClass(/revealed/);
+}
+async function geometry(page: Page, width: number, height: number) {
+  await expect(page.locator('.dossier')).toHaveCount(25);
+  const boxes = await page.locator('.dossier').evaluateAll((es) =>
+    es.map((e) => {
+      const r = e.getBoundingClientRect();
+      return {
+        w: r.width,
+        h: r.height,
+        top: r.top,
+        bottom: r.bottom,
+        left: r.left,
+        right: r.right,
+      };
+    }),
+  );
+  expect(
+    boxes.every(
+      (r) =>
+        r.w >= 43.99 &&
+        r.h >= 43.99 &&
+        r.top >= 0 &&
+        r.bottom <= height &&
+        r.left >= 0 &&
+        r.right <= width,
+    ),
+    JSON.stringify(boxes),
+  ).toBe(true);
+  expect(
+    await page.evaluate(() => ({
+      w: document.documentElement.scrollWidth,
+      h: document.documentElement.scrollHeight,
+    })),
+  ).toEqual({ w: width, h: height });
+  const controls = await page
+    .locator('.cn-table button:not(.dossier)')
+    .evaluateAll((es) =>
+      es
+        .filter((e) => e.getClientRects().length)
+        .map((e) => {
+          const r = e.getBoundingClientRect();
+          return {
+            label: e.getAttribute('aria-label') ?? e.textContent,
+            w: r.width,
+            h: r.height,
+            right: r.right,
+            bottom: r.bottom,
+          };
+        }),
+    );
+  expect(
+    controls.every(
+      (r) =>
+        r.w >= 43.99 && r.h >= 43.99 && r.right <= width && r.bottom <= height,
+    ),
+    JSON.stringify(controls),
+  ).toBe(true);
+}
+async function capture(page: Page, path: string) {
+  mkdirSync(dirname(path), { recursive: true });
+  // Review output is WebP; Playwright's PNG buffer is piped directly to cwebp.
+  const png = await page.screenshot({ animations: 'disabled' });
+  execFileSync('cwebp', ['-quiet', '-q', '88', '-o', path, '--', '-'], {
+    input: png,
+  });
+}
+const sizes = [
+  { width: 1440, height: 900 },
+  { width: 1280, height: 720 },
+  { width: 768, height: 1024 },
+  { width: 390, height: 844 },
+  { width: 360, height: 640 },
+  { width: 320, height: 568 },
+];
+test('six viewports, English/Spanish, eight players, enlarged text and accessible history/key dialogs', async ({
+  page,
+}, info) => {
+  test.setTimeout(180000);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.setViewportSize(sizes[0]!);
+  await page.goto('/practice/codenames');
+  await scenario(page, 'midgame');
+  await settings(page);
+  await page
+    .locator('dialog')
+    .getByLabel('Seats', { exact: true })
+    .selectOption('8');
+  await close(page);
+  for (const lang of ['en', 'es']) {
+    if (lang === 'es') {
+      await settings(page);
+      await page.locator('dialog select').last().selectOption('es');
+      await scenario(page, 'midgame');
+    }
+    for (const size of sizes) {
+      await page.setViewportSize(size);
+      await geometry(page, size.width, size.height);
+      if (size.width >= 1024) {
+        await expect(page.locator('.history-panel')).toBeVisible();
+        await expect(page.locator('.players-panel')).toBeVisible();
+        await expect(page.locator('.props')).toBeVisible();
+        await expect(page.locator('.key-panel')).toHaveCount(0);
+      } else {
+        await expect(page.locator('.props')).toBeHidden();
+        await expect(page.locator('.history-panel')).toBeHidden();
+        await page.locator('.compact-history').click();
+        await expect(page.locator('dialog .history-entry')).toHaveCount(3);
+        await capture(
+          page,
+          info.outputPath(`history-${lang}-${size.width}.webp`),
+        );
+        await page.keyboard.press('Escape');
+        await expect(page.locator('.compact-history')).toBeFocused();
+      }
+      await capture(page, info.outputPath(`table-${lang}-${size.width}.webp`));
+      await page.evaluate(
+        () => (document.documentElement.style.fontSize = '200%'),
+      );
+      await expect(page.locator('.cn-table')).toHaveClass(/enlarged/);
+      await geometry(page, size.width, size.height);
+      await page.locator('.compact-players').click();
+      await expect(page.locator('dialog .player-list li')).toHaveCount(8);
+      await close(page);
+      await settings(page);
+      await expect(page.locator('dialog[open]')).toBeVisible();
+      await close(page);
+      await page.evaluate(() => (document.documentElement.style.fontSize = ''));
+      await expect(page.locator('.cn-table')).not.toHaveClass(/enlarged/);
+    }
+  }
+  await settings(page);
+  await page.locator('dialog select').last().selectOption('en');
+  await settings(page);
+  await page
+    .getByLabel('Training seat', { exact: true })
+    .selectOption('training-0');
+  await close(page);
+  await page.locator('.compact-key').click();
+  await expect(page.locator('dialog .key-cell')).toHaveCount(25);
+  await page.getByRole('switch').click();
+  await expect(page.locator('dialog .key-cell')).toHaveCount(0);
+  await close(page);
+  await expect(
+    page.locator('.dossier:not(.revealed)[data-identity]'),
+  ).toHaveCount(0);
+  await page.reload();
+  await page.locator('.compact-key').click();
+  await expect(page.getByRole('switch')).not.toBeChecked();
+  await page.getByRole('switch').click();
+  await close(page);
+  expect(errors).toEqual([]);
+});
+
+test('desktop composition stays compact from 1024px through ultrawide screens', async ({
+  page,
+}, info) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.goto('/practice/codenames');
+  await expect(page.locator('.history-panel .empty')).toBeVisible();
+  const placement = () =>
+    page.evaluate(() => {
+      const rect = (selector: string) => {
+        const r = document.querySelector(selector)!.getBoundingClientRect();
+        return {
+          x: r.x,
+          y: r.y,
+          width: r.width,
+          height: r.height,
+          right: r.right,
+          bottom: r.bottom,
+          centreY: (r.top + r.bottom) / 2,
+        };
+      };
+      return {
+        table: rect('.table-layout'),
+        header: rect('.table-header'),
+        teams: rect('.team-row'),
+        board: rect('.word-grid'),
+        history: rect('.history-panel'),
+        bottom: rect('.bottom-panels'),
+        lastCard: rect('.dossier:last-child'),
+      };
+    });
+  let layout = await placement();
+  expect(Math.abs(layout.history.y - layout.teams.y)).toBeLessThan(
+    1,
+  );
+  await capture(page, info.outputPath('empty-history.webp'));
+  await scenario(page, 'midgame');
+  await settings(page);
+  await page
+    .locator('dialog')
+    .getByLabel('Seats', { exact: true })
+    .selectOption('8');
+  await page
+    .getByLabel('Training seat', { exact: true })
+    .selectOption('training-0');
+  await close(page);
+  for (const size of [
+    { width: 1024, height: 600 },
+    { width: 1024, height: 768 },
+    { width: 1440, height: 900 },
+    { width: 1920, height: 1080 },
+    { width: 2560, height: 1440 },
+  ]) {
+    await page.setViewportSize(size);
+    await expect(page.locator('.cn-table')).not.toHaveClass(/compact/);
+    await geometry(page, size.width, size.height);
+    layout = await placement();
+    expect(layout.table.width).toBeLessThanOrEqual(1120);
+    expect(layout.table.height).toBeLessThanOrEqual(680);
+    expect(
+      Math.abs(layout.table.x + layout.table.width / 2 - size.width / 2),
+    ).toBeLessThan(1);
+    expect(layout.table.y - layout.header.bottom).toBeLessThanOrEqual(15);
+    expect(layout.board.y).toBeGreaterThanOrEqual(layout.teams.bottom);
+    expect(layout.bottom.y).toBeGreaterThanOrEqual(layout.lastCard.bottom);
+    expect(
+      Math.abs(layout.history.y - layout.teams.y),
+    ).toBeLessThan(1);
+    expect(layout.history.x).toBeGreaterThan(layout.board.right);
+    expect(layout.history.height).toBeLessThanOrEqual(layout.board.bottom - layout.teams.y + 1);
+    await expect(page.locator('.key-panel')).toBeVisible();
+    await expect(page.locator('.key-panel .key-cell').last()).toBeInViewport();
+    await capture(
+      page,
+      info.outputPath(`desktop-${size.width}x${size.height}.webp`),
+    );
+  }
+});
+
+test('keyboard confirmation, searchable rules, silent audio, turn handoffs and both immediate results', async ({
+  page,
+}, info) => {
+  await page.addInitScript(() =>
+    Object.defineProperty(window, 'AudioContext', { value: undefined }),
+  );
+  await page.goto('/practice/codenames');
+  await settings(page);
+  await page.getByRole('button', { name: 'Rules', exact: true }).click();
+  await page.getByLabel('Search the rules').fill('unlimited');
+  await expect(page.locator('dialog')).toContainText('Extra guesses');
+  await page.getByLabel('Search the rules').fill('');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+  const key = await practiceKey(page);
+  const team = await page.locator('.cn-table').getAttribute('data-active-team');
+  const own = key.find((c) => c.identity === team)!.card;
+  await expect(
+    page.getByRole('button', { name: 'End turn', exact: true }),
+  ).toBeDisabled();
+  await page.locator(`[data-card="${own}"]`).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('dialog.confirmation[open]')).toBeVisible();
+  await expect(page.locator('.dossier.revealed')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(page.locator(`[data-card="${own}"]`)).toBeFocused();
+  await reveal(page, own);
+  await page.getByRole('button', { name: 'End turn', exact: true }).click();
+  await expect(page.locator('.cn-table')).toHaveAttribute('data-phase', 'clue');
+  await clue(page, 'Forest', '2');
+  await reveal(page, key.find((c) => c.identity === 'civilian')!.card);
+  await clue(page, 'Night', '1');
+  await reveal(page, key.find((c) => c.identity === 'assassin')!.card);
+  await expect(page.locator('dialog.result')).toContainText('assassin');
+  await close(page);
+  await expect(page.locator('.dossier[data-identity]')).toHaveCount(25);
+  await expect(page.locator('.dossier:enabled')).toHaveCount(0);
+  await capture(page, info.outputPath('assassin.webp'));
+  await scenario(page, 'final');
+  const finalKey = await practiceKey(page);
+  const active = await page
+    .locator('.cn-table')
+    .getAttribute('data-active-team');
+  const remaining = await page
+    .locator('.dossier:not(.revealed)')
+    .evaluateAll((es) => es.map((e) => e.getAttribute('data-card')));
+  await reveal(
+    page,
+    finalKey.find((c) => c.identity === active && remaining.includes(c.card))!
+      .card,
+  );
+  await expect(page.locator('dialog.result')).toContainText(
+    'agents have been found',
+  );
+});
+
+test('four private clients submit clues, hand off, reconnect mid-turn, win and rematch', async ({
   browser,
   baseURL,
 }, info) => {
   test.setTimeout(180000);
   const contexts = await Promise.all(
     Array.from({ length: 4 }, () =>
-      browser.newContext({
-        baseURL,
-        viewport: { width: 1280, height: 800 },
-        recordVideo: {
-          dir: info.outputPath('videos'),
-          size: { width: 1280, height: 800 },
-        },
-      }),
+      browser.newContext({ baseURL, viewport: { width: 1440, height: 900 } }),
     ),
   );
   const pages = await Promise.all(contexts.map((c) => c.newPage()));
-  const errors: string[] = [],
-    snapshots: any[][] = pages.map(() => []);
+  const snapshots: any[][] = pages.map(() => []);
+  const errors: string[] = [];
   pages.forEach((p, i) => {
     p.on('pageerror', (e) => errors.push(e.message));
     p.on('websocket', (socket) =>
@@ -61,9 +387,8 @@ test('four private clients finish an ordinary round, rematch, and lose to the as
       .getByRole('button', { name: 'Create room →', exact: true })
       .click();
     await expect(host).toHaveURL(/\/room\//);
-    const url = host.url();
     for (let i = 1; i < 4; i++) {
-      await pages[i]!.goto(url);
+      await pages[i]!.goto(host.url());
       await pages[i]!.getByLabel('Your name', { exact: true }).fill(
         ['', 'Red spymaster', 'Blue operative', 'Blue spymaster'][i]!,
       );
@@ -76,10 +401,8 @@ test('four private clients finish an ordinary round, rematch, and lose to the as
     await host.getByRole('button', { name: 'Start game', exact: true }).click();
     async function roles() {
       for (let i = 0; i < 4; i++) {
-        const p = pages[i]!;
-        await expect(p.locator('.setup')).toBeVisible();
-        await p
-          .locator(`.team-panel.${i < 2 ? 'red' : 'blue'}`)
+        await expect(pages[i]!.locator('.setup')).toBeVisible();
+        await pages[i]!.locator(`.team-panel.${i < 2 ? 'red' : 'blue'}`)
           .getByRole('button', {
             name: `Choose ${i % 2 ? 'Spymaster' : 'Operative'}`,
             exact: true,
@@ -91,181 +414,86 @@ test('four private clients finish an ordinary round, rematch, and lose to the as
       await expect(host.locator('.dossier')).toHaveCount(25);
     }
     await roles();
-    await host.screenshot({
-      animations: 'disabled',
-      path: info.outputPath('operative-desktop.png'),
-    });
-    await pages[1]!.screenshot({
-      animations: 'disabled',
-      path: info.outputPath('spymaster-desktop.png'),
-    });
-    expect(await host.locator('.dossier[data-identity]').count()).toBe(0);
-    expect(await pages[1]!.locator('.dossier[data-identity]').count()).toBe(25);
-    const active = (await pages[1]!
-      .getByLabel('Clue word', { exact: true })
-      .count())
-      ? 0
-      : 2;
-    const spy = pages[active + 1]!,
-      operative = pages[active]!,
-      reviewer = pages[active === 0 ? 3 : 1]!;
+    const first =
+      (await host.locator('.cn-table').getAttribute('data-active-team')) ===
+      'red'
+        ? 0
+        : 2;
+    const spy = pages[first + 1]!,
+      op = pages[first]!;
+    await expect(host.locator('.dossier[data-identity]')).toHaveCount(0);
+    await expect(spy.locator('.dossier[data-identity]')).toHaveCount(25);
+    await capture(host, info.outputPath('operative.webp'));
+    await capture(spy, info.outputPath('spymaster.webp'));
     await spy.context().setOffline(true);
-    await expect(operative.locator('.waiting')).toContainText(
-      active === 0 ? 'Red spymaster' : 'Blue spymaster',
-    );
-    await expect(operative.locator('.controls')).toContainText(
-      'seat reserved until',
-    );
-    await operative.screenshot({
-      animations: 'disabled',
-      path: info.outputPath('waiting-reserved-spymaster.png'),
-    });
+    await expect(spy.locator('.notice')).toBeVisible();
+    await expect(op.locator('.dossier:enabled')).toHaveCount(0);
     await spy.context().setOffline(false);
     await expect(spy.locator('.notice')).toHaveCount(0);
-    await clue(spy, reviewer);
+    await clue(spy, 'Sea', '2');
     const targets = await spy
-      .locator(`.dossier[data-identity="${active === 0 ? 'red' : 'blue'}"]`)
+      .locator(`.dossier[data-identity="${first === 0 ? 'red' : 'blue'}"]`)
       .evaluateAll((es) => es.map((e) => e.getAttribute('data-card')!));
-    for (const card of targets) {
-      await operative.locator(`[data-card="${card}"]`).click();
-      await expect(operative.locator('.confirmation')).toContainText(
-        'Selected dossier',
-      );
-      await operative.locator('.confirmation .primary').click();
-      await expect(operative.locator(`[data-card="${card}"]`)).toHaveClass(
-        /revealed/,
-      );
-      if (card === targets[0]) {
-        await operative.context().setOffline(true);
-        await expect(operative.locator('.notice')).toContainText(
-          'Disconnected',
-        );
-        await operative.context().setOffline(false);
-        await expect(operative.locator('.notice')).toHaveCount(0);
-        await expect(operative.locator('.confirmation button')).toHaveCount(0);
-        expect(
-          await operative
-            .locator('.dossier:not(.revealed)[data-identity]')
-            .count(),
-        ).toBe(0);
-      }
-    }
+    await reveal(op, targets[0]!);
+    await op.locator(`[data-card="${targets[1]}"]`).click();
+    await expect(op.locator('.confirmation')).toBeVisible();
+    await op.context().setOffline(true);
+    await expect(op.locator('.notice')).toBeVisible();
+    await expect(op.locator('.confirmation')).not.toBeVisible();
+    await op.context().setOffline(false);
+    await expect(op.locator('.notice')).toHaveCount(0);
+    await expect(op.locator('.active-clue')).toContainText('Sea');
+    await op.getByRole('button', { name: 'End turn', exact: true }).click();
+    const next = first === 0 ? 2 : 0;
+    await clue(pages[next + 1]!, 'Forest', '2');
+    const nextOwn = await pages[next + 1]!.locator(
+      `.dossier[data-identity="${next === 0 ? 'red' : 'blue'}"]`,
+    )
+      .first()
+      .getAttribute('data-card');
+    await reveal(pages[next]!, nextOwn!);
+    await pages[next]!.getByRole('button', {
+      name: 'End turn',
+      exact: true,
+    }).click();
+    await clue(spy, 'Together');
+    for (const card of targets.slice(1)) await reveal(op, card);
     await expect(host.locator('.result')).toBeVisible();
-    await host.screenshot({
-      animations: 'disabled',
-      path: info.outputPath('ordinary-result.png'),
-    });
-    for (const index of [0, 2])
-      for (const room of snapshots[index]!) {
-        if (room.game?.public.phase !== 'finished')
-          expect(room.game?.private.key).toBeUndefined();
-        for (const cell of room.game?.public.board ?? [])
-          if (!cell.revealed && room.game.public.phase !== 'finished')
-            expect(cell.identity).toBeUndefined();
+    for (const i of [0, 2])
+      for (const room of snapshots[i]!) {
+        expect(room.game?.private.key).toBeUndefined();
+        for (const c of room.game?.public.board ?? [])
+          if (!c.revealed && room.game.public.phase !== 'finished')
+            expect(c.identity).toBeUndefined();
+        for (const r of room.game?.public.clueHistory ?? [])
+          for (const g of r.guesses)
+            expect(room.game.public.board[g.card].revealed).toBe(true);
       }
-    const currentHostId = snapshots[0]!.at(-1).hostId;
+    const hostId = snapshots[0]!.at(-1).hostId;
     const currentHost = pages.find(
-      (_, i) => snapshots[i]!.at(-1).playerId === currentHostId,
+      (_, i) => snapshots[i]!.at(-1).playerId === hostId,
     )!;
     await currentHost
-      .getByRole('button', { name: 'New case · choose teams again' })
+      .getByRole('button', { name: 'Play again · choose teams' })
       .click();
     await roles();
-    const next = (await pages[1]!
-      .getByLabel('Clue word', { exact: true })
-      .count())
-      ? 0
-      : 2;
-    await clue(pages[next + 1]!, pages[next === 0 ? 3 : 1]!, '1');
-    const assassin = await pages[next + 1]!.locator(
+    const active =
+      (await host.locator('.cn-table').getAttribute('data-active-team')) ===
+      'red'
+        ? 0
+        : 2;
+    await clue(pages[active + 1]!, 'Night', '1');
+    const assassin = await pages[active + 1]!.locator(
       '.dossier[data-identity="assassin"]',
     ).getAttribute('data-card');
-    await pages[next]!.locator(`[data-card="${assassin}"]`).click();
-    await pages[next]!.locator('.confirmation .primary').click();
+    await reveal(pages[active]!, assassin!);
     await expect(host.locator('.result')).toContainText('assassin');
-    await host.screenshot({
-      animations: 'disabled',
-      path: info.outputPath('assassin-result.png'),
-    });
     expect(errors).toEqual([]);
   } finally {
     await Promise.all(contexts.map((c) => c.close()));
   }
 });
-test('responsive practice, keyboard confirmation, searchable manual, settings and Spanish stable board', async ({
-  page,
-}, info) => {
-  const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/practice/codenames');
-  await page.getByRole('button', { name: 'Field manual', exact: true }).click();
-  await page.getByLabel('Search the field manual').fill('unlimited');
-  await expect(page.locator('dialog')).toContainText('Extra guesses');
-  await page.keyboard.press('Escape');
-  await expect(
-    page.getByRole('button', { name: 'Field manual', exact: true }),
-  ).toBeFocused();
-  for (const size of [
-    { width: 1440, height: 900 },
-    { width: 768, height: 1024 },
-    { width: 390, height: 844 },
-    { width: 360, height: 640 },
-    { width: 320, height: 568 },
-  ]) {
-    await page.setViewportSize(size);
-    await expect(page.locator('.dossier')).toHaveCount(25);
-    const widths = await page.locator('.dossier').evaluateAll((es) =>
-      es.map((e) => ({
-        w: e.getBoundingClientRect().width,
-        h: e.getBoundingClientRect().height,
-      })),
-    );
-    expect(widths.every((x) => x.w >= 44 && x.h >= 44)).toBe(true);
-    expect(
-      await page.evaluate(() => document.documentElement.scrollWidth),
-    ).toBeLessThanOrEqual(size.width);
-    await page.screenshot({
-      animations: 'disabled',
-      path: info.outputPath(`training-${size.width}.png`),
-    });
-  }
-  await page.setViewportSize({ width: 390, height: 844 });
-  await settings(page);
-  await page.getByLabel('Reduce motion', { exact: true }).check();
-  await page.getByLabel('Sound', { exact: true }).uncheck();
-  await close(page);
-  await page.getByLabel('Clue word', { exact: true }).fill('Sea');
-  await page.getByRole('button', { name: 'Send clue for review' }).click();
-  await page.getByRole('button', { name: 'Allow clue', exact: true }).click();
-  await expect(page.locator('.dossier[data-identity]')).toHaveCount(0);
-  await page.locator('.dossier').first().focus();
-  await page.keyboard.press('Enter');
-  await expect(page.locator('.dossier.revealed')).toHaveCount(0);
-  await page.keyboard.press('Escape');
-  await expect(page.locator('.confirmation button')).toHaveCount(0);
-  const words = await page.locator('.dossier strong').allTextContents();
-  await settings(page);
-  await page
-    .locator('dialog')
-    .getByRole('combobox', { name: 'Language', exact: true })
-    .selectOption('es');
-  await expect(
-    page.getByRole('button', { name: 'Manual de campo', exact: true }),
-  ).toBeVisible();
-  expect(await page.locator('.dossier strong').allTextContents()).toEqual(
-    words,
-  );
-  await expect(page.locator('.cn-table')).toHaveAttribute(
-    'data-phase',
-    'guessing',
-  );
-  await expect(page.locator('.clue-strip')).toContainText('Sea');
-  await page.screenshot({
-    animations: 'disabled',
-    path: info.outputPath('spanish-operative.png'),
-  });
-  expect(errors).toEqual([]);
-});
+
 test('eight seats consent, race distinct operative confirmations, and fit the table', async ({
   browser,
   baseURL,
@@ -339,7 +567,6 @@ test('eight seats consent, race distinct operative confirmations, and fit the ta
     await host.getByRole('button', { name: 'Start game', exact: true }).click();
     await host.getByLabel('Your name', { exact: true }).fill('Operative 0');
     await host.getByLabel('Board language', { exact: true }).selectOption('es');
-    await host.getByLabel('Allow agreed abbreviations').check();
     await host
       .getByRole('button', { name: 'Create room →', exact: true })
       .click();
@@ -365,37 +592,28 @@ test('eight seats consent, race distinct operative confirmations, and fit the ta
         .click();
     }
     await expect(host.locator('.agreements')).toContainText('Español');
-    await expect(host.locator('.agreements')).toContainText('Allowed');
-    await host.screenshot({
-      animations: 'disabled',
-      path: info.outputPath('eight-seat-setup.png'),
-    });
+    await capture(host, info.outputPath('eight-seat-setup.webp'));
     for (const p of pages)
       await p.getByRole('button', { name: /I’m ready/ }).click();
     await expect(host.locator('.dossier')).toHaveCount(25);
-    await expect(host.locator('.mobile-counters')).toContainText('Agent 7');
-    await host.screenshot({
-      animations: 'disabled',
-      path: info.outputPath('eight-seat-tablet.png'),
-    });
-    const active = (await pages[1]!
-      .getByLabel('Clue word', { exact: true })
-      .count())
-      ? 0
-      : 4;
-    const spy = pages[active + 1]!,
-      reviewer = pages[active === 0 ? 5 : 1]!;
+    await settings(host);
+    await expect(host.locator('.settings-roster')).toContainText('Agent 7');
+    await close(host);
+    await capture(host, info.outputPath('eight-seat-tablet.webp'));
+    const active =
+        (await host.locator('.cn-table').getAttribute('data-active-team')) ===
+        'red'
+          ? 0
+          : 4,
+      spy = pages[active + 1]!;
+    await clue(spy);
     const operatives = [pages[active]!, pages[active + 2]!];
-    await clue(spy, reviewer, '3');
     const targets = await spy
       .locator(`.dossier[data-identity="${active === 0 ? 'red' : 'blue'}"]`)
       .evaluateAll((es) =>
         es.slice(0, 2).map((e) => e.getAttribute('data-card')!),
       );
     for (let i = 0; i < 2; i++) {
-      await expect(
-        operatives[i]!.getByRole('button', { name: 'End turn', exact: true }),
-      ).toBeDisabled();
       await operatives[i]!.locator(`[data-card="${targets[i]}"]`).click();
       expect(
         await operatives[i]!.evaluate(() => (window as any).__cnRace.guesses),
@@ -404,10 +622,7 @@ test('eight seats consent, race distinct operative confirmations, and fit the ta
         () => ((window as any).__cnRace.hold = true),
       );
     }
-    await operatives[0]!.screenshot({
-      animations: 'disabled',
-      path: info.outputPath('race-confirmation.png'),
-    });
+    await capture(operatives[0]!, info.outputPath('race-confirmation.webp'));
     await Promise.all(
       operatives.map((p) => p.locator('.confirmation .primary').click()),
     );
@@ -461,31 +676,20 @@ test('eight seats consent, race distinct operative confirmations, and fit the ta
     await operatives[1]!.locator(`[data-card="${remaining}"]`).click();
     await operatives[1]!.locator('.confirmation .primary').click();
     await expect(host.locator('.dossier.revealed')).toHaveCount(2);
-    await host.screenshot({
-      animations: 'disabled',
-      path: info.outputPath('race-settled.png'),
-    });
+    await capture(host, info.outputPath('race-settled.webp'));
     await host.setViewportSize({ width: 320, height: 568 });
-    await host
-      .locator('.mobile-counters details')
-      .first()
-      .locator('summary')
-      .click();
-    await expect(host.locator('.mobile-counters')).toContainText('Spymaster');
     await host.evaluate(
       () => (document.documentElement.style.fontSize = '200%'),
     );
     expect(
       await host.evaluate(() => document.documentElement.scrollWidth),
     ).toBeLessThanOrEqual(320);
-    await host.screenshot({
-      animations: 'disabled',
-      path: info.outputPath('eight-seat-200-text.png'),
-    });
+    await capture(host, info.outputPath('eight-seat-200-text.webp'));
   } finally {
     await Promise.all(contexts.map((c) => c.close()));
   }
 });
+
 test('accepted public effects play once after gesture, cancel on resize, and mute safely', async ({
   page,
 }, info) => {
@@ -523,35 +727,29 @@ test('accepted public effects play once after gesture, cancel on resize, and mut
   expect(await page.evaluate(() => (window as any).__cnEffects.contexts)).toBe(
     0,
   );
-  await page.getByRole('button', { name: 'Field manual', exact: true }).click();
+  await settings(page);
   await close(page);
   await expect
     .poll(() => page.evaluate(() => (window as any).__cnEffects.contexts))
     .toBe(1);
   expect(await page.evaluate(() => (window as any).__cnEffects.sounds)).toBe(0);
-  await page.getByLabel('Clue word', { exact: true }).fill('Sky');
-  await page.getByLabel('Count', { exact: true }).selectOption('2');
-  const target = await page
-    .locator('.dossier.key.blue')
-    .first()
-    .getAttribute('data-card');
-  await page.getByRole('button', { name: 'Send clue for review' }).click();
-  await page.getByRole('button', { name: 'Allow clue', exact: true }).click();
+  const key = await practiceKey(page);
+  const team = await page.locator('.cn-table').getAttribute('data-active-team');
+  const target = key.find((c) => c.identity === team)!.card;
   await page.locator(`[data-card="${target}"]`).click();
   await page.locator('.confirmation .primary').click();
   await expect
     .poll(() => page.evaluate(() => (window as any).__cnEffects.flips))
     .toBe(1);
-  expect(await page.evaluate(() => (window as any).__cnEffects.stamps)).toBe(1);
+  expect(await page.evaluate(() => (window as any).__cnEffects.stamps)).toBe(0);
   await expect
     .poll(() => page.evaluate(() => (window as any).__cnEffects.sounds))
     .toBeGreaterThan(0);
   await page.setViewportSize({ width: 390, height: 844 });
   // Resize/visibility settle immediately: the next new accepted reveal still animates.
-  const nextTarget = await page
-    .locator('.dossier:not(.revealed)')
-    .first()
-    .getAttribute('data-card');
+  const nextTarget = key.find(
+    (c) => c.identity === team && c.card !== target,
+  )!.card;
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', {
       configurable: true,
@@ -580,13 +778,8 @@ test('accepted public effects play once after gesture, cancel on resize, and mut
   expect(await page.evaluate(() => (window as any).__cnEffects.sounds)).toBe(
     sounds,
   );
-  await page.screenshot({
-    path: info.outputPath('accepted-reveal.png'),
-    animations: 'disabled',
-  });
-  await page.getByRole('button', { name: 'End turn', exact: true }).click();
-  await page.getByLabel('Clue word', { exact: true }).fill('Quiet');
-  await page.getByRole('button', { name: 'Send clue for review' }).click();
+  await capture(page, info.outputPath('accepted-reveal.webp'));
+  await reveal(page, key.find((c) => c.identity === 'civilian')!.card);
   expect(await page.evaluate(() => (window as any).__cnEffects.sounds)).toBe(
     sounds,
   );
@@ -594,7 +787,12 @@ test('accepted public effects play once after gesture, cancel on resize, and mut
   const preferences = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('codenames:preferences')!),
   );
-  expect(preferences).toEqual({ sound: false, volume: 0.25, reduced: true });
+  expect(preferences).toEqual({
+    sound: false,
+    volume: 0.25,
+    reduced: true,
+    showKey: true,
+  });
   await page.reload();
   await settings(page);
   await expect(page.getByLabel('Sound', { exact: true })).not.toBeChecked();
@@ -603,199 +801,331 @@ test('accepted public effects play once after gesture, cancel on resize, and mut
     0,
   );
 });
-test('unavailable audio never blocks clue review or card confirmation', async ({
+
+test('clue composer remains reachable with enlarged text and missing artwork at all sizes', async ({
   page,
-}) => {
-  await page.addInitScript(() =>
-    Object.defineProperty(window, 'AudioContext', { value: undefined }),
-  );
+}, info) => {
+  test.setTimeout(180000);
+  await page.route('**/*.webp', (route) => route.abort());
   await page.goto('/practice/codenames');
-  const target = await page
-    .locator('.dossier.key.blue')
-    .first()
-    .getAttribute('data-card');
-  await page.getByLabel('Clue word', { exact: true }).fill('Sky');
-  await page.getByRole('button', { name: 'Send clue for review' }).click();
-  await page.getByRole('button', { name: 'Allow clue', exact: true }).click();
-  await page.locator(`[data-card="${target}"]`).click();
-  await page.locator('.confirmation .primary').click();
-  await expect(page.locator(`[data-card="${target}"]`)).toHaveClass(/revealed/);
+  for (const lang of ['en', 'es']) {
+    if (lang === 'es') {
+      await settings(page);
+      await page.locator('dialog select').last().selectOption('es');
+    }
+    for (const size of sizes) {
+      await page.setViewportSize(size);
+      await page.evaluate(
+        () => (document.documentElement.style.fontSize = '200%'),
+      );
+      await expect(page.locator('.cn-table')).toHaveClass(/compact/);
+      await geometry(page, size.width, size.height);
+      await page.locator('.compact-players').click();
+      await expect(page.locator('dialog .player-list li')).toHaveCount(4);
+      await close(page);
+      await page.locator('.compact-key').click();
+      await expect(page.locator('dialog .key-cell')).toHaveCount(25);
+      await close(page);
+      await page.locator('.give-clue').click();
+      await page.locator('.clue-form input').fill('Café');
+      await page.locator('.clue-form select').selectOption('0');
+      await page.locator('.clue-form button').focus();
+      await expect(page.locator('.clue-form button')).toBeInViewport();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('.give-clue')).toBeFocused();
+      await page.evaluate(() => (document.documentElement.style.fontSize = ''));
+      await expect(page.locator('.cn-table')).not.toHaveClass(/enlarged/);
+    }
+  }
+  await page.locator('.give-clue').click();
+  await page.locator('.clue-form input').fill('Café');
+  await page.locator('.clue-form button').click();
+  await expect(page.locator('.cn-table')).toHaveAttribute(
+    'data-phase',
+    'guessing',
+  );
+  await geometry(page, 320, 568);
+  await capture(page, info.outputPath('missing-artwork.webp'));
 });
 
-test('review rejection, penalty benefit and skip, wrong reveals and finite budgets explain the journey', async ({
-  browser,
-  baseURL,
-}, info) => {
-  const context = await browser.newContext({
-    baseURL,
-    viewport: { width: 1440, height: 900 },
-    recordVideo: {
-      dir: info.outputPath('videos'),
-      size: { width: 1440, height: 900 },
-    },
-  });
-  const page = await context.newPage();
-  const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.message));
-  try {
-    await page.goto('/practice/codenames');
-    await expect(page.locator('.dossier.key')).toHaveCount(25);
-    const key = await page.locator('.dossier').evaluateAll((es) =>
-      es.map((e) => ({
-        card: e.getAttribute('data-card')!,
-        identity: e.getAttribute('data-identity')!,
-      })),
-    );
-    const target = (identity: string, offset = 0) =>
-      key.filter((c) => c.identity === identity)[offset]!.card;
-    async function submit(count = '1') {
-      await page.getByLabel('Clue word', { exact: true }).fill('Ocean');
-      await page.getByLabel('Count', { exact: true }).selectOption(count);
-      await page.getByRole('button', { name: 'Send clue for review' }).click();
-    }
-    async function reveal(card: string) {
-      await page.locator(`[data-card="${card}"]`).click();
-      await page.locator('.confirmation .primary').click();
-      await expect(page.locator(`[data-card="${card}"]`)).toHaveClass(
-        /revealed/,
-      );
-    }
-    await submit();
-    await expect(page.locator('.cn-table')).toHaveAttribute(
-      'data-phase',
-      'clueReview',
-    );
-    await expect(page.locator('.dossier:enabled')).toHaveCount(0);
-    await page.screenshot({
-      animations: 'disabled',
-      path: info.outputPath('review.png'),
-    });
-    await page
-      .getByRole('button', { name: 'Invalid clue', exact: true })
-      .click();
-    await expect(page.locator('.cn-table')).toHaveAttribute(
-      'data-phase',
-      'penalty',
-    );
-    expect(
-      await page
-        .locator('.dossier:enabled')
-        .evaluateAll((es) =>
-          es.every((e) => e.getAttribute('data-identity') === 'red'),
+test('wood and props load and decode through the asset pipeline', async ({
+  page,
+}) => {
+  // CI checks production; set this locally to exercise the same assertion in Vite.
+  const urls = ['/practice/codenames'];
+  if (process.env.CODENAMES_DEV_URL)
+    urls.push(`${process.env.CODENAMES_DEV_URL}/practice/codenames`);
+  for (const url of urls) {
+    await page.goto(url);
+    await expect(page.locator('.cn-table')).toBeVisible();
+    const assets = await page.evaluate(() => {
+      const table = document.querySelector('.cn-table')!;
+      const wood =
+        getComputedStyle(table).backgroundImage.match(/url\("([^"]+)"\)/)?.[1];
+      if (!wood) throw new Error('The table has no resolved wood URL');
+      return [
+        wood,
+        ...Array.from(
+          table.querySelectorAll<HTMLImageElement>('.prop'),
+          (image) => image.src,
         ),
-    ).toBe(true);
-    await page.locator(`[data-card="${target('red')}"]`).click();
-    await page.screenshot({
-      animations: 'disabled',
-      path: info.outputPath('penalty-selection.png'),
+      ];
     });
-    await page.locator('.confirmation .primary').click();
-    await expect(page.locator('.cn-table')).toHaveAttribute(
-      'data-phase',
-      'clue',
-    );
-    await expect(page.locator('.side.red > strong')).toHaveText('7');
-    await submit();
-    await page
-      .getByRole('button', { name: 'Invalid clue', exact: true })
-      .click();
-    await page
-      .getByRole('button', { name: 'Skip benefit', exact: true })
-      .click();
-    await expect(page.locator('.dossier.revealed')).toHaveCount(1);
-    await submit('1');
-    await page.getByRole('button', { name: 'Allow clue', exact: true }).click();
-    await expect(
-      page.getByRole('button', { name: 'End turn', exact: true }),
-    ).toBeDisabled();
-    await reveal(target('blue'));
-    await expect(
-      page.getByRole('button', { name: 'End turn', exact: true }),
-    ).toBeEnabled();
-    await reveal(target('blue', 1));
-    await expect(page.locator('.cn-table')).toHaveAttribute(
-      'data-phase',
-      'clue',
-    );
-    await submit('0');
-    await page.getByRole('button', { name: 'Allow clue', exact: true }).click();
-    await expect(page.locator('.controls')).toContainText('∞');
-    await reveal(target('civilian'));
-    await expect(page.locator('.cn-table')).toHaveAttribute(
-      'data-phase',
-      'clue',
-    );
-    await page.screenshot({
-      animations: 'disabled',
-      path: info.outputPath('civilian-handoff.png'),
-    });
-    await submit('unlimited');
-    await page.getByRole('button', { name: 'Allow clue', exact: true }).click();
-    await reveal(target('red', 1));
-    await expect(page.locator('.cn-table')).toHaveAttribute(
-      'data-phase',
-      'clue',
-    );
-    await expect(page.locator('.side.red > strong')).toHaveText('6');
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.screenshot({
-      animations: 'disabled',
-      path: info.outputPath('enemy-handoff-phone.png'),
-    });
-    await settings(page);
-    await expect(page.locator('.history')).toContainText('rejected');
-    for (const label of await page.locator('.preferences label').all())
-      expect((await label.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-    await page.screenshot({
-      animations: 'disabled',
-      path: info.outputPath('history-settings-phone.png'),
-    });
-    await page
-      .getByLabel('Local training · all roles', { exact: true })
-      .selectOption('final');
-    await close(page);
-    const final = await page
-      .locator('.dossier.key.blue')
-      .first()
-      .getAttribute('data-card');
-    await submit();
-    await page.getByRole('button', { name: 'Allow clue', exact: true }).click();
-    await reveal(final!);
-    await expect(page.locator('.result')).toContainText('Blue team wins');
-    await expect(page.locator('.dossier:enabled')).toHaveCount(0);
-    await page.screenshot({
-      animations: 'disabled',
-      path: info.outputPath('final-agent-phone.png'),
-    });
-    await settings(page);
-    await page
-      .locator('dialog')
-      .getByLabel('Language', { exact: true })
-      .selectOption('es');
-    await page
-      .getByRole('button', { name: 'Manual de campo', exact: true })
-      .click();
-    await expect(page.locator('.cn-table')).toHaveAttribute(
-      'data-phase',
-      'finished',
-    );
-    await page.getByLabel('Buscar en el manual de campo').fill('reconectar');
-    await expect(page.locator('dialog details')).toHaveCount(1);
-    await expect(page.locator('dialog')).toContainText('conserva');
-    await page.screenshot({
-      animations: 'disabled',
-      path: info.outputPath('spanish-connection-guide-phone.png'),
-    });
-    await page
-      .getByLabel('Buscar en el manual de campo')
-      .fill('penalizaciones');
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.screenshot({
-      animations: 'disabled',
-      path: info.outputPath('spanish-review-guide.png'),
-    });
-    expect(errors).toEqual([]);
-  } finally {
-    await context.close();
+    expect(assets).toHaveLength(6);
+    for (const asset of assets) {
+      const response = await page.request.get(asset);
+      expect(response.status(), asset).toBe(200);
+      expect(response.headers()['content-type'], asset).toContain('image/webp');
+      const dimensions = await page.evaluate(async (src) => {
+        const image = new Image();
+        image.src = src;
+        await image.decode();
+        return [image.naturalWidth, image.naturalHeight];
+      }, asset);
+      expect(
+        dimensions.every((value) => value > 0),
+        asset,
+      ).toBe(true);
+    }
   }
+});
+
+test('paper and translucent panel materials retain accessible text contrast', async ({
+  page,
+}, info) => {
+  await page.setViewportSize(sizes[0]!);
+  await page.goto('/practice/codenames');
+  await scenario(page, 'midgame');
+  await settings(page);
+  await page
+    .getByLabel('Training seat', { exact: true })
+    .selectOption('training-0');
+  await close(page);
+  await page.evaluate(() => document.fonts.ready);
+  const targets = [
+    '.dossier.revealed.red strong',
+    '.dossier.revealed.blue strong',
+    '.dossier.civilian strong',
+    '.dossier.assassin strong',
+    '.team-status h2',
+    '.team-status strong',
+    '.team-status p',
+    '.brand h1',
+    '.main-nav button',
+    '.room-meta',
+    '.viewer small',
+    '.round-label',
+    '.turn-pill',
+    '.active-clue b',
+    '.active-clue span',
+    '.players-panel h2',
+    '.player-list li > span:last-child',
+    '.player-list small',
+    '.key-panel h3',
+    '.key-body p',
+    '.history-panel h2',
+    '.history-panel header small',
+    '.team-label',
+    '.history-title strong',
+    '.history-entry > small',
+    '.guess',
+  ];
+  await expect(
+    page.locator('.dossier svg, .dossier img, .dossier .key-mark'),
+  ).toHaveCount(0);
+  expect(
+    await page.evaluate(() =>
+      Array.from(document.fonts).some(
+        (face) =>
+          face.family.includes('Codenames Roboto Condensed') &&
+          face.status === 'loaded',
+      ),
+    ),
+  ).toBe(true);
+  const cardEdges = await page.locator('.dossier').evaluateAll((cards) =>
+    cards.map((card) => {
+      const style = getComputedStyle(card);
+      return { outline: style.outlineStyle, shadow: style.boxShadow };
+    }),
+  );
+  expect(cardEdges).toHaveLength(25);
+  expect(
+    cardEdges.every(
+      (edge) => edge.outline === 'none' && !edge.shadow.includes('inset'),
+    ),
+  ).toBe(true);
+  // Sample the actual browser-composited background underneath every text run.
+  // This includes wood, props, lighting, paper and all translucent layers, at their
+  // rendered positions; source-image highlights elsewhere on the table don't count.
+  for (const team of ['red', 'blue']) {
+    const original = await page.locator('.turn-pill').getAttribute('class');
+    await page
+      .locator('.turn-pill')
+      .evaluate((el, team) => (el.className = `turn-pill ${team}`), team);
+    const samples = await page.evaluate((targets) => {
+      for (const panel of document.querySelectorAll('.glass, .team-status')) {
+        const style = getComputedStyle(panel);
+        const team = panel.classList.contains('team-status');
+        const stops = [...style.backgroundImage.matchAll(/rgba?\(([^)]+)\)/g)];
+        if (!stops.length) throw new Error('Missing panel gradient');
+        for (const stop of stops) {
+          const alpha = Number(stop[1]!.split(',')[3] ?? 1);
+          if (
+            !Number.isFinite(alpha) ||
+            (team ? alpha !== 1 : alpha <= 0 || alpha >= 0.85)
+          )
+            throw new Error(
+              team
+                ? 'Team surface must be opaque'
+                : 'Glass must remain translucent',
+            );
+        }
+        if (!team && style.backgroundImage.includes('url('))
+          throw new Error('Glass must expose the actual backdrop');
+        if (
+          !team &&
+          CSS.supports('backdrop-filter', 'blur(1px)') &&
+          style.backdropFilter === 'none'
+        )
+          throw new Error('Glass backdrop filter is missing');
+      }
+      return targets.flatMap((selector) => {
+        const elements = [...document.querySelectorAll(selector)];
+        if (!elements.length)
+          throw new Error(`Missing contrast target: ${selector}`);
+        return elements.flatMap((el) => {
+          const colour = getComputedStyle(el).color;
+          const match = colour.match(/^rgba?\(([^)]+)\)$/);
+          if (!match) throw new Error(`Unsupported colour: ${colour}`);
+          const ink = match[1]!.split(',').map(Number);
+          if (
+            ink.length !== 3 ||
+            ink.some((c) => !Number.isFinite(c) || c < 0 || c > 255)
+          )
+            throw new Error(`Invalid or translucent text colour: ${colour}`);
+          const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+          const rects: {
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+          }[] = [];
+          while (walker.nextNode()) {
+            if (
+              !walker.currentNode.textContent?.trim() ||
+              walker.currentNode.parentElement?.closest('.sr-only')
+            )
+              continue;
+            const range = document.createRange();
+            range.selectNodeContents(walker.currentNode);
+            for (const rect of range.getClientRects())
+              if (rect.width > 0 && rect.height > 0)
+                rects.push({
+                  x: rect.x,
+                  y: rect.y,
+                  width: rect.width,
+                  height: rect.height,
+                });
+          }
+          if (!rects.length) throw new Error(`No measurable text: ${selector}`);
+          return { selector, ink, rects };
+        });
+      });
+    }, targets);
+    const hideInk = await page.addStyleTag({
+      content:
+        '.cn-table * { color: transparent !important; text-shadow: none !important; } .cn-table svg { visibility: hidden !important; }',
+    });
+    let background: Buffer;
+    try {
+      background = await page.screenshot({
+        animations: 'disabled',
+        scale: 'css',
+      });
+    } finally {
+      await hideInk.evaluate((el) => el.remove());
+      await page
+        .locator('.turn-pill')
+        .evaluate((el, original) => (el.className = original!), original);
+    }
+    const ratios = await page.evaluate(
+      async ({ samples, imageUrl }) => {
+        const image = new Image();
+        image.src = imageUrl;
+        await image.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        if (!canvas.width || !canvas.height)
+          throw new Error('Empty background capture');
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(image, 0, 0);
+        const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        const lum = (rgb: number[]) =>
+          rgb.reduce((sum, channel, i) => {
+            const v = channel / 255;
+            return (
+              sum +
+              (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4) *
+                [0.2126, 0.7152, 0.0722][i]!
+            );
+          }, 0);
+        return samples.map(({ selector, ink, rects }) => {
+          const foreground = lum(ink);
+          let ratio = Infinity,
+            count = 0;
+          for (const rect of rects) {
+            if (
+              rect.x < 0 ||
+              rect.y < 0 ||
+              rect.x + rect.width > canvas.width ||
+              rect.y + rect.height > canvas.height
+            )
+              throw new Error(`Text outside capture: ${selector}`);
+            for (
+              let y = Math.ceil(rect.y);
+              y < Math.floor(rect.y + rect.height);
+              y++
+            )
+              for (
+                let x = Math.ceil(rect.x);
+                x < Math.floor(rect.x + rect.width);
+                x++
+              ) {
+                const offset = (y * canvas.width + x) * 4;
+                if (pixels[offset + 3] !== 255)
+                  throw new Error('Invalid background pixel');
+                const back = lum([
+                  pixels[offset]!,
+                  pixels[offset + 1]!,
+                  pixels[offset + 2]!,
+                ]);
+                ratio = Math.min(
+                  ratio,
+                  (Math.max(foreground, back) + 0.05) /
+                    (Math.min(foreground, back) + 0.05),
+                );
+                count++;
+              }
+          }
+          if (!count || !Number.isFinite(ratio) || ratio < 1 || ratio > 21)
+            throw new Error(`Invalid measurement: ${selector}`);
+          return { selector, ratio, pixels: count };
+        });
+      },
+      {
+        samples,
+        imageUrl: `data:image/png;base64,${background.toString('base64')}`,
+      },
+    );
+    await info.attach(`material-contrast-${team}`, {
+      body: JSON.stringify(ratios, null, 2),
+      contentType: 'application/json',
+    });
+    for (const result of ratios)
+      expect
+        .soft(result.ratio, `${team} turn: ${result.selector}`)
+        .toBeGreaterThanOrEqual(4.5);
+  }
+  await capture(page, info.outputPath('spymaster.webp'));
 });

@@ -37,6 +37,7 @@
 </p>
 
 <style>
+  /* Uses the table dialog palette; rules remain accessible on compact screens. */
   label {
     display: grid;
     gap: 0.5rem;
@@ -77,7 +78,7 @@
     font-size: 0.85rem;
   }
   a {
-    color: #245c97;
+    color: #94c4ff;
   }
   @media (max-width: 500px) {
     .frames {

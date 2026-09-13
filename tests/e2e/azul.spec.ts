@@ -15,12 +15,23 @@ async function close(page: Page) {
   await page.getByRole('button', { name: 'Close', exact: true }).click();
 }
 async function scenario(page: Page, id: string) {
+  if (await page.getByRole('dialog').isVisible()) await close(page);
   await settings(page);
   await page.getByLabel('Practice scenario').selectOption(id);
   await close(page);
 }
+async function source(page: Page) {
+  await page
+    .locator(
+      '.factory-tiles button:enabled,.factory-open:enabled,.center-group:enabled',
+    )
+    .first()
+    .click();
+  if (await page.locator('.factory-picker').count())
+    await page.locator('.factory-picker button[data-color]').first().click();
+}
 async function choose(page: Page, row: number | null = 0) {
-  await page.locator('.factory-tiles button:enabled').first().click();
+  await source(page);
   if (row === null)
     await page.getByRole('button', { name: 'Floor line', exact: true }).click();
   else
@@ -48,6 +59,16 @@ async function clearFactories(page: Page) {
     }
 }
 async function noOverflow(page: Page, width: number) {
+  expect(
+    await page
+      .locator('.surface')
+      .evaluate((e) => e.scrollHeight - e.clientHeight),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollHeight - innerHeight,
+    ),
+  ).toBeLessThanOrEqual(1);
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth),
   ).toBeLessThanOrEqual(width);
@@ -123,6 +144,9 @@ test('ceramic workshop: keyboard draft, actual flights, help focus, scoring and 
   await page
     .getByRole('button', { name: 'Confirm tiles', exact: true })
     .click();
+  await page
+    .getByRole('button', { name: 'Round details', exact: true })
+    .click();
   await expect(page.locator('.explanations')).toContainText('+6 wall points');
   await expect(page.locator('.explanations')).toContainText(
     '+2 wall points (0 horizontal + 2 vertical)',
@@ -161,7 +185,7 @@ test('phone and tablet: nine factories, marker overflow, silent reduced motion a
   await expect(page.locator('.opponent')).toHaveCount(3);
   await noOverflow(page, 390);
   await page.screenshot({ path: info.outputPath('azul-phone-four.png') });
-  await page.locator('.opponent').first().click();
+  await page.locator('.opponent .inspect').first().click();
   await expect(page.getByRole('dialog').locator('.player-board')).toBeVisible();
   await close(page);
   await page.setViewportSize({ width: 768, height: 1024 });
@@ -269,10 +293,15 @@ for (const count of [2, 4])
         );
       let actor = pages[0];
       for (const p of pages)
-        if (await p.locator('.factory-tiles button:enabled').count()) actor = p;
+        if (
+          await p
+            .locator('.factory-tiles button:enabled,.factory-open:enabled')
+            .count()
+        )
+          actor = p;
       if (actor === a) await choose(actor, null);
       else {
-        await actor.locator('.factory-tiles button:enabled').first().tap();
+        await source(actor);
         await actor
           .getByRole('button', { name: 'Floor line', exact: true })
           .tap();
@@ -319,7 +348,9 @@ for (const count of [2, 4])
           for (const p of pages)
             if (
               await p
-                .locator('.factory-tiles button:enabled,.center-group:enabled')
+                .locator(
+                  '.factory-tiles button:enabled,.factory-open:enabled,.center-group:enabled',
+                )
                 .count()
             )
               current = p;
@@ -330,7 +361,7 @@ for (const count of [2, 4])
                   if (
                     await p
                       .locator(
-                        '.factory-tiles button:enabled,.center-group:enabled',
+                        '.factory-tiles button:enabled,.factory-open:enabled,.center-group:enabled',
                       )
                       .count()
                   )
@@ -340,10 +371,7 @@ for (const count of [2, 4])
               .toBe(true);
             continue;
           }
-          await current
-            .locator('.factory-tiles button:enabled,.center-group:enabled')
-            .first()
-            .click();
+          await source(current);
           const lines = current.locator('.pattern:enabled');
           if (await lines.count()) await lines.first().click();
           else
@@ -407,17 +435,18 @@ test('review: right-to-left patterns, readable wall, compact touch targets and e
     expect(right!.x).toBeGreaterThan(left!.x);
     await expect(slots.nth(0).locator('.tile.blue')).toHaveCount(1);
     await expect(slots.nth(1).locator('.empty-slot')).toHaveCount(1);
+    await page.locator('.own-inspect').click();
     await expect(
       page.getByRole('img', {
         name: 'Wall row 1, column 1 · Blue diamond · Empty',
         exact: true,
       }),
     ).toHaveCount(1);
-    await page.locator('.own-board').scrollIntoViewIfNeeded();
     await page.screenshot({
       path: info.outputPath('azul-review-readable-phone.png'),
     });
-    await page.locator('.opponent').first().tap();
+    await close(page);
+    await page.locator('.opponent .inspect').first().tap();
     const dialog = page.getByRole('dialog');
     expect(
       await dialog.evaluate((e) => e.scrollWidth - e.clientWidth),
@@ -432,9 +461,7 @@ test('review: right-to-left patterns, readable wall, compact touch targets and e
         exact: true,
       })
       .tap();
-    for (const line of await page
-      .locator('.own-board .pattern:enabled')
-      .all()) {
+    for (const line of await page.locator('dialog .pattern:enabled').all()) {
       expect((await line.boundingBox())!.height).toBeGreaterThanOrEqual(44);
       await line.tap();
     }
@@ -457,6 +484,9 @@ test('review: right-to-left patterns, readable wall, compact touch targets and e
     await expect(page.locator('.azul-flight').first()).toBeAttached();
     await page.setViewportSize({ width: 1024, height: 768 });
     await expect(page.locator('.azul-flight')).toHaveCount(0);
+    await page
+      .getByRole('button', { name: 'Round details', exact: true })
+      .click();
     await expect(page.locator('.explanations')).toContainText('+6 wall points');
     await scenario(page, 'scoring');
     await choose(page);
@@ -495,4 +525,320 @@ test('review: right-to-left patterns, readable wall, compact touch targets and e
   } finally {
     await context.close();
   }
+});
+
+for (const [width, height] of [
+  [360, 640],
+  [390, 844],
+  [768, 1024],
+  [1100, 700],
+  [1440, 900],
+  [720, 450],
+]) {
+  test(`Table Light geometry and picker ${width}×${height}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width, height });
+    await page.goto('/practice/azul');
+    await page.evaluate(() => document.fonts.ready);
+    for (const id of ['start2', 'start3', 'start4']) {
+      await scenario(page, id);
+      await clearFactories(page);
+      await expect(page.locator('.own-board .starter')).toHaveAttribute(
+        'aria-hidden',
+        'true',
+      );
+      await noOverflow(page, width);
+      const anchors = await page
+        .locator('.surface [data-azul-location]')
+        .evaluateAll((nodes) =>
+          nodes.map((n) => ({
+            key: n.getAttribute('data-azul-location'),
+            width: n.getBoundingClientRect().width,
+            height: n.getBoundingClientRect().height,
+          })),
+        );
+      expect(new Set(anchors.map((a) => a.key)).size).toBe(anchors.length);
+      expect(anchors.every((a) => a.width > 0 && a.height > 0)).toBe(true);
+      await expect(page.locator('.opponent .player-board button')).toHaveCount(
+        0,
+      );
+      const bounds = await page
+        .locator('.factory-open,.factory-tiles button,.center-group')
+        .evaluateAll((nodes) =>
+          nodes
+            .map((n) => n.getBoundingClientRect())
+            .map((r) => ({
+              x: r.x,
+              y: r.y,
+              right: r.right,
+              bottom: r.bottom,
+              width: r.width,
+              height: r.height,
+            })),
+        );
+      for (const [i, a] of bounds.entries()) {
+        expect(a.width).toBeGreaterThanOrEqual(44);
+        expect(a.height).toBeGreaterThanOrEqual(44);
+        for (const b of bounds.slice(i + 1))
+          expect(
+            a.right <= b.x ||
+              b.right <= a.x ||
+              a.bottom <= b.y ||
+              b.bottom <= a.y,
+          ).toBe(true);
+      }
+    }
+    await page.screenshot({
+      path: info.outputPath(`table-light-${width}.png`),
+    });
+    const inspect = page.locator('.inspect').first();
+    await inspect.click();
+    await expect(page.locator('dialog [data-azul-location]')).toHaveCount(0);
+    await expect(page.locator('dialog button button')).toHaveCount(0);
+    await close(page);
+    await expect(inspect).toBeFocused();
+    if (width <= 600) {
+      const factory = page.locator('.factory-open:enabled').first();
+      const pieces = await factory.locator('.tile').count();
+      await factory.focus();
+      await page.keyboard.press('Enter');
+      await expect(
+        page.locator('.factory-picker button[data-color]').first(),
+      ).toBeFocused();
+      await expect(page.locator('.azul-table')).toHaveAttribute(
+        'data-game-revision',
+        '0',
+      );
+      expect(await factory.locator('.tile').count()).toBe(pieces);
+      await page.keyboard.press('Escape');
+      await expect(factory).toBeFocused();
+      await factory.click();
+      await page.screenshot({
+        path: info.outputPath(`table-light-picker-${width}.png`),
+      });
+      await page.locator('.factory-picker button[data-color]').first().click();
+      await page
+        .getByRole('button', { name: 'Floor line', exact: true })
+        .click();
+      await page
+        .getByRole('button', { name: 'Confirm tiles', exact: true })
+        .click();
+      await expect(page.locator('.azul-table')).toHaveAttribute(
+        'data-game-revision',
+        '1',
+      );
+      await expect(page.locator('.factory-picker')).toHaveCount(0);
+    }
+    await scenario(page, 'crowded');
+    for (const group of await page.locator('.center-group').all()) {
+      await group.focus();
+      await page.keyboard.press('Enter');
+      await expect(page.locator('.confirmation')).toContainText('12');
+      await page.keyboard.press('Escape');
+    }
+    await page.locator('.supply').scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: info.outputPath(`table-light-centre-${width}.png`),
+    });
+    // Text-only enlargement, not page zoom: computed text sizes double while controls reflow.
+    await page.evaluate(() => {
+      const texts = Array.from(
+        document.querySelectorAll<HTMLElement>('.azul-table *'),
+      ).filter((e) =>
+        Array.from(e.childNodes).some(
+          (n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim(),
+        ),
+      );
+      const sizes = texts.map((e) => parseFloat(getComputedStyle(e).fontSize));
+      texts.forEach((e, i) => (e.style.fontSize = `${sizes[i] * 2}px`));
+    });
+    await noOverflow(page, width);
+    await page.locator('.own-board').scrollIntoViewIfNeeded();
+    const numerals = await page
+      .locator('.own-board .rail-ticks span:visible')
+      .evaluateAll((nodes) =>
+        nodes
+          .filter((n) => n.textContent?.trim())
+          .map((n) => {
+            const range = document.createRange();
+            range.selectNodeContents(n);
+            const r = range.getBoundingClientRect();
+            return { left: r.left, right: r.right };
+          }),
+      );
+    for (let i = 1; i < numerals.length; i++)
+      expect(numerals[i].left).toBeGreaterThan(numerals[i - 1].right);
+    await page.screenshot({
+      path: info.outputPath(`table-light-text200-${width}.png`),
+    });
+  });
+}
+
+test('Table Light scoring endpoints, cleanup, overflow rail and dialog cancellation', async ({
+  page,
+}, info) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/practice/azul');
+  await page.evaluate(() => document.fonts.ready);
+  await scenario(page, 'cleanup');
+  await page
+    .getByRole('button', {
+      name: 'Take 2 · Blue diamond · Center',
+      exact: true,
+    })
+    .click();
+  await page.getByRole('button', { name: /^Line 2 ·/ }).click();
+  await page
+    .getByRole('button', { name: 'Confirm tiles', exact: true })
+    .focus();
+  // Observe and seek every actual WAAPI flight to verify its geometric endpoint.
+  await page.evaluate(() => {
+    (window as any).endpoints = [];
+    new MutationObserver((records) => {
+      for (const r of records)
+        for (const node of r.addedNodes) {
+          if (
+            !(node instanceof HTMLElement) ||
+            !node.classList.contains('azul-flight')
+          )
+            continue;
+          const animation = node.getAnimations()[0];
+          const effect = animation.effect!;
+          animation.pause();
+          animation.currentTime =
+            Number(effect.getTiming().delay) +
+            Number(effect.getTiming().duration);
+          const rect = node.getBoundingClientRect();
+          (window as any).endpoints.push({
+            from: node.dataset.from,
+            to: node.dataset.to,
+            expected: JSON.parse(node.dataset.endpoint!),
+            actual: { x: rect.x, y: rect.y, size: rect.width },
+            svg: !!node.querySelector('svg'),
+          });
+          animation.currentTime = 0;
+          animation.play();
+        }
+    }).observe(document.body, { childList: true });
+  });
+  await page.keyboard.press('Enter');
+  await expect
+    .poll(() => page.evaluate(() => (window as any).endpoints.length))
+    .toBeGreaterThan(20);
+  const endpoints = await page.evaluate(() => (window as any).endpoints);
+  for (const endpoint of endpoints) {
+    expect(endpoint.svg).toBe(true);
+    expect(endpoint.actual.x).toBeCloseTo(endpoint.expected.x, 1);
+    expect(endpoint.actual.y).toBeCloseTo(endpoint.expected.y, 1);
+    expect(endpoint.actual.size).toBeCloseTo(endpoint.expected.size, 1);
+  }
+  expect(endpoints.some((e: any) => e.to.startsWith('workshop-1/wall/'))).toBe(
+    true,
+  );
+  expect(
+    endpoints.some(
+      (e: any) => e.from === 'workshop-0/floor/3' && e.to === 'discard',
+    ),
+  ).toBe(true);
+  expect(
+    endpoints.some(
+      (e: any) => e.from === 'workshop-0/floor/2' && e.to === 'center/marker',
+    ),
+  ).toBe(true);
+  await expect(page.locator('.azul-flight')).toHaveCount(0);
+  const targets = await page.evaluate(
+    (ends) =>
+      ends.map((e: { to: string }) => {
+        const target = document.querySelector<HTMLElement>(
+          `.surface [data-azul-location="${e.to}"]`,
+        )!;
+        const r = target.getBoundingClientRect();
+        const size = Math.min(34, r.width, r.height);
+        return {
+          x: r.x + (r.width - size) / 2,
+          y: r.y + (r.height - size) / 2,
+          size,
+        };
+      }),
+    endpoints,
+  );
+  // Independently compare WAAPI endpoints with actual table destination geometry.
+  for (let i = 0; i < endpoints.length; i++) {
+    // The fixed table keeps actual destinations stable throughout acceptance.
+    expect(Math.abs(targets[i].x - endpoints[i].actual.x)).toBeLessThanOrEqual(
+      1.1,
+    );
+    expect(Math.abs(targets[i].y - endpoints[i].actual.y)).toBeLessThanOrEqual(
+      1.1,
+    );
+    expect(targets[i].size).toBeCloseTo(endpoints[i].actual.size, 1);
+  }
+  await page.screenshot({ path: info.outputPath('table-light-cleanup.png') });
+  await scenario(page, 'cross100');
+  await choose(page);
+  await page
+    .getByRole('button', { name: 'Confirm tiles', exact: true })
+    .click();
+  await expect(page.locator('.own-board .score-overflow')).toHaveText('100+');
+  await expect(page.locator('.own-board header strong')).toContainText('106');
+  await expect(page.locator('.own-board .score-marker')).toHaveAttribute(
+    'style',
+    'left: 100%;',
+  );
+  await page.screenshot({ path: info.outputPath('table-light-100plus.png') });
+  await scenario(page, 'scoring');
+  await choose(page);
+  await page
+    .getByRole('button', { name: 'Confirm tiles', exact: true })
+    .focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.azul-flight').first()).toBeAttached();
+  await page
+    .locator('.inspect')
+    .first()
+    .evaluate((e: HTMLButtonElement) => e.click());
+  await expect(page.locator('.azul-flight')).toHaveCount(0);
+  await expect(page.locator('dialog [data-azul-location]')).toHaveCount(0);
+  await expect(page.locator('.own-board header strong')).toContainText('13');
+  await close(page);
+  // An accepted action received while inspection is open stays settled.
+  await scenario(page, 'scoring');
+  await choose(page);
+  await page.locator('.inspect').first().click();
+  await page
+    .getByRole('button', {
+      name: 'Confirm tiles',
+      exact: true,
+      includeHidden: true,
+    })
+    .evaluate((e: HTMLButtonElement) => e.click());
+  await expect(page.locator('.azul-table')).toHaveAttribute(
+    'data-game-revision',
+    '1',
+  );
+  await expect(page.locator('.azul-flight')).toHaveCount(0);
+  await close(page);
+  await scenario(page, 'no_wall');
+  await page
+    .getByRole('button', {
+      name: 'Take 2 · Blue diamond · Center',
+      exact: true,
+    })
+    .click();
+  await page.getByRole('button', { name: 'Floor line', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Confirm tiles', exact: true })
+    .focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.azul-flight').first()).toBeAttached();
+  await page
+    .getByRole('button', { name: 'Skip animation', exact: true })
+    .click();
+  await expect(page.locator('.azul-flight')).toHaveCount(0);
+  await expect(page.locator('.own-board header strong')).toContainText('0');
+  await expect(page.locator('.own-board .floor .tile')).toHaveCount(0);
+  expect(errors).toEqual([]);
 });

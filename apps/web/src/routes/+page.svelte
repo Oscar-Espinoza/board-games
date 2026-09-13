@@ -11,9 +11,7 @@
   let selected = $state<GameId>('uno');
   let panel = $state<'start' | 'summary' | 'rules' | 'join' | null>(null);
   let secretPowers = $state(false);
-  let boardLanguage = $state('en'),
-    allowAbbreviations = $state(false),
-    allowMultiwordNames = $state(false);
+  let boardLanguage = $state('en');
   let name = $state(''),
     code = $state(''),
     setup = $state('variable'),
@@ -130,7 +128,7 @@
         selected === 'little-secret'
           ? { wordLanguage: boardLanguage, powers: secretPowers }
           : selected === 'codenames'
-            ? { boardLanguage, allowAbbreviations, allowMultiwordNames }
+            ? { boardLanguage }
             : { setup, practice },
       );
       await goto(`/room/${credentials.roomId}`);
@@ -265,16 +263,6 @@
             ><option value="en">English</option><option value="es"
               >Español</option
             ></select
-          ><label
-            ><input
-              type="checkbox"
-              bind:checked={allowAbbreviations}
-            />{m.cn_abbreviations()}</label
-          ><label
-            ><input
-              type="checkbox"
-              bind:checked={allowMultiwordNames}
-            />{m.cn_names()}</label
           >
         </fieldset>{/if}
       {#if selected === 'catan'}<fieldset>

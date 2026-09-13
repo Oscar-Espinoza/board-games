@@ -1,6 +1,8 @@
 <script lang="ts">
   let { scene, step = 2 }: { scene: string; step?: number } = $props();
-  const palette = ['#1766a0', '#edb737', '#ae4235', '#24313b', '#faf2da'];
+  import { palette as paints } from './palette.js';
+  import { colors } from './index.js';
+  const palette = colors.map((color) => paints[color].glaze);
 </script>
 
 <svg viewBox="0 0 400 170" aria-hidden="true">
@@ -15,7 +17,7 @@
           height="23"
           rx="3"
           fill={connected && !(step === 0 && r === 2 && c === 2)
-            ? '#edb737'
+            ? paints.yellow.glaze
             : '#e9dfc422'}
           stroke={r === 2 && c === 2 ? '#fff6db' : 'none'}
           stroke-width="2"
@@ -23,7 +25,7 @@
       {/each}{/each}
     <text x="270" y="80" fill="#f8edcc" font-size="24"
       >{step === 2 ? '4 + 3' : '+ ?'}</text
-    ><text x="280" y="119" fill="#edb737" font-size="30"
+    ><text x="280" y="119" fill={paints.yellow.glaze} font-size="30"
       >{step === 2 ? '= 7' : '◇'}</text
     >
   {:else if scene === 'marker' || scene === 'penalty'}
@@ -39,7 +41,9 @@
         width="39"
         height="39"
         rx="5"
-        fill={scene === 'marker' && i === 6 ? '#faf2da' : palette[i % 5]}
+        fill={scene === 'marker' && i === 6
+          ? paints.white.glaze
+          : palette[i % 5]}
       />{/each}
     <text x="200" y="135" text-anchor="middle" fill="#f8edcc" font-size="22"
       >{scene === 'marker'
@@ -74,12 +78,12 @@
           width="30"
           height="30"
           rx="4"
-          fill="#edb737"
+          fill={paints.yellow.glaze}
           opacity={(step === 0 && i === 2) || (step === 2 && i > 0) ? 0.15 : 1}
         />{/each}<text x="157" y="95" fill="#f8edcc" font-size="28">→</text>
     {:else}<text x="45" y="73" fill="#f8edcc" font-size="23"
         >{scene === 'finish' ? '+2 / +7' : '20 × 5'}</text
-      ><text x="62" y="111" fill="#edb737" font-size="26"
+      ><text x="62" y="111" fill={paints.yellow.glaze} font-size="26"
         >{scene === 'finish' ? '+10' : '= 100'}</text
       >{/if}
   {:else}

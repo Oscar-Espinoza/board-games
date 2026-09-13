@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900">
+  <defs>
+    <linearGradient id="base" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#573320"/>
+      <stop offset=".45" stop-color="#6a3f26"/>
+      <stop offset="1" stop-color="#3f2415"/>
+    </linearGradient>
+    <radialGradient id="light" cx=".46" cy=".4" r=".78">
+      <stop offset="0" stop-color="#f3b979" stop-opacity=".22"/>
+      <stop offset=".5" stop-color="#c98a52" stop-opacity=".06"/>
+      <stop offset=".8" stop-color="#140a04" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#0c0603" stop-opacity=".62"/>
+    </radialGradient>
+    <filter id="g1" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.0018 0.05" numOctaves="5" seed="11"/>
+      <feColorMatrix values="0 0 0 0 .13  0 0 0 0 .07  0 0 0 0 .035  2.2 0 0 0 -0.9"/>
+    </filter>
+    <filter id="g2" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.0016 0.055" numOctaves="5" seed="42"/>
+      <feColorMatrix values="0 0 0 0 .13  0 0 0 0 .07  0 0 0 0 .035  2.2 0 0 0 -0.9"/>
+    </filter>
+    <filter id="g3" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.002 0.045" numOctaves="5" seed="7"/>
+      <feColorMatrix values="0 0 0 0 .13  0 0 0 0 .07  0 0 0 0 .035  2.2 0 0 0 -0.9"/>
+    </filter>
+    <filter id="warm" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.0012 0.02" numOctaves="3" seed="3"/>
+      <feColorMatrix values="0 0 0 0 .78  0 0 0 0 .47  0 0 0 0 .27  2.2 0 0 0 -1.1"/>
+    </filter>
+    <filter id="fibre" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="turbulence" baseFrequency="0.0009 0.42" numOctaves="2" seed="19"/>
+      <feColorMatrix values="0 0 0 0 .09  0 0 0 0 .05  0 0 0 0 .02  3.2 0 0 0 -1.1"/>
+    </filter>
+    <filter id="pores" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.35 1.6" numOctaves="1" seed="5"/>
+      <feColorMatrix values="0 0 0 0 .08  0 0 0 0 .04  0 0 0 0 .02  5 0 0 0 -3.1"/>
+    </filter>
+  </defs>
+  <rect width="1440" height="900" fill="url(#base)"/>
+  <rect width="1440" height="900" filter="url(#warm)"/>
+  <!-- planks: grain seeds alternate so each board reads separately -->
+  <rect y="0" width="1440" height="182" filter="url(#g1)"/>
+  <rect y="182" width="1440" height="176" filter="url(#g2)"/>
+  <rect y="358" width="1440" height="186" filter="url(#g3)"/>
+  <rect y="544" width="1440" height="178" filter="url(#g1)" transform="translate(0 0)"/>
+  <rect y="722" width="1440" height="178" filter="url(#g2)"/>
+  <rect width="1440" height="900" filter="url(#fibre)" opacity=".4"/>
+  <rect width="1440" height="900" filter="url(#pores)" opacity=".55"/>
+  <!-- board tone variation -->
+  <rect y="182" width="1440" height="176" fill="#2a160a" opacity=".10"/>
+  <rect y="544" width="1440" height="178" fill="#f0b880" opacity=".04"/>
+  <rect y="722" width="1440" height="178" fill="#2a160a" opacity=".07"/>
+  <!-- seams -->
+  <g stroke-linecap="round">
+    <g stroke="#1b0e06" stroke-width="3" opacity=".85">
+      <path d="M0 182.5 H1440"/><path d="M0 358.5 H1440"/><path d="M0 544.5 H1440"/><path d="M0 722.5 H1440"/>
+    </g>
+    <g stroke="#b07a4b" stroke-width="1" opacity=".22">
+      <path d="M0 185 H1440"/><path d="M0 361 H1440"/><path d="M0 547 H1440"/><path d="M0 725 H1440"/>
+    </g>
+    <g stroke="#1b0e06" stroke-width="2.5" opacity=".75">
+      <path d="M612 0 V182"/><path d="M1190 182 V358"/><path d="M296 182 V358"/><path d="M880 358 V544"/><path d="M430 544 V722"/><path d="M1320 544 V722"/><path d="M760 722 V900"/>
+    </g>
+    <g stroke="#b07a4b" stroke-width="1" opacity=".18">
+      <path d="M614.5 0 V182"/><path d="M1192.5 182 V358"/><path d="M298.5 182 V358"/><path d="M882.5 358 V544"/><path d="M432.5 544 V722"/><path d="M1322.5 544 V722"/><path d="M762.5 722 V900"/>
+    </g>
+  </g>
+  <rect width="1440" height="900" fill="url(#light)"/>
+</svg>

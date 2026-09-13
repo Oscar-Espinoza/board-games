@@ -170,6 +170,10 @@
           aria-busy={session.pending}
         >
           <Board
+            roomId={room.id}
+            maxPlayers={metadata?.maxPlayers ?? 8}
+            onInvite={invite}
+            {copied}
             view={room.game}
             playerId={room.playerId}
             players={room.players}

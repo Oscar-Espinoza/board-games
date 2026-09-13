@@ -11,3 +11,8 @@ Rendered on 2026-09-13 from the Table Light artboards at 1:1, no scaling. Artwor
 - `moments.webp`: 1400×800, storyboard of the six beats worth animating, each labelled with the event that already drives it.
 
 The three directions these came from are on a design canvas outside the repository. Table Light is the accepted one; see [ADR 017](../../adr/017-azul-table-light.md).
+
+The corrected written specification supersedes mockup geometry: retain existing
+corner controls; “in hand” is an uncommitted preview; the main screen never scrolls.
+Compact layouts use colour and destination dialogs. Desktop places the supply
+and playable board side by side below all opponents. See [mobile](../mobile.md).

@@ -1,0 +1,987 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <script src="./support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&amp;display=swap"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #2a1a10;
+            font-family: 'Archivo', Arial, Helvetica, sans-serif;
+          }
+          a {
+            color: #f2e9dc;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #ffffff;
+          }
+          .glass {
+            background: linear-gradient(
+              180deg,
+              rgba(36, 29, 25, 0.93),
+              rgba(22, 18, 15, 0.93)
+            );
+            border: 1px solid rgba(255, 236, 210, 0.09);
+            border-radius: 8px;
+            box-shadow:
+              inset 0 1px 0 rgba(255, 240, 220, 0.06),
+              0 2px 4px rgba(8, 4, 2, 0.45),
+              0 14px 30px rgba(8, 4, 2, 0.5);
+            backdrop-filter: blur(6px);
+          }
+          .card {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 5px;
+            color: #2b2520;
+            font-size: 21px;
+            font-weight: 700;
+            letter-spacing: 0.015em;
+            text-transform: uppercase;
+            background:
+              url(./paper.svg),
+              radial-gradient(
+                ellipse at 32% 18%,
+                rgba(255, 252, 242, 0.6),
+                rgba(255, 252, 242, 0) 70%
+              ),
+              linear-gradient(172deg, #efe6d3 0%, #e7dbc3 55%, #dacbae 100%);
+            box-shadow:
+              inset 0 1px 0 rgba(255, 255, 255, 0.75),
+              inset 0 -3px 0 rgba(150, 124, 88, 0.5),
+              inset 0 0 20px rgba(140, 105, 60, 0.16),
+              0 2px 1px rgba(20, 10, 5, 0.5),
+              0 9px 14px rgba(20, 10, 5, 0.42);
+            text-shadow: 0 1px 0 rgba(255, 248, 230, 0.55);
+          }
+          .card::after {
+            content: '';
+            position: absolute;
+            inset: 5px;
+            border: 1px solid rgba(120, 95, 60, 0.08);
+            border-radius: 3px;
+            pointer-events: none;
+          }
+          .card.red {
+            color: #fff6f0;
+            background:
+              url(./paper.svg),
+              radial-gradient(
+                ellipse at 28% 22%,
+                rgba(255, 150, 110, 0.35),
+                rgba(255, 150, 110, 0) 65%
+              ),
+              radial-gradient(
+                ellipse at 80% 85%,
+                rgba(120, 20, 10, 0.25),
+                rgba(120, 20, 10, 0) 60%
+              ),
+              linear-gradient(165deg, #e24c3d 0%, #cc3c30 55%, #b5322a 100%);
+            box-shadow:
+              inset 0 1px 0 rgba(255, 190, 170, 0.5),
+              inset 0 -3px 0 rgba(95, 20, 14, 0.55),
+              0 2px 1px rgba(20, 8, 4, 0.5),
+              0 9px 14px rgba(20, 8, 4, 0.42);
+            text-shadow: 0 1px 1px rgba(60, 10, 5, 0.35);
+          }
+          .card.blue {
+            color: #f4f8ff;
+            background:
+              url(./paper.svg),
+              radial-gradient(
+                ellipse at 28% 22%,
+                rgba(120, 180, 255, 0.35),
+                rgba(120, 180, 255, 0) 65%
+              ),
+              radial-gradient(
+                ellipse at 80% 85%,
+                rgba(8, 30, 90, 0.25),
+                rgba(8, 30, 90, 0) 60%
+              ),
+              linear-gradient(165deg, #2b7de8 0%, #1d67d4 55%, #1756b9 100%);
+            box-shadow:
+              inset 0 1px 0 rgba(170, 205, 255, 0.5),
+              inset 0 -3px 0 rgba(10, 35, 95, 0.55),
+              0 2px 1px rgba(4, 8, 20, 0.5),
+              0 9px 14px rgba(10, 8, 6, 0.42);
+            text-shadow: 0 1px 1px rgba(5, 20, 60, 0.35);
+          }
+          .card.assassin {
+            color: #f1ece4;
+            background:
+              url(./paper.svg),
+              radial-gradient(
+                ellipse at 28% 22%,
+                rgba(255, 255, 255, 0.08),
+                rgba(255, 255, 255, 0) 65%
+              ),
+              linear-gradient(165deg, #383533 0%, #252322 55%, #1a1918 100%);
+            box-shadow:
+              inset 0 1px 0 rgba(255, 255, 255, 0.14),
+              inset 0 -3px 0 rgba(0, 0, 0, 0.6),
+              0 2px 1px rgba(0, 0, 0, 0.55),
+              0 9px 14px rgba(10, 5, 2, 0.45);
+            text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+          }
+          .card.red::after,
+          .card.blue::after,
+          .card.assassin::after {
+            border-color: rgba(255, 255, 255, 0.07);
+          }
+          .nav-muted {
+            color: #c7bcae;
+          }
+          .divider {
+            width: 1px;
+            height: 30px;
+            background: rgba(255, 240, 220, 0.12);
+          }
+          .dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            flex: none;
+            box-shadow:
+              inset 0 -2px 3px rgba(0, 0, 0, 0.25),
+              0 1px 2px rgba(0, 0, 0, 0.4);
+          }
+          .dot.red {
+            background: radial-gradient(
+              circle at 35% 30%,
+              #f47a6c,
+              #d9473b 60%,
+              #b5352b
+            );
+          }
+          .dot.blue {
+            background: radial-gradient(
+              circle at 35% 30%,
+              #5ea0f5,
+              #2c74de 60%,
+              #1d5bbd
+            );
+          }
+          .chip {
+            min-width: 26px;
+            height: 24px;
+            padding: 0 7px;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            background: #3a3430;
+            border: 1px solid rgba(255, 240, 220, 0.1);
+            color: #f2e9dc;
+            font-size: 15px;
+            font-weight: 600;
+          }
+          .guess {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: #7ccf73;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+          }
+          .team-red {
+            background:
+              url(./paper.svg),
+              radial-gradient(
+                ellipse at 30% 20%,
+                rgba(220, 80, 60, 0.35),
+                rgba(220, 80, 60, 0) 70%
+              ),
+              linear-gradient(160deg, #a52f29 0%, #8a2420 55%, #6f1d1a 100%);
+          }
+          .team-blue {
+            background:
+              url(./paper.svg),
+              radial-gradient(
+                ellipse at 70% 20%,
+                rgba(90, 160, 255, 0.35),
+                rgba(90, 160, 255, 0) 70%
+              ),
+              linear-gradient(160deg, #2069d6 0%, #1a57bb 55%, #16489c 100%);
+          }
+          .key {
+            border-radius: 2px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          position: relative;
+          width: 1440px;
+          height: 900px;
+          overflow: hidden;
+          background: #3f2415;
+          color: #f2e9dc;
+        "
+      >
+        <!-- table surface -->
+        <img
+          src="wood.svg"
+          alt=""
+          style="
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 1440px;
+            height: 900px;
+          "
+        />
+
+        <!-- objects on the table (no writing on any of them) -->
+        <img
+          src="book.svg"
+          alt=""
+          style="
+            position: absolute;
+            left: 1232px;
+            top: 18px;
+            width: 300px;
+            transform: rotate(-9deg);
+            filter: brightness(0.42) saturate(1.4);
+          "
+        />
+        <img
+          src="book.svg"
+          alt=""
+          style="
+            position: absolute;
+            left: 1196px;
+            top: 44px;
+            width: 286px;
+            transform: rotate(-17deg);
+          "
+        />
+        <img
+          src="sprig.svg"
+          alt=""
+          style="
+            position: absolute;
+            left: 1062px;
+            top: 66px;
+            width: 176px;
+            transform: rotate(-8deg);
+          "
+        />
+        <img
+          src="mug.svg"
+          alt=""
+          style="position: absolute; left: -66px; top: 148px; width: 240px"
+        />
+        <img
+          src="notepad.svg"
+          alt=""
+          style="position: absolute; left: -26px; top: 540px; width: 232px"
+        />
+        <img
+          src="book.svg"
+          alt=""
+          style="
+            position: absolute;
+            left: 1112px;
+            top: 722px;
+            width: 296px;
+            transform: rotate(-11deg);
+          "
+        />
+
+        <!-- header -->
+        <header
+          class="glass"
+          style="
+            position: absolute;
+            left: 8px;
+            top: 6px;
+            width: 1424px;
+            height: 72px;
+            box-sizing: border-box;
+            padding: 0 28px 0 96px;
+            display: flex;
+            align-items: center;
+            gap: 56px;
+            border-radius: 10px;
+          "
+        >
+          <div style="display: flex; align-items: center; gap: 12px">
+            <svg width="28" height="28" viewBox="0 0 26 26" fill="#f4ede3">
+              <circle cx="7.6" cy="7.6" r="5.4"></circle>
+              <circle cx="18.4" cy="7.6" r="5.4"></circle>
+              <circle cx="7.6" cy="18.4" r="5.4"></circle>
+              <circle cx="18.4" cy="18.4" r="5.4"></circle>
+            </svg>
+            <span
+              style="
+                font-size: 27px;
+                font-weight: 700;
+                letter-spacing: -0.01em;
+                color: #f6efe5;
+              "
+              >Codenames</span
+            >
+          </div>
+          <nav
+            style="
+              display: flex;
+              align-items: center;
+              gap: 36px;
+              font-size: 15px;
+              font-weight: 500;
+            "
+          >
+            <a href="#" style="color: #ffffff; font-weight: 600">Play</a>
+            <a href="#" class="nav-muted">How to Play</a>
+            <a href="#" class="nav-muted">About</a>
+          </nav>
+          <div
+            style="
+              margin-left: auto;
+              display: flex;
+              align-items: center;
+              gap: 22px;
+              font-size: 14px;
+              color: #d9cfc2;
+            "
+          >
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span>Room: Sunset-7F</span>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#d9cfc2"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"
+                ></path>
+                <path
+                  d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"
+                ></path>
+              </svg>
+            </div>
+            <div class="divider"></div>
+            <div style="display: flex; align-items: center; gap: 9px">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="#d9cfc2">
+                <circle cx="9" cy="8" r="3.6"></circle>
+                <path d="M2 20c0-4 3.2-6.5 7-6.5s7 2.5 7 6.5z"></path>
+                <circle cx="16.6" cy="8.6" r="3"></circle>
+                <path
+                  d="M14.8 13.7c.6-.1 1.1-.2 1.7-.2 3.3 0 5.5 2.2 5.5 5.8V20h-4.6c0-2.6-1-4.5-2.6-5.8z"
+                ></path>
+              </svg>
+              <span>6/8</span>
+            </div>
+            <div class="divider"></div>
+            <div style="display: flex; align-items: center; gap: 11px">
+              <div
+                style="
+                  width: 36px;
+                  height: 36px;
+                  border-radius: 50%;
+                  background: linear-gradient(160deg, #3a82ee, #1f60cc);
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  color: #ffffff;
+                  font-size: 13px;
+                  font-weight: 700;
+                  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+                "
+              >
+                JS
+              </div>
+              <div
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 2px;
+                  line-height: 1.15;
+                "
+              >
+                <span style="color: #f2e9dc; font-size: 14px; font-weight: 600"
+                  >Jordan</span
+                >
+                <span
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    color: #b7ab9b;
+                    font-size: 12px;
+                  "
+                  >Online
+                  <span
+                    style="
+                      width: 8px;
+                      height: 8px;
+                      border-radius: 50%;
+                      background: #4cc45a;
+                      box-shadow: 0 0 6px rgba(76, 196, 90, 0.6);
+                    "
+                  ></span
+                ></span>
+              </div>
+            </div>
+            <div class="divider"></div>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="#e8dfd2">
+              <path
+                fill-rule="evenodd"
+                d="M10.3 2h3.4l.5 2.6c.7.2 1.3.5 1.9.9l2.4-1.2 2.4 2.4-1.2 2.4c.4.6.7 1.2.9 1.9l2.6.5v3.4l-2.6.5c-.2.7-.5 1.3-.9 1.9l1.2 2.4-2.4 2.4-2.4-1.2c-.6.4-1.2.7-1.9.9L13.7 22h-3.4l-.5-2.6c-.7-.2-1.3-.5-1.9-.9l-2.4 1.2-2.4-2.4 1.2-2.4c-.4-.6-.7-1.2-.9-1.9L.8 13.7v-3.4l2.6-.5c.2-.7.5-1.3.9-1.9L3.1 5.5l2.4-2.4 2.4 1.2c.6-.4 1.2-.7 1.9-.9zM12 8.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2z"
+              ></path>
+            </svg>
+          </div>
+        </header>
+
+        <!-- team status -->
+        <section
+          style="
+            position: absolute;
+            left: 226px;
+            top: 92px;
+            width: 804px;
+            height: 114px;
+            display: flex;
+            gap: 12px;
+          "
+        >
+          <div
+            class="team-red"
+            style="
+              width: 236px;
+              box-sizing: border-box;
+              padding: 16px 22px;
+              border-radius: 7px;
+              border: 1px solid rgba(255, 170, 150, 0.18);
+              box-shadow:
+                inset 0 1px 0 rgba(255, 190, 170, 0.2),
+                0 2px 3px rgba(10, 4, 2, 0.5),
+                0 14px 26px rgba(10, 4, 2, 0.5);
+              display: flex;
+              flex-direction: column;
+              gap: 4px;
+            "
+          >
+            <span style="font-size: 19px; font-weight: 600; color: #fbe9e4"
+              >Red Team</span
+            >
+            <div style="display: flex; align-items: center; gap: 14px">
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="#f19b90">
+                <circle cx="9" cy="8" r="3.6"></circle>
+                <path d="M2 20c0-4 3.2-6.5 7-6.5s7 2.5 7 6.5z"></path>
+                <circle cx="16.6" cy="8.6" r="3"></circle>
+                <path
+                  d="M14.8 13.7c.6-.1 1.1-.2 1.7-.2 3.3 0 5.5 2.2 5.5 5.8V20h-4.6c0-2.6-1-4.5-2.6-5.8z"
+                ></path>
+              </svg>
+              <span
+                style="
+                  font-size: 42px;
+                  font-weight: 700;
+                  line-height: 1;
+                  color: #ffffff;
+                "
+                >6</span
+              >
+            </div>
+            <span style="font-size: 14px; color: #f2d2cc; padding-left: 48px"
+              >agents remaining</span
+            >
+          </div>
+          <div
+            class="glass"
+            style="
+              flex: 1;
+              box-sizing: border-box;
+              padding: 14px 24px;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              gap: 9px;
+            "
+          >
+            <span style="font-size: 18px; font-weight: 500; color: #efe6da"
+              >Round 3</span
+            >
+            <div
+              style="
+                width: 256px;
+                height: 38px;
+                border-radius: 5px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: linear-gradient(180deg, #df4c40, #c23a30);
+                box-shadow:
+                  inset 0 1px 0 rgba(255, 200, 190, 0.35),
+                  0 2px 4px rgba(0, 0, 0, 0.35);
+                color: #ffffff;
+                font-size: 19px;
+                font-weight: 600;
+              "
+            >
+              Red Team's Turn
+            </div>
+            <span style="font-size: 14px; color: #bfb3a4"
+              >Give a clue. Your team will guess.</span
+            >
+          </div>
+          <div
+            class="team-blue"
+            style="
+              width: 236px;
+              box-sizing: border-box;
+              padding: 16px 22px;
+              border-radius: 7px;
+              border: 1px solid rgba(150, 190, 255, 0.2);
+              box-shadow:
+                inset 0 1px 0 rgba(170, 205, 255, 0.25),
+                0 2px 3px rgba(4, 4, 10, 0.5),
+                0 14px 26px rgba(8, 4, 2, 0.5);
+              display: flex;
+              flex-direction: column;
+              align-items: flex-end;
+              gap: 4px;
+            "
+          >
+            <span style="font-size: 19px; font-weight: 600; color: #eaf2ff"
+              >Blue Team</span
+            >
+            <div style="display: flex; align-items: center; gap: 14px">
+              <span
+                style="
+                  font-size: 42px;
+                  font-weight: 700;
+                  line-height: 1;
+                  color: #ffffff;
+                "
+                >5</span
+              >
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="#8fbdf7">
+                <circle cx="9" cy="8" r="3.6"></circle>
+                <path d="M2 20c0-4 3.2-6.5 7-6.5s7 2.5 7 6.5z"></path>
+                <circle cx="16.6" cy="8.6" r="3"></circle>
+                <path
+                  d="M14.8 13.7c.6-.1 1.1-.2 1.7-.2 3.3 0 5.5 2.2 5.5 5.8V20h-4.6c0-2.6-1-4.5-2.6-5.8z"
+                ></path>
+              </svg>
+            </div>
+            <span style="font-size: 14px; color: #cfe0fa; padding-right: 48px"
+              >agents remaining</span
+            >
+          </div>
+        </section>
+
+        <!-- word grid -->
+        <main
+          style="
+            position: absolute;
+            left: 196px;
+            top: 226px;
+            width: 864px;
+            height: 462px;
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            grid-template-rows: repeat(5, minmax(0, 1fr));
+            gap: 11px 12px;
+            transform: perspective(1800px) rotateX(7deg);
+            transform-origin: 50% 70%;
+          "
+        >
+          <div class="card red">Apple</div>
+          <div class="card">Chair</div>
+          <div class="card">Moon</div>
+          <div class="card blue">River</div>
+          <div class="card" style="transform: rotate(0.4deg)">Plane</div>
+          <div class="card">Train</div>
+          <div class="card" style="transform: rotate(-0.5deg)">Snow</div>
+          <div class="card">Bottle</div>
+          <div class="card red">Dance</div>
+          <div class="card">Bridge</div>
+          <div class="card">Clock</div>
+          <div class="card">Plant</div>
+          <div class="card" style="transform: rotate(0.45deg)">Beach</div>
+          <div class="card">Ring</div>
+          <div class="card blue">Fish</div>
+          <div class="card" style="transform: rotate(-0.4deg)">Paper</div>
+          <div class="card">Dragon</div>
+          <div class="card red">School</div>
+          <div class="card assassin">Knife</div>
+          <div class="card">Cloud</div>
+          <div class="card blue" style="transform: rotate(-0.5deg)">Foot</div>
+          <div class="card">Star</div>
+          <div class="card">Field</div>
+          <div class="card" style="transform: rotate(0.4deg)">Engine</div>
+          <div class="card">Smile</div>
+        </main>
+
+        <!-- players -->
+        <section
+          class="glass"
+          style="
+            position: absolute;
+            left: 206px;
+            top: 722px;
+            width: 512px;
+            height: 156px;
+            box-sizing: border-box;
+            padding: 18px 26px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+          "
+        >
+          <span style="font-size: 18px; font-weight: 600; color: #f2e9dc"
+            >Players (6)</span
+          >
+          <div
+            style="
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              gap: 12px 24px;
+              font-size: 15px;
+              color: #e6dccd;
+            "
+          >
+            <div style="display: flex; align-items: center; gap: 12px">
+              <span class="dot red"></span>alex (Spymaster)
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px">
+              <span class="dot blue"></span>morgan (Spymaster)
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px">
+              <span class="dot red"></span>taylor
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px">
+              <span class="dot blue"></span>casey
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px">
+              <span class="dot red"></span>jordan (You)
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px">
+              <span class="dot blue"></span>riley
+            </div>
+          </div>
+        </section>
+
+        <!-- spymaster key -->
+        <section
+          class="glass"
+          style="
+            position: absolute;
+            left: 732px;
+            top: 722px;
+            width: 328px;
+            height: 156px;
+            box-sizing: border-box;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+          "
+        >
+          <div style="display: flex; align-items: center; gap: 10px">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#e8dfd2"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"
+              ></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            <span style="font-size: 16px; font-weight: 600; color: #f2e9dc"
+              >Spymaster Mode</span
+            >
+            <div
+              style="
+                margin-left: auto;
+                width: 46px;
+                height: 24px;
+                border-radius: 12px;
+                background: linear-gradient(180deg, #45b653, #369a44);
+                box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+                display: flex;
+                align-items: center;
+                justify-content: flex-end;
+                padding: 2px;
+                box-sizing: border-box;
+              "
+            >
+              <div
+                style="
+                  width: 20px;
+                  height: 20px;
+                  border-radius: 50%;
+                  background: #f7f4ef;
+                  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+                "
+              ></div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 18px">
+            <div
+              style="
+                width: 118px;
+                height: 90px;
+                box-sizing: border-box;
+                padding: 7px;
+                border-radius: 5px;
+                background: #141210;
+                border: 1px solid rgba(255, 240, 220, 0.14);
+                box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+                display: grid;
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+                grid-template-rows: repeat(5, minmax(0, 1fr));
+                gap: 3px;
+              "
+            >
+              <div class="key" style="background: #d6493d"></div>
+              <div class="key" style="background: #d8cab0"></div>
+              <div class="key" style="background: #2b73dc"></div>
+              <div class="key" style="background: #2b73dc"></div>
+              <div class="key" style="background: #d6493d"></div>
+              <div class="key" style="background: #d8cab0"></div>
+              <div class="key" style="background: #2b73dc"></div>
+              <div class="key" style="background: #d6493d"></div>
+              <div class="key" style="background: #d6493d"></div>
+              <div class="key" style="background: #d8cab0"></div>
+              <div class="key" style="background: #d6493d"></div>
+              <div class="key" style="background: #d8cab0"></div>
+              <div class="key" style="background: #2b73dc"></div>
+              <div class="key" style="background: #d6493d"></div>
+              <div class="key" style="background: #2b73dc"></div>
+              <div class="key" style="background: #d8cab0"></div>
+              <div class="key" style="background: #d6493d"></div>
+              <div class="key" style="background: #d6493d"></div>
+              <div
+                class="key"
+                style="
+                  background: #050505;
+                  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+                "
+              ></div>
+              <div class="key" style="background: #2b73dc"></div>
+              <div class="key" style="background: #2b73dc"></div>
+              <div class="key" style="background: #d8cab0"></div>
+              <div class="key" style="background: #d6493d"></div>
+              <div class="key" style="background: #2b73dc"></div>
+              <div class="key" style="background: #d8cab0"></div>
+            </div>
+            <p
+              style="
+                margin: 0;
+                font-size: 14px;
+                line-height: 1.55;
+                color: #d4c9ba;
+              "
+            >
+              You see the key.<br />The other team doesn't.
+            </p>
+          </div>
+        </section>
+
+        <!-- clue history -->
+        <aside
+          class="glass"
+          style="
+            position: absolute;
+            left: 1080px;
+            top: 196px;
+            width: 326px;
+            box-sizing: border-box;
+            padding: 18px 22px 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+          "
+        >
+          <div
+            style="
+              display: flex;
+              align-items: baseline;
+              justify-content: space-between;
+            "
+          >
+            <span style="font-size: 19px; font-weight: 600; color: #f2e9dc"
+              >Clue History</span
+            >
+            <span style="font-size: 12px; color: #a99c8c">Round 3</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 9px">
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-size: 16px;
+              "
+            >
+              <span class="dot red" style="width: 13px; height: 13px"></span>
+              <span style="color: #f26d5f; font-weight: 600">Red</span>
+              <span style="color: #eee4d6">Music</span>
+              <span class="chip">2</span>
+            </div>
+            <div style="display: flex; gap: 16px; padding-left: 23px">
+              <span class="guess"
+                >DANCE
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="#7ccf73"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M3 8.5l3.2 3L13 4.5"></path></svg
+              ></span>
+              <span class="guess"
+                >SCHOOL
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="#7ccf73"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M3 8.5l3.2 3L13 4.5"></path></svg
+              ></span>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 9px">
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-size: 16px;
+              "
+            >
+              <span class="dot blue" style="width: 13px; height: 13px"></span>
+              <span style="color: #5b9ff5; font-weight: 600">Blue</span>
+              <span style="color: #eee4d6">Water</span>
+              <span class="chip">2</span>
+              <span style="margin-left: auto; font-size: 12px; color: #a99c8c"
+                >Round 2</span
+              >
+            </div>
+            <div style="display: flex; gap: 16px; padding-left: 23px">
+              <span class="guess"
+                >RIVER
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="#7ccf73"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M3 8.5l3.2 3L13 4.5"></path></svg
+              ></span>
+              <span class="guess"
+                >FISH
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="#7ccf73"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M3 8.5l3.2 3L13 4.5"></path></svg
+              ></span>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 9px">
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-size: 16px;
+              "
+            >
+              <span class="dot red" style="width: 13px; height: 13px"></span>
+              <span style="color: #f26d5f; font-weight: 600">Red</span>
+              <span style="color: #eee4d6">Time</span>
+              <span class="chip">1</span>
+              <span style="margin-left: auto; font-size: 12px; color: #a99c8c"
+                >Round 1</span
+              >
+            </div>
+            <div style="display: flex; gap: 16px; padding-left: 23px">
+              <span class="guess"
+                >APPLE
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="#7ccf73"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M3 8.5l3.2 3L13 4.5"></path></svg
+              ></span>
+            </div>
+          </div>
+        </aside>
+
+        <!-- plant spills over the header corner -->
+        <img
+          src="plant.svg"
+          alt=""
+          style="
+            position: absolute;
+            left: -20px;
+            top: -16px;
+            width: 240px;
+            pointer-events: none;
+          "
+        />
+      </div>
+    </x-dc>
+    <script
+      data-dc-script
+      data-props='{"$preview":{"width":1440,"height":900}}'
+    >
+      class Component extends DCLogic {}
+    </script>
+  </body>
+</html>

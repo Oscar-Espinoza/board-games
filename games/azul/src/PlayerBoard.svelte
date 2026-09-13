@@ -7,6 +7,7 @@
     type Color,
     type Destination,
   } from './index.js';
+  import { railPosition } from './geometry.js';
   import Tile from './Tile.svelte';
   import { m } from '@board-games/shared/messages';
   let {
@@ -19,7 +20,19 @@
     destination = null,
     choose,
     highlights = [],
+    hiddenLocations = [],
+    fitted = false,
+    density = 'full',
+    interactive = true,
+    anchors = true,
+    displayedScore = board.score,
   }: {
+    fitted?: boolean;
+    hiddenLocations?: string[];
+    density?: 'full' | 'compact';
+    interactive?: boolean;
+    anchors?: boolean;
+    displayedScore?: number;
     board: Board;
     id: string;
     name: string;
@@ -30,6 +43,8 @@
     choose?: (d: Destination) => void;
     highlights?: [number, number][];
   } = $props();
+  const location = (suffix: string) =>
+    anchors ? `${id}/${suffix}` : undefined;
   const descriptionId = $props.id();
   const colorLabels = {
     blue: m.azul_blue,
@@ -49,16 +64,45 @@
           : m.azul_available();
 </script>
 
-<section class="player-board" class:active aria-label={m.azul_board({ name })}>
+<section
+  class="player-board"
+  class:active
+  class:fitted
+  class:compact={density === 'compact'}
+  aria-hidden={density === 'compact' ? true : undefined}
+  aria-label={m.azul_board({ name })}
+>
+  {#if density === 'compact'}<span
+      class="compact-marker"
+      data-azul-location={location('marker')}
+    ></span>{/if}
   <header>
     <span class="name"
-      >{name}{#if marker}<span
-          class="starter"
-          data-azul-location="{id}/marker"
-          title={m.azul_next()}>①</span
-        >{/if}</span
-    ><strong>{board.score}<small> {m.azul_score({ score: '' })}</small></strong>
+      >{name}<span
+        class="starter"
+        class:marker-away={!marker}
+        aria-hidden={!marker}
+        data-azul-location={density === 'full' ? location('marker') : undefined}
+        title={m.azul_next()}>①</span
+      ></span
+    ><strong
+      >{displayedScore}<small> {m.azul_score({ score: '' })}</small></strong
+    >
   </header>
+  <div class="score-rail" aria-label={m.azul_score({ score: displayedScore })}>
+    <div class="rail-ticks" aria-hidden="true">
+      {#each Array(21) as _, i}<span>{i % 4 === 0 ? i * 5 : ''}</span>{/each}
+    </div>
+    <span
+      class="score-marker"
+      style="left:{railPosition(displayedScore)}%"
+      aria-hidden="true"
+    ></span>
+    {#if displayedScore > 100}<span
+        class="score-overflow"
+        aria-label={m.azul_score_overflow({ score: displayedScore })}>100+</span
+      >{/if}
+  </div>
   <div class="board-labels">
     <span>{m.azul_patterns()}</span><span>{m.azul_wall()}</span>
   </div>
@@ -66,29 +110,41 @@
     <div class="patterns">
       {#each board.patterns as pattern, row}
         {@const issue = color ? rowIssue(board, color, row) : null}
-        <button
+        <svelte:element
+          this={interactive ? 'button' : 'div'}
+          role={interactive ? 'button' : 'group'}
           class="pattern"
           class:legal={color && !issue && choose}
           class:selected={destination?.kind === 'pattern' &&
             destination.row === row}
-          disabled={!choose || !color || !!issue}
+          disabled={interactive ? !choose || !color || !!issue : undefined}
           aria-label="{m.azul_line({ row: row + 1 })} · {pattern.count}/{row +
             1} · {pattern.color
             ? colorLabels[pattern.color]()
             : m.azul_empty()} · {issueLabel(issue)}"
           title={issueLabel(issue)}
-          onclick={() => choose?.({ kind: 'pattern', row })}
+          onclick={interactive
+            ? () => choose?.({ kind: 'pattern', row })
+            : undefined}
         >
-          <span class="row-number">{row + 1}</span>
+          <span class="row-number">{row + 1}</span><span
+            class="arrow"
+            aria-hidden="true">▸</span
+          >
           {#if issue}<span class="row-issue">{issueLabel(issue)}</span>{/if}
           {#each Array(row + 1) as _, slot}<span
               class="slot"
-              data-azul-location="{id}/pattern/{row}/{slot}"
+              style:visibility={hiddenLocations.includes(
+                `${id}/pattern/${row}/${slot}`,
+              )
+                ? 'hidden'
+                : undefined}
+              data-azul-location={location(`pattern/${row}/${slot}`)}
               >{#if pattern.color && slot < pattern.count}<Tile
                   color={pattern.color}
                 />{:else}<span class="empty-slot"></span>{/if}</span
             >{/each}
-        </button>
+        </svelte:element>
       {/each}
     </div>
     <div class="wall" aria-label={m.azul_wall()}>
@@ -104,7 +160,7 @@
               color: colorLabels[wallColors[r][c]](),
               status: occupied ? m.azul_occupied() : m.azul_empty(),
             })}
-            data-azul-location="{id}/wall/{r}/{c}"
+            data-azul-location={location(`wall/${r}/${c}`)}
             ><Tile color={wallColors[r][c]} ghost={!occupied} /></span
           >{/each}{/each}
     </div>
@@ -114,12 +170,14 @@
       ? board.floor.map((color) => colorLabels[color]()).join(', ')
       : m.azul_empty()}</span
   >
-  <button
+  <svelte:element
+    this={interactive ? 'button' : 'div'}
+    role={interactive ? 'button' : 'group'}
     class="floor"
     class:legal={color && choose}
     class:selected={destination?.kind === 'floor'}
-    disabled={!choose || !color}
-    onclick={() => choose?.({ kind: 'floor' })}
+    disabled={interactive ? !choose || !color : undefined}
+    onclick={interactive ? () => choose?.({ kind: 'floor' }) : undefined}
     aria-label={m.azul_floor()}
     aria-describedby="{descriptionId}-floor"
   >
@@ -127,14 +185,14 @@
       >{#each penalties as penalty, slot}<span class="floor-space"
           ><small>−{penalty}</small><span
             class="slot"
-            data-azul-location="{id}/floor/{slot}"
+            data-azul-location={location(`floor/${slot}`)}
             >{#if board.floor[slot]}<Tile
                 color={board.floor[slot]}
               />{:else}<span class="empty-slot"></span>{/if}</span
           ></span
         >{/each}</span
     >
-  </button>
+  </svelte:element>
 </section>
 
 <style>
@@ -147,6 +205,7 @@
     white-space: nowrap;
   }
   .player-board {
+    position: relative;
     --tile: 33px;
     --gap: 5px;
     width: 100%;
@@ -182,6 +241,17 @@
   header small {
     font-size: 11px;
     font-weight: 500;
+  }
+  .compact-marker {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    top: 2px;
+    right: 2px;
+    opacity: 0;
+  }
+  .marker-away {
+    opacity: 0;
   }
   .starter {
     display: inline-block;
@@ -341,47 +411,165 @@
     outline: 3px solid #1170a8;
     outline-offset: 2px;
   }
-  @media (max-width: 600px) {
-    .player-board {
-      --tile: 23px;
-      --gap: 3px;
-      padding: 12px 10px 10px;
-    }
-    .mosaic,
-    .board-labels {
-      gap: 11px;
-    }
-    .floor-slots {
-      gap: 4px;
-    }
-    .floor .slot {
-      width: 25px;
-      height: 25px;
-    }
-    .wall {
-      column-gap: 3px;
-    }
-    .pattern {
-      gap: 3px;
-      padding: 1px;
-    }
-    .row-number {
-      font-size: 9px;
-    }
-    .name {
-      font-size: 19px;
-    }
-    header strong {
-      font-size: 24px;
-    }
-    .board-labels {
-      font-size: 9px;
-      letter-spacing: 0.06em;
-    }
+  .player-board {
+    container-type: inline-size;
+    --gap: 2px;
+    padding: 14px 12px 12px;
+    color: var(--azul-ink, #293c40);
+    background: var(--azul-board, #f5ead3);
+    border: 2px solid var(--azul-board-edge, #c9b28c);
+    border-radius: 10px;
+    box-shadow: var(--azul-board-shadow);
   }
-  @media (min-width: 601px) and (max-width: 1100px) {
-    .player-board {
-      --tile: 30px;
-    }
+  .mosaic,
+  .floor {
+    --tile: min(34px, calc((100cqw - 42px) / 10));
+  }
+  .mosaic,
+  .board-labels {
+    gap: 18px;
+  }
+  .name {
+    font-family: var(--azul-title, Georgia, serif);
+  }
+  .row-number,
+  .board-labels,
+  .floor-space small {
+    color: var(--azul-soft-ink, #514c40);
+  }
+  .arrow {
+    position: absolute;
+    right: -14px;
+    font-size: 12px;
+    color: #6b796f;
+  }
+  .floor {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .floor-slots {
+    gap: var(--gap);
+  }
+  .floor .slot {
+    width: var(--tile);
+    height: var(--tile);
+  }
+  .score-rail {
+    position: relative;
+    margin: 4px 8px 20px;
+    border-bottom: 1px solid #716c59;
+    padding-bottom: 6px;
+  }
+  .rail-ticks {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--azul-soft-ink, #514c40);
+  }
+  .rail-ticks span {
+    position: relative;
+    width: 0;
+    display: flex;
+    justify-content: center;
+  }
+  .rail-ticks span::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    height: 3px;
+    border-left: 1px solid #716c59;
+  }
+  .score-marker {
+    position: absolute;
+    bottom: -5px;
+    width: 9px;
+    height: 9px;
+    transform: translateX(-50%);
+    background: #275e71;
+    border: 1px solid #fff8e8;
+    box-shadow: 0 1px 2px #0006;
+  }
+  .score-overflow {
+    position: absolute;
+    right: -8px;
+    top: -15px;
+    font-size: 11px;
+    font-weight: 700;
+    background: #f5ead3;
+  }
+  .compact {
+    padding: 6px;
+    border-width: 1px;
+    border-radius: 5px;
+  }
+  .compact header,
+  .compact .board-labels,
+  .compact .floor-label,
+  .compact .floor-space small,
+  .compact .row-number,
+  .compact .arrow,
+  .compact .rail-ticks,
+  .compact .score-overflow {
+    display: none;
+  }
+  .compact .mosaic,
+  .compact .floor {
+    --tile: calc((100cqw - 18px) / 10);
+    --gap: 1px;
+  }
+  .compact .mosaic {
+    gap: 10px;
+  }
+  .compact .patterns,
+  .compact .wall {
+    grid-template-rows: repeat(5, calc(var(--tile) + 2px));
+    gap: 1px;
+  }
+  .compact .pattern {
+    min-height: 0;
+    padding: 0;
+    border: 0;
+  }
+  .compact .floor {
+    min-height: 0;
+    margin-top: 4px;
+    padding: 0;
+    border: 0;
+  }
+  .compact .score-rail {
+    margin: 3px 3px 8px;
+    padding: 0;
+  }
+  .compact .score-marker {
+    width: 5px;
+    height: 5px;
+    bottom: -3px;
+  }
+  .compact .floor-space {
+    gap: 0;
+  }
+  .fitted:not(.compact) {
+    padding: 8px;
+  }
+  .fitted:not(.compact) header {
+    padding-bottom: 3px;
+  }
+  .fitted:not(.compact) .name {
+    font-size: 18px;
+  }
+  .fitted:not(.compact) header strong {
+    font-size: 22px;
+  }
+  .fitted:not(.compact) .score-rail {
+    margin: 3px 8px 12px;
+  }
+  .fitted:not(.compact) .board-labels {
+    margin-bottom: 3px;
+  }
+  .fitted:not(.compact) .floor {
+    min-height: 44px;
+    margin-top: 3px;
+    padding: 2px;
   }
 </style>

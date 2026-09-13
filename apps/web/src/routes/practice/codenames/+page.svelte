@@ -2,7 +2,6 @@
   import Board from '@board-games/codenames/Board.svelte';
   import {
     practice,
-    seats,
     scenarios,
     type Scenario,
   } from '@board-games/codenames/practice';
@@ -17,16 +16,18 @@
     game = practice(),
     seat = $state(game.actor),
     view = $state(game.view(game.actor)),
-    locale = $state(getLocale());
+    locale = $state(getLocale()),
+    seatCount = $state(4);
+  const seatSizes = [4, 8];
   const displaySeats = $derived.by(() => {
     locale;
-    return seats.map((p, i) => ({
-      ...p,
-      name: `${i < 2 ? m.cn_red() : m.cn_blue()} · ${(i % 2) + 1}`,
+    return view.public.players.map((id, i) => ({
+      ...game.seats.find((p) => p.id === id)!,
+      name: `${i < 2 || (i >= 4 && i % 2 === 0) ? m.cn_red() : m.cn_blue()} · ${i + 1}`,
     }));
   });
   function reset() {
-    game = practice(scenario, locale === 'es' ? 'es' : 'en');
+    game = practice(scenario, locale === 'es' ? 'es' : 'en', seatCount);
     seat = game.actor;
     view = game.view(seat);
     round++;
@@ -67,6 +68,7 @@
                 >{{
                   setup: m.cn_practice_setup,
                   match: m.cn_practice_match,
+                  midgame: m.cn_practice_midgame,
                   final: m.cn_practice_final,
                   assassin: m.cn_practice_assassin,
                 }[id]()}</option
@@ -78,6 +80,14 @@
             bind:value={seat}
             onchange={() => (view = game.view(seat))}
             >{#each displaySeats as p}<option value={p.id}>{p.name}</option
+              >{/each}</select
+          ></label
+        ><label
+          >{m.cn_seats()}<select
+            aria-label={m.cn_seats()}
+            bind:value={seatCount}
+            onchange={reset}
+            >{#each seatSizes as size}<option value={size}>{size}</option
               >{/each}</select
           ></label
         ><button onclick={reset}>{m.cn_reset()}</button><label

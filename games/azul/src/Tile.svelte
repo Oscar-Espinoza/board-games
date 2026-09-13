@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { palette } from './palette.js';
   import type { Color } from './index.js';
   import { m } from '@board-games/shared/messages';
   let {
@@ -19,6 +20,7 @@
 <span
   class="tile {color}"
   class:ghost
+  style="--glaze:{palette[color].glaze};--motif:{palette[color].motif}"
   data-azul-location={location}
   role="img"
   aria-label={labels[color]()}
@@ -96,36 +98,14 @@
     width: 90%;
     height: 90%;
   }
-  .blue {
-    --glaze: #1766a0;
-    --motif: #c9e5f4;
-  }
-  .yellow {
-    --glaze: #edb737;
-    --motif: #7d5015;
-  }
-  .red {
-    --glaze: #ae4235;
-    --motif: #ffddbb;
-  }
-  .black {
-    --glaze: #24313b;
-    --motif: #d6b893;
-  }
-  .white {
-    --glaze: #faf2da;
-    --motif: #368c9e;
-  }
   .marker {
-    --glaze: #f5e8c9;
-    --motif: #15364c;
     border-radius: 50%;
   }
   .ghost {
     opacity: 1;
     box-shadow: none;
     border: 1px dashed #8a9b9e;
-    background: color-mix(in srgb, var(--glaze) 12%, #f6ebd2);
+    background: color-mix(in srgb, var(--glaze) 23%, #f6ebd2);
     color: #386174;
   }
 </style>

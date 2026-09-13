@@ -1,21 +1,17 @@
-import type { Event } from './index.js';
+import { mount, unmount, flushSync } from 'svelte';
+import Tile from './Tile.svelte';
+import type { Presentation, PresentationStep } from './presentation.js';
 export type Bounds = Map<string, DOMRect>;
 export function measure(root: HTMLElement): Bounds {
   const map: Bounds = new Map();
   root.querySelectorAll<HTMLElement>('[data-azul-location]').forEach((el) => {
+    if (el.closest('dialog')) return;
     const r = el.getBoundingClientRect();
-    if (r.width && r.height) map.set(el.dataset.azulLocation!, r);
+    if (r.width && r.height && !map.has(el.dataset.azulLocation!))
+      map.set(el.dataset.azulLocation!, r);
   });
   return map;
 }
-const paints = {
-  blue: ['#1766a0', '◆'],
-  yellow: ['#edb737', '☀'],
-  red: ['#ae4235', '❯'],
-  black: ['#24313b', '▦'],
-  white: ['#faf2da', '✿'],
-  marker: ['#f5e8c9', '1'],
-};
 export function ceramicAudio() {
   let context: AudioContext | undefined;
   const sources = new Set<OscillatorNode>();
@@ -89,104 +85,105 @@ export function ceramicAudio() {
   };
 }
 export function tileFlights() {
-  const active = new Set<{ node: HTMLElement; animation: Animation }>();
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  const active = new Set<{
+    node: HTMLElement;
+    animation: Animation;
+    tile: ReturnType<typeof mount>;
+  }>();
+  const timers = new Set<ReturnType<typeof setTimeout>>();
+  function later(run: () => void, delay: number) {
+    const timer = setTimeout(() => {
+      timers.delete(timer);
+      run();
+    }, delay);
+    timers.add(timer);
+  }
   function cancel() {
-    clearTimeout(timer);
-    for (const { node, animation } of active) {
+    timers.forEach(clearTimeout);
+    timers.clear();
+    for (const { node, animation, tile } of active) {
       animation.cancel();
+      void unmount(tile);
       node.remove();
     }
     active.clear();
   }
   function play(
-    events: Event[],
+    plan: Presentation,
     before: Bounds,
     after: Bounds,
+    step: (step: PresentationStep) => void,
     done: () => void,
     sound: ReturnType<typeof ceramicAudio>,
   ) {
     cancel();
-    let duration = 0;
-    const hasWall = events.some((e) => e.type === 'wall');
     const locate = (map: Bounds, id: string) =>
-      map.get(id) ?? map.get(`${id.split('/')[0]}/summary`);
-    let soundedDraft = false;
-    for (const event of events) {
-      if (event.type !== 'travel' && event.type !== 'wall') continue;
-      const start = locate(before, event.from) ?? locate(after, event.from),
-        end = locate(after, event.to) ?? locate(before, event.to);
+      map.get(id) ??
+      (id.startsWith('center/')
+        ? map.get(id.split('/').slice(0, 2).join('/'))
+        : undefined) ??
+      map.get(`${id.split('/')[0]}/summary`);
+    for (const flight of plan.flights) {
+      const start = locate(before, flight.from) ?? locate(after, flight.from),
+        end = locate(after, flight.to) ?? locate(before, flight.to);
       if (!start || !end) continue;
-      const delay =
-        event.type === 'wall'
-          ? 380 + event.row * 230
-          : event.reason === 'deal'
-            ? hasWall
-              ? 1740
-              : 430
-            : event.reason === 'spill'
-              ? 80
-              : 0;
-      const travelTime = event.type === 'wall' ? 240 : 310;
+      const startSize = Math.min(34, start.width, start.height),
+        endSize = Math.min(34, end.width, end.height);
+      const sx = start.x + (start.width - startSize) / 2,
+        sy = start.y + (start.height - startSize) / 2,
+        ex = end.x + (end.width - endSize) / 2,
+        ey = end.y + (end.height - endSize) / 2;
       const node = document.createElement('span');
       node.className = 'azul-flight';
       node.setAttribute('aria-hidden', 'true');
-      const [paint, symbol] = paints[event.color];
-      node.textContent = symbol;
+      node.dataset.from = flight.from;
+      node.dataset.to = flight.to;
+      node.dataset.endpoint = JSON.stringify({ x: ex, y: ey, size: endSize });
       Object.assign(node.style, {
         position: 'fixed',
-        left: `${start.x}px`,
-        top: `${start.y}px`,
-        width: `${Math.min(34, start.width)}px`,
-        height: `${Math.min(34, start.height)}px`,
-        display: 'grid',
-        placeItems: 'center',
-        borderRadius: event.color === 'marker' ? '50%' : '5px',
-        background: paint,
-        color:
-          event.color === 'white' ||
-          event.color === 'yellow' ||
-          event.color === 'marker'
-            ? '#244658'
-            : '#f8eacb',
-        fontSize: '23px',
-        boxShadow: 'inset 0 2px 1px #ffffff88, 1px 4px 6px #0005',
+        left: `${sx}px`,
+        top: `${sy}px`,
+        width: `${startSize}px`,
+        height: `${startSize}px`,
+        transformOrigin: 'top left',
+        display: 'block',
         zIndex: '80',
         pointerEvents: 'none',
       });
+      const tile = mount(Tile, {
+        target: node,
+        props: { color: flight.color },
+      });
+      flushSync();
       document.body.append(node);
       const animation = node.animate(
         [
-          { transform: 'translate(0,0) rotate(-5deg)', opacity: 0 },
+          { transform: 'translate(0,0) scale(1)', opacity: 0 },
           { offset: 0.08, opacity: 1 },
           {
-            transform: `translate(${end.x - start.x}px,${end.y - start.y}px) rotate(0deg)`,
+            transform: `translate(${ex - sx}px,${ey - sy}px) scale(${endSize / startSize})`,
             opacity: 1,
           },
         ],
         {
-          duration: travelTime,
-          delay,
+          duration: flight.duration,
+          delay: flight.at,
           fill: 'both',
           easing: 'cubic-bezier(.2,.7,.2,1)',
         },
       );
-      const item = { node, animation };
+      const item = { node, animation, tile };
       active.add(item);
       animation.onfinish = () => {
+        void unmount(tile);
         node.remove();
         active.delete(item);
       };
-      duration = Math.max(duration, delay + travelTime);
-      if (event.type === 'wall') sound.play('score', delay / 1000);
-      else if (event.reason === 'marker') sound.play('marker');
-      else if (!soundedDraft && event.reason === 'draft') {
-        sound.play('tile');
-        soundedDraft = true;
-      }
+      if (flight.sound) sound.play(flight.sound, flight.at / 1000);
     }
-    timer = setTimeout(done, duration + 50);
-    return duration > 0;
+    for (const entry of plan.steps) later(() => step(entry), entry.at);
+    later(done, plan.duration);
+    return plan.duration > 0;
   }
   return { cancel, play };
 }

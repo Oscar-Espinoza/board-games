@@ -1,6 +1,9 @@
 # ADR 015: Codenames roles, review and private dossiers
 
-Date: 2026-09-12. Status: accepted for implementation.
+Date: 2026-09-12. Status: partially superseded by [ADR 018](018-codenames-voice-table.md).
+
+Clue review, penalties, turn enforcement and history below describe the previous
+mode. ADR 018 replaces them with voice-led play; role consent and privacy remain.
 
 ## Context
 

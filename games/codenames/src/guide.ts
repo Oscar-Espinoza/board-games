@@ -1,8 +1,8 @@
 import { m } from '@board-games/shared/messages';
+// Chapters match the authoritative setup → clue → guessing → finished model.
 const ids = [
   'setup',
   'clues',
-  'review',
   'guess',
   'budget',
   'finish',

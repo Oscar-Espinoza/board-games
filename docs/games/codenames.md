@@ -1,65 +1,76 @@
 # Codenames
 
-Four to eight seated players form two teams and choose their own roles: exactly one spymaster
-and at least one operative per team. Uneven teams are legal. The host chooses
-English or Spanish board words and the abbreviation/multiword-name agreements
-when creating a room. Everyone sees those fixed options before readying.
-Changing role invalidates all readiness; a disconnected seat prevents dealing.
-A replaced setup seat retains its assignment but requires fresh consent from all.
-After the deal, roles and board language are immutable until host rematch.
+4–8 friends form two teams, each with exactly one spymaster and at least one
+operative. Everyone chooses a role and confirms versioned readiness. Role changes
+clear consent; absent seats prevent the deal. The fixed board language is English
+or Spanish. A random starting team receives 9 agents; the other 8, plus 7 civilians
+and 1 assassin. Operatives receive only words and revealed identities. Only
+spymasters receive the hidden key, regardless of host status.
 
-A new board contains 25 distinct independently curated words, nine starting-team
-agents, eight opposing agents, seven civilians and one assassin. Randomness is
-injected; words, starting team and identity arrangement are shuffled separately.
-No key exists during setup. Both spymasters receive the key, operatives do not.
-Hosting grants no extra game information. Board words never change when interface
-locale changes. Local practice also preserves its clue, reveals and phase while
-changing the interface language.
+## Clues and turns
 
-The active spymaster gives a meaning-based clue and count (0–9 or unlimited).
-NFC-normalized Unicode clues preserve accents, reject invisible/control characters
-and have an 80-character limit. Exact-word and multiple-word warnings are advisory:
-the opposing spymaster judges semantic legality and agreed exceptions. Acceptance
-opens guessing; rejection permits the opponent to reveal one own agent or skip,
-then give their next clue. This mandatory pre-guess review is an app convention.
-There is no retroactive challenge, undo, target marking or host override.
+Phases are `setup`, `clue`, `guessing`, `finished`. The active team's spymaster
+submits a word and count. Words are NFC-normalized and trimmed, 1–80 graphemes,
+without control/format characters. Counts are integers 0–9 or `unlimited`.
+The app stores clues; the group judges semantic legality aloud. There is no clue
+review, penalty or agreement-option subsystem. Normal clues should concern meaning,
+not spelling, position, gestures, or unrevealed words and their forms.
 
-An operative selects locally, then explicitly confirms a reveal. The first valid
-server intention wins competing guesses. At least one guess is required before
-ending a turn. A finite clue allows count plus one guesses; zero and unlimited
-have no numerical cap. An own agent allows continuing; a civilian or enemy ends
-the turn. The assassin immediately awards victory to the opposite team. Revealing
-all agents wins immediately, including an opponent's reveal or penalty benefit.
-Finished boards expose the whole key and become inert. Host rematch creates fresh
-team setup, consent and a new board.
+Only active-team operatives may select and confirm an unrevealed word after a clue.
+A finite clue permits count + 1 guesses, including earlier clues. Zero and unlimited
+remove the numerical cap. Make at least one guess before End turn becomes available.
+Own agents allow continued guessing within the budget. A civilian, opposing agent,
+exhausted finite budget or End turn hands off: active team switches, turn increments,
+clue clears, and the other spymaster gives a clue. An absent required actor blocks
+their actions; hosts have no substitute powers.
 
-Accepted events and public history contain only published clues and revealed
-identities. History retains the most recent 200 entries. Presentation sequences
-are independent of room revisions; initial loads, reconnects, gaps, role/round
-changes, hidden tabs, resizing and motion changes establish a fresh baseline.
-Motion decorates current state without delaying actions. Sound defaults enabled,
-but context creation/resume requires a user gesture. Only sound/volume/motion
-preferences are stored locally; never keys or game snapshots.
+A team's last agent immediately wins for that team, even if the opponent revealed
+it. The assassin immediately loses for the active authenticated operative's team.
+These results precede handoffs. Everyone sees the full key after finishing; only
+the host may start a rematch with fresh roles and consent.
 
-`/practice/codenames` is local role-switching training: full case, team setup,
-final-agent and assassin scenarios. It never supplies multiplayer initialization.
-Original SVG/CSS art and the searchable field manual contain no live private data.
+## History, privacy and sessions
 
-## Sources
+Newest-first public history records team, turn, clue/count and every confirmed
+guess's word/index/revealed identity. It contains no unrevealed identity. Own guesses
+have a success mark; civilian, opponent and assassin guesses have distinct treatment
+and accessible identity labels. Key permutations must leave operative payloads
+identical. Private keys, public snapshots and history are explicitly projected.
 
-- [CGE classic English rules, EN 30](https://filemanager.czechgames.com/storage/files/codenames/rules/CN%20rulebook%20EN%2030.pdf)
-- [CGE/Devir Spanish rules, ES 07](https://filemanager.czechgames.com/storage/files/codenames/rules/CN%20rulebook%20ES%2007.pdf)
+The room binds actor identity. Selection is local; it is cleared on state changes,
+disconnect/reconnect, resize, visibility changes, errors and match changes.
+The event gate suppresses duplicate/gapped/reconnected presentation. Only unchanged,
+uncommitted setup readiness can retry stale revisions (at most three attempts,
+stable action ID). Clues, guesses and end-turn never automatically retry.
+Reserved seats recover their role; expired reservations may be replaced. Setup
+replacements renew everyone's consent. Host promotion never grants secrets.
 
-These sources were verified in the preceding planning session. The generated key,
-4–8 application capacity and explicit clue review are digital app conventions.
+## Table and accessibility
 
-## Validation
+Header: real room/invite, seat count, viewer, Rules, About and Settings. Team panels
+show exact remaining counts; the centre shows round, active team, clue and guesses.
+Revealed cards keep coloured paper word faces. Spymaster display preference persists
+locally; the actual key never reaches operatives until the finished public board.
+Players are grouped by team, including reserved/disconnected states. No chat.
 
-Seeded rules, malformed intentions, all win paths, role permissions, presence,
-metamorphic operative privacy, detached projection, bounded history and event
-sequence behavior have automated coverage. Real Socket.IO coverage exercises
-operative-host privacy, forged actors, competing guesses, stale/duplicate/round
-intention handling, authenticated synchronization, reconnection and fresh rematch.
-Browser results and remaining manual checks are recorded in the implementation
-handoff and [High review](../handoffs/codenames-review.md). WebKit automation does not replace physical Safari/iOS validation; fluent
-human Spanish review and a human four-person playtest remain required release work.
+The main screen fits 1440×900, 1280×720, 768×1024, 390×844, 360×640 and 320×568.
+Compact screens hide props and move history/players/key to accessible native dialogs;
+clue composition also uses a dialog. Dialog content can scroll internally. All targets
+are at least 44px. Known card identities include SVG symbols as well as colours.
+Text is localized in English and Spanish; Archivo is self-hosted with Spanish glyphs.
+Original generated WebP wood/transparent props are an approved Codenames-only asset
+exception. No gameplay information or writing is baked into them.
+Existing audio unlocks only on a gesture, fails silently and adds no new cues.
+Accepted public events drive reveals, history and turn changes; reduced motion
+suppresses animations. Settings preserves sound/volume/motion/key preferences.
+
+`/practice/codenames` has local setup, full-board clue, coherent round-three history,
+final-agent and assassin fixtures, four/eight seats and role switching. Multiplayer
+initialization and eager catalog metadata never import these fixtures.
+
+[ADR 019](../adr/019-codenames-table-turns.md) supersedes the relevant voice-only
+clauses of [ADR 018](../adr/018-codenames-voice-table.md). See the
+[accepted design](../codenames-redesign/README.md) and
+[validation/evidence](../evidence/codenames/table-redesign/README.md).
+Classic rules: [CGE English](https://filemanager.czechgames.com/storage/files/codenames/rules/CN%20rulebook%20EN%2030.pdf)
+and [CGE Spanish](https://filemanager.czechgames.com/storage/files/codenames/rules/CN%20rulebook%20ES%2007.pdf).

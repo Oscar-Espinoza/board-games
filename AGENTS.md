@@ -42,14 +42,18 @@ controls. Preserve role-private Codenames keys and Sushi hands, picks and Menu
 offers in actual recipient payloads. Their practice fixtures stay separate from
 multiplayer initialization and catalog metadata. Only still-valid simultaneous
 readiness/picks retry coded stale errors, keeping the action ID through at most
-three total attempts; never retry Azul drafts or Codenames guesses automatically.
+three total attempts; never retry Azul drafts or Codenames clues, guesses or end-turn automatically.
 See [ADR 013](docs/adr/013-three-game-delivery.md), [Azul rules](docs/games/azul.md),
 [Codenames rules](docs/games/codenames.md) and
 [Sushi Go Party rules](docs/games/sushi-go-party.md).
 
 Azul's accepted table presentation is Table Light: one circle of factory displays
 at every player count, a loose centre pool inside it, opponents rendered as real
-boards rather than text, and a 0–100 score track. Take colours from the game-owned
+boards rather than text, and a decorative 0–100 score track with uncapped exact scores and a `100+`
+indicator. The main table must fit the viewport without scrolling. Compact layouts
+use whole-factory buttons, a colour dialog and a full-size destination dialog. Compact boards are noninteractive and dialog
+copies emit no table anchors. Stage scoring/cleanup only from accepted public
+events and snapshots; keep the existing audio system. Take colours from the game-owned
 palette module rather than restating hex values, and keep every
 `data-azul-location` anchor — a missing or zero-sized anchor drops its flight
 silently, and the flying tile is styled in JavaScript outside the component tree.
@@ -64,3 +68,13 @@ Reveal ballots and RPS only after all required commitments. Preserve resumable
 actor-owned reactions and explicit host context. Retry only unchanged,
 uncommitted readiness, continuation, ballots and RPS. See
 [ADR 014](docs/adr/014-little-secret.md) and [rules](docs/games/little-secret.md).
+
+Codenames uses setup, clue, guessing and finished phases with authoritative active
+teams, clues, guess budgets and public clue history. Only the active spymaster
+submits clues; only active-team operatives reveal or end turns. Keep mandatory
+first guesses, immediate wins, private unrevealed identities and unanimous setup
+readiness. The fixed 5×5 paper grid, header, team panels, history, players and key
+follow [ADR 019](docs/adr/019-codenames-table-turns.md). Original locally bundled
+WebP materials/transparent props are approved for Codenames only; gameplay and
+interface text remain Svelte/CSS. See the [redesign](docs/codenames-redesign/README.md)
+and [rules](docs/games/codenames.md).

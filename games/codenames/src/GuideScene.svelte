@@ -62,7 +62,7 @@
     <text x="210" y="159" text-anchor="middle" fill="#f5eedc" font-size="18"
       >{step === 2 ? '9 + 8 + 7 + 1 = 25' : m.cn_ready()}</text
     >
-  {:else if lesson.scene === 'clues' || lesson.scene === 'review'}
+  {:else if lesson.scene === 'clues'}
     <rect x="35" y="35" width="255" height="110" rx="7" fill="#f5eedc" /><path
       d="M51 53h104"
       stroke="#b88b47"
@@ -89,12 +89,10 @@
       r="24"
       fill={step === 2 ? '#245c97' : '#b88b47'}
     /><text x="368" y="94" text-anchor="middle" fill="#fff" font-size="25"
-      >{step === 2 ? '✓' : '?'}</text
+      >{step === 2 ? '2' : '…'}</text
     >
     <text x="210" y="173" text-anchor="middle" fill="#f5eedc" font-size="15"
-      >{lesson.scene === 'review' && step === 1
-        ? `${m.cn_allow()} / ${m.cn_reject()}`
-        : m.cn_clueReview()}</text
+      >{m.cn_give_clue()}</text
     >
   {:else if lesson.scene === 'budget'}
     <text x="76" y="50" text-anchor="middle" fill="#f5eedc" font-size="28"
@@ -121,7 +119,7 @@
       stroke-width="5"
     />
     <text x="210" y="164" text-anchor="middle" fill="#f5eedc" font-size="16"
-      >{step === 0 ? m.cn_count() : step === 1 ? '≥ 1' : m.cn_end()}</text
+      >{step === 0 ? m.cn_count() : step === 1 ? '≥ 1' : m.cn_end_turn()}</text
     >
   {:else}
     {#each Array.from({ length: 15 }, (_, i) => i) as i}<g
@@ -140,7 +138,7 @@
             : '#f5eedc'}
         />
         {#if lesson.scene === 'finish' ? i % 4 === 0 && (i !== 8 || step === 2) : step === 2 && i === 7}<path
-            d="M24 28q8-16 16 0M29 12h7v7h-7z"
+            d="M12 17h41v2H12z"
             fill="#f5eedc"
           />{:else}<path
             d="M12 15h41M18 23h29"

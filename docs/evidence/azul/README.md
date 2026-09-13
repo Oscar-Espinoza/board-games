@@ -19,3 +19,11 @@ The table scrolls internally on compact viewports. See [owner handoff](../../han
 The `azul-review-*` images were captured after the High corrections: right-to-left pattern filling, readable empty-wall motifs, compact opponent dialog and explicit empty/occupied accessible wall labels. `azul-review-text-200.webp` is WebKit at 360×640 with every computed HTML font size doubled through browser scripting; it is a text-enlargement stress check, not a claim of Safari or native browser zoom validation. `azul-review-desktop.webp` and `azul-review-scoring.webp` show the final desktop table and corrected axis contributions.
 
 `review-motion.webm` is a short clip from the final real Chromium keyboard/scoring browser journey. It supplements the original Medium recording, whose faint wall previews and pattern direction were subsequently corrected. High independently sampled the original recording at five frames per second and inspected the final recording and updated screenshots.
+
+## Table Light — September 13
+
+The [corrected Table Light implementation](table-light/README.md) has separate
+Chromium/WebKit after-captures, actual motion recordings and endpoint assertions.
+All original captures above remain the before-images. The latest
+[viewport-fit revision](table-light/viewport-fit/README.md) keeps the main screen
+fixed and uses colour/destination dialogs on compact screens.

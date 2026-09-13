@@ -79,23 +79,55 @@ test('real socket authority, operative host privacy, simultaneous guesses, dupli
     expect(game().private.key).toBeUndefined();
     expect(game(1).private.key).toHaveLength(25);
     expect(game().public.board.every((c) => !('identity' in c))).toBe(true);
-    const active = game().public.activeTeam,
+    const active = game().public.startingTeam,
       spy = active === 'red' ? 1 : 3,
       operative = active === 'red' ? 0 : 4,
-      reviewer = active === 'red' ? 3 : 1,
       teammate = active === 'red' ? 2 : 5;
     const old = snapshot(operative);
-    const forged = await raw(sockets[operative]!, 'action', {
+    const forged = await raw(sockets[spy]!, 'action', {
       id: 'forged',
       round: old.round,
       revision: old.revision,
-      playerId: credentials[spy]!.playerId,
-      action: { type: 'submitClue', word: 'mar', count: 1 },
+      playerId: credentials[operative]!.playerId,
+      action: { type: 'guess', card: 0 },
     });
     expect(forged.ok).toBe(false);
     expect(snapshot().revision).toBe(old.revision);
-    await act(spy, { type: 'submitClue', word: 'mar', count: 2 });
-    await act(reviewer, { type: 'reviewClue', allow: true });
+    for (const i of [operative, active === 'red' ? 3 : 1]) {
+      const before = snapshot(i);
+      expect(
+        (
+          await raw(sockets[i]!, 'action', {
+            id: `bad-clue-${i}`,
+            round: before.round,
+            revision: before.revision,
+            playerId: credentials[spy]!.playerId,
+            action: { type: 'submitClue', word: 'Ocean', count: 2 },
+          })
+        ).ok,
+      ).toBe(false);
+      expect(snapshot().revision).toBe(before.revision);
+    }
+    await act(spy, { type: 'submitClue', word: 'Ocean', count: 2 });
+    const wrongTeam = active === 'red' ? 4 : 0;
+    for (const [i, action] of [
+      [wrongTeam, { type: 'guess', card: 0 }],
+      [spy, { type: 'endTurn' }],
+      [operative, { type: 'endTurn' }],
+    ] as const) {
+      const before = snapshot(i);
+      expect(
+        (
+          await raw(sockets[i]!, 'action', {
+            id: `bad-action-${serial++}`,
+            round: before.round,
+            revision: before.revision,
+            action,
+          })
+        ).ok,
+      ).toBe(false);
+      expect(snapshot().revision).toBe(before.revision);
+    }
     const before = snapshot(operative),
       key = game(spy).private.key!;
     const card = key.findIndex((k) => k === active);
@@ -120,6 +152,19 @@ test('real socket authority, operative host privacy, simultaneous guesses, dupli
     expect(results.filter((r) => r.ok)).toHaveLength(1);
     expect(results.find((r) => !r.ok).code).toBe('STALE_REVISION');
     expect(game().public.board.filter((c) => c.revealed)).toHaveLength(1);
+    const afterGuess = snapshot(spy);
+    expect(
+      (
+        await raw(sockets[spy]!, 'action', {
+          id: 'forged-end-turn',
+          round: afterGuess.round,
+          revision: afterGuess.revision,
+          playerId: credentials[operative]!.playerId,
+          action: { type: 'endTurn' },
+        })
+      ).ok,
+    ).toBe(false);
+    expect(snapshot().revision).toBe(afterGuess.revision);
     const rev = snapshot().revision;
     const accepted = results[0].ok ? envelope : competing;
     const acceptedSocket = sockets[results[0].ok ? operative : teammate]!;
@@ -149,6 +194,29 @@ test('real socket authority, operative host privacy, simultaneous guesses, dupli
     expect(
       (rejoined.game as View).public.board.filter((c) => c.revealed),
     ).toHaveLength(1);
+    expect((rejoined.game as View).public.clue).toEqual({
+      word: 'Ocean',
+      count: 2,
+      team: active,
+    });
+    expect((rejoined.game as View).public.used).toBe(1);
+    expect((rejoined.game as View).public.clueHistory[0]!.guesses).toHaveLength(
+      1,
+    );
+    const currentTurn = rooms.view(credentials[0]!.roomId, reconnect.id!);
+    await req(reconnect, 'action', {
+      id: 'end-turn',
+      round: currentTurn.round,
+      revision: currentTurn.revision,
+      action: { type: 'endTurn' },
+    });
+    expect(game(spy).public.activeTeam).not.toBe(active);
+    const nextSpy = active === 'red' ? 3 : 1;
+    await act(nextSpy, { type: 'submitClue', word: 'Forest', count: 1 });
+    const nextOp = active === 'red' ? 4 : 0;
+    const civilian = key.indexOf('civilian');
+    await act(nextOp, { type: 'guess', card: civilian });
+    await act(spy, { type: 'submitClue', word: 'Night', count: 1 });
     const assassin = key.indexOf('assassin');
     const current = rooms.view(credentials[0]!.roomId, reconnect.id!);
     await req(reconnect, 'action', {
@@ -305,7 +373,7 @@ test('setup replacement renews consent; promoted operative and absent/replaced s
         (await act(i, { type: 'ready', version: game().public.setupVersion }))
           .ok,
       ).toBe(true);
-    const spy = game().public.activeTeam === 'red' ? 0 : 2,
+    const spy = game().public.startingTeam === 'red' ? 0 : 2,
       reviewer = spy === 0 ? 2 : 0;
     const key = game(spy).private.key;
     await disconnect(spy);
@@ -335,21 +403,27 @@ test('setup replacement renews consent; promoted operative and absent/replaced s
         })
       ).ok,
     ).toBe(false);
+    expect((await act(spy, { type: 'guess', card: 0 })).ok).toBe(false);
     expect(
       (await act(spy, { type: 'submitClue', word: 'Sea', count: 1 })).ok,
     ).toBe(true);
     await disconnect(reviewer);
-    expect(game().public.phase).toBe('clueReview');
-    expect((await act(1, { type: 'reviewClue', allow: true })).ok).toBe(false);
+    expect(game().public.phase).toBe('guessing');
+    const civilian = key!.indexOf('civilian');
+    expect((await act(spy + 1, { type: 'guess', card: civilian })).ok).toBe(
+      true,
+    );
+    expect(game().public.phase).toBe('clue');
+    expect(game().public.activeTeam).toBe(reviewer === 0 ? 'red' : 'blue');
     seats[reviewer] = await client();
     await req(seats[reviewer]!, 'join', credentials[reviewer]);
-    expect((await act(reviewer, { type: 'reviewClue', allow: true })).ok).toBe(
-      true,
-    );
-    expect(game().public.phase).toBe('guessing');
-    expect(game().public.board.every((cell) => !('identity' in cell))).toBe(
-      true,
-    );
+    expect(game(reviewer).private.key).toEqual(key);
+    expect(game().public.board.filter((c) => c.revealed)).toHaveLength(1);
+    expect(
+      game()
+        .public.board.filter((c) => !c.revealed)
+        .every((c) => !('identity' in c)),
+    ).toBe(true);
   } finally {
     for (const socket of all) socket.disconnect();
     await new Promise<void>((resolve) => server.close(() => resolve()));

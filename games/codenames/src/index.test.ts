@@ -1,7 +1,7 @@
 import { describe, test, expect } from 'bun:test';
 import { create, apply, view, presence } from './index.js';
 import { words } from './words.js';
-import { seeded } from './practice.js';
+import { seeded, practice } from './practice.js';
 import { eventGate } from './presentation.js';
 import type { State, Team } from './types.js';
 const ids = ['rs', 'ro', 'bs', 'bo'];
@@ -32,24 +32,23 @@ function dealt(seed = 1) {
     s = apply(s, p, { type: 'ready', version: s.setupVersion }, random);
   return s;
 }
-function actor(s: State, role = 'spymaster', opponent = false) {
-  return s.players.find(
-    (p) =>
-      s.assignments[p]!.role === role &&
-      (opponent
-        ? s.assignments[p]!.team !== s.activeTeam
-        : s.assignments[p]!.team === s.activeTeam),
-  )!;
+function operative(s: State) {
+  return s.activeTeam === 'red' ? 'ro' : 'bo';
+}
+function spymaster(s: State) {
+  return s.activeTeam === 'red' ? 'rs' : 'bs';
+}
+function clued(s = dealt(), count: number | 'unlimited' = 2, word = 'Ocean') {
+  return action(s, spymaster(s), { type: 'submitClue', word, count });
+}
+function guess(s: State, identity: string) {
+  return action(s, operative(s), {
+    type: 'guess',
+    card: s.board.findIndex((c) => c.identity === identity && !c.revealed),
+  });
 }
 function action(s: State, p: string, a: unknown) {
   return apply(s, p, a, seeded(33));
-}
-function guessing(s = dealt(), count: number | 'unlimited' = 2) {
-  s = action(s, actor(s), { type: 'submitClue', word: 'Ocean', count });
-  return action(s, actor(s, 'spymaster', true), {
-    type: 'reviewClue',
-    allow: true,
-  });
 }
 function reject(s: State, p: string, a: unknown) {
   const before = JSON.stringify(s);
@@ -72,9 +71,13 @@ describe('Codenames authoritative rules', () => {
     const teams = new Set<Team>();
     for (let seed = 1; seed <= 30; seed++) {
       const s = dealt(seed);
-      teams.add(s.activeTeam);
+      teams.add(s.startingTeam);
+      expect(s.phase).toBe('clue');
+      expect(s.turn).toBe(1);
+      expect(s.activeTeam).toBe(s.startingTeam);
+      expect(s.clueHistory).toEqual([]);
       expect(new Set(s.board.map((c) => c.word)).size).toBe(25);
-      expect(s.board.filter((c) => c.identity === s.activeTeam)).toHaveLength(
+      expect(s.board.filter((c) => c.identity === s.startingTeam)).toHaveLength(
         9,
       );
       expect(s.board.filter((c) => c.identity === 'assassin')).toHaveLength(1);
@@ -126,145 +129,176 @@ describe('Codenames authoritative rules', () => {
     expect(replacement.setupVersion).toBe(s.setupVersion + 1);
     expect(replacement.assignments).toEqual(s.assignments);
     const live = dealt();
-    expect(presence(live, [])).toBe(live);
-  });
-  test('clue Unicode normalized; malformed input rejects but exact words and multiword clues are reviewed', () => {
-    let s = dealt();
-    const p = actor(s);
-    for (const word of ['', '  ', 'a\u200bb', 'a\n', 'a'.repeat(81)])
-      reject(s, p, { type: 'submitClue', word, count: 1 });
-    for (const count of [-1, 10, 1.5, '1', Infinity, NaN])
-      reject(s, p, { type: 'submitClue', word: 'word', count });
-    s = action(s, p, {
+    expect(presence(live, []).connectedPlayers).toEqual([]);
+    expect(presence(live, []).phase).toBe(live.phase);
+    reject(presence(live, []), spymaster(live), {
       type: 'submitClue',
-      word: '  Cafe\u0301 del mar  ',
-      count: 0,
+      word: 'Ocean',
+      count: 2,
     });
-    expect(s.clue?.word).toBe('Café del mar');
-    expect(s.phase).toBe('clueReview');
-    const exact = dealt();
-    expect(
-      action(exact, actor(exact), {
+  });
+  test('clues normalize NFC and trim, enforce grapheme length, count and control/format exclusion', () => {
+    const s = dealt();
+    expect(clued(s, 2, '  Cafe\u0301  ').clue?.word).toBe('Café');
+    expect(clued(s, 9, 'é'.repeat(80)).clue?.word).toHaveLength(80);
+    expect(clued(s, 1, 'a\u0301'.repeat(80)).clue?.word).toHaveLength(80);
+    for (const word of [
+      '',
+      '  ',
+      'a'.repeat(81),
+      'line\nfeed',
+      '\tword',
+      'a\u200bb',
+      'a\u202eb',
+      null,
+      42,
+    ])
+      reject(s, spymaster(s), { type: 'submitClue', word, count: 1 });
+    for (const count of [-1, 10, 1.5, NaN, Infinity, '2', null, true])
+      reject(s, spymaster(s), { type: 'submitClue', word: 'Ocean', count });
+    for (const player of ids.filter((p) => p !== spymaster(s)))
+      reject(s, player, {
         type: 'submitClue',
-        word: exact.board[0]!.word,
-        count: 9,
-      }).phase,
-    ).toBe('clueReview');
-  });
-  test('review permissions, no guessing before approval, rejection benefit and skip', () => {
-    let s = dealt();
-    s = action(s, actor(s), { type: 'submitClue', word: 'sky', count: 2 });
-    reject(s, actor(s, 'operative'), { type: 'guess', card: 0 });
-    reject(s, actor(s), { type: 'reviewClue', allow: true });
-    s = action(s, actor(s, 'spymaster', true), {
-      type: 'reviewClue',
-      allow: false,
-    });
-    const p = actor(s, 'spymaster', true);
-    reject(s, p, {
-      type: 'takePenalty',
-      card: s.board.findIndex((c) => c.identity === s.activeTeam),
-    });
-    expect(action(s, p, { type: 'takePenalty', card: null }).phase).toBe(
-      'clue',
-    );
-    const own = s.board.findIndex((c) => c.identity === s.assignments[p]!.team);
-    const n = action(s, p, { type: 'takePenalty', card: own });
-    expect(n.board[own]!.revealed).toBe(true);
-    expect(n.activeTeam).not.toBe(s.activeTeam);
-    reject(n, p, { type: 'reviewClue', allow: true });
-  });
-  test('finite budget plus one, mandatory first guess, unlimited and zero stop rules', () => {
-    for (const count of [0, 'unlimited', 1] as const) {
-      let s = guessing(dealt(), count);
-      reject(s, actor(s, 'operative'), { type: 'endTurn' });
-      reject(s, actor(s), { type: 'guess', card: 0 });
-      const active = s.activeTeam;
-      for (let i = 0; i < 2; i++) {
-        s = action(s, actor(s, 'operative'), {
-          type: 'guess',
-          card: s.board.findIndex((c) => !c.revealed && c.identity === active),
-        });
-      }
-      expect(s.phase).toBe(count === 1 ? 'clue' : 'guessing');
-      if (count !== 1) {
-        expect(s.budget.kind).toBe('unlimited');
-        s = action(s, actor(s, 'operative'), { type: 'endTurn' });
-        expect(s.activeTeam).not.toBe(active);
-      }
-    }
-  });
-  test('civilian and enemy immediately hand off; every malformed card rejects unchanged', () => {
-    for (const kind of ['civilian', 'enemy']) {
-      const s = guessing();
-      const index = s.board.findIndex((c) =>
-        kind === 'civilian'
-          ? c.identity === 'civilian'
-          : c.identity !== s.activeTeam && ['red', 'blue'].includes(c.identity),
-      );
-      const n = action(s, actor(s, 'operative'), {
-        type: 'guess',
-        card: index,
+        word: 'Ocean',
+        count: 1,
+        player: spymaster(s),
       });
-      expect(n.phase).toBe('clue');
-      expect(n.activeTeam).not.toBe(s.activeTeam);
-    }
-    const s = guessing();
-    for (const card of [-1, 25, 1.3, NaN, '0', null])
-      reject(s, actor(s, 'operative'), { type: 'guess', card });
-    const own = s.board.findIndex((c) => c.identity === s.activeTeam);
-    const n = action(s, actor(s, 'operative'), { type: 'guess', card: own });
-    reject(n, actor(n, 'operative'), { type: 'guess', card: own });
+    const n = clued(s);
+    expect(n.phase).toBe('guessing');
+    expect(n.events.map((e) => e.type)).toEqual(['clueSubmitted']);
+    expect(n.clueHistory).toEqual([
+      { turn: 1, team: s.activeTeam, word: 'Ocean', count: 2, guesses: [] },
+    ]);
+    reject(n, spymaster(n), { type: 'submitClue', word: 'Again', count: 1 });
+    for (const type of ['reviewClue', 'takePenalty'])
+      for (const player of ids) reject(n, player, { type });
   });
-  test('assassin, last agent, enemy last agent and penalty win resolve before handoff', () => {
-    for (const scenario of ['assassin', 'own', 'enemy', 'penalty']) {
-      let s = guessing();
-      const target: Team =
-        scenario === 'enemy' || scenario === 'penalty'
-          ? s.activeTeam === 'red'
-            ? 'blue'
-            : 'red'
-          : s.activeTeam;
-      let card = s.board.findIndex(
-        (c) => c.identity === (scenario === 'assassin' ? 'assassin' : target),
-      );
-      if (scenario !== 'assassin')
-        for (const [i, c] of s.board.entries())
-          if (c.identity === target && i !== card) c.revealed = true;
-      if (scenario === 'penalty') s.phase = 'penalty';
-      const n = action(
-        s,
-        actor(
-          s,
-          scenario === 'penalty' ? 'spymaster' : 'operative',
-          scenario === 'penalty',
-        ),
-        { type: scenario === 'penalty' ? 'takePenalty' : 'guess', card },
-      );
-      expect(n.phase).toBe('finished');
-      expect(n.result?.team).toBe(
-        scenario === 'assassin'
-          ? s.activeTeam === 'red'
-            ? 'blue'
-            : 'red'
-          : target,
-      );
-      expect(view(n, 'ro').public.board.every((c) => c.identity)).toBe(true);
-      reject(n, 'rs', { type: 'submitClue', word: 'later', count: 1 });
+  test('finite budget includes one extra guess, first guess is mandatory and handoff resets state', () => {
+    let s = clued(dealt(), 1);
+    expect(s.budget).toEqual({ kind: 'finite', cap: 2 });
+    reject(s, operative(s), { type: 'endTurn' });
+    const team = s.activeTeam;
+    s = guess(s, team);
+    expect(s.used).toBe(1);
+    for (const player of ids.filter((p) => p !== operative(s)))
+      reject(s, player, { type: 'endTurn' });
+    const ended = action(s, operative(s), { type: 'endTurn' });
+    expect(ended.phase).toBe('clue');
+    expect(ended.turn).toBe(2);
+    expect(ended.activeTeam).not.toBe(team);
+    expect(ended.clue).toBeNull();
+    expect(ended.used).toBe(0);
+    expect(ended.events.map((e) => e.type)).toEqual(['turnEnded']);
+    reject(ended, operative(ended), { type: 'endTurn' });
+    s = guess(s, team);
+    expect(s.phase).toBe('clue');
+    expect(s.events.map((e) => e.type)).toEqual(['cardRevealed', 'turnEnded']);
+    expect(s.clueHistory[0]!.guesses).toHaveLength(2);
+    s = clued(s, 3);
+    expect(s.clueHistory).toHaveLength(2);
+    expect(s.clueHistory[1]!.turn).toBe(2);
+  });
+  test('zero and unlimited remove numerical limit, civilian and opposing cards still hand off', () => {
+    for (const count of [0, 'unlimited'] as const) {
+      let s = clued(dealt(), count);
+      expect(s.budget).toEqual({ kind: 'unlimited' });
+      for (let i = 0; i < 4; i++) s = guess(s, s.activeTeam);
+      expect(s.used).toBe(4);
+      expect(s.phase).toBe('guessing');
+      for (const identity of [
+        'civilian',
+        s.activeTeam === 'red' ? 'blue' : 'red',
+      ] as const) {
+        const n = guess(s, identity);
+        expect(n.phase).toBe('clue');
+        expect(n.activeTeam).not.toBe(s.activeTeam);
+        expect(n.clueHistory[0]!.guesses.at(-1)!.identity).toBe(identity);
+      }
     }
+  });
+  test('only authenticated active operatives guess, malformed or duplicate actions reject unchanged', () => {
+    const s = clued();
+    for (const p of [...ids.filter((p) => p !== operative(s)), 'unknown'])
+      reject(s, p, { type: 'guess', card: 0 });
+    for (const before of [setup(), dealt()])
+      reject(before, 'ro', { type: 'guess', card: 0 });
+    for (const card of [-1, 25, 1.3, NaN, Infinity, '0', null])
+      reject(s, operative(s), { type: 'guess', card });
+    for (const input of [null, [], 'guess', { type: 'undo' }])
+      reject(s, operative(s), input);
+    const card = s.board.findIndex((c) => c.identity === s.activeTeam);
+    const n = action(s, operative(s), { type: 'guess', card });
+    reject(n, operative(n), { type: 'guess', card });
+    expect(s.board[card]!.revealed).toBe(false);
+    expect(n.actionSequence).toBe(s.actionSequence + 1);
+    expect(n.clueHistory[0]!.guesses).toEqual([
+      { card, word: s.board[card]!.word, identity: s.activeTeam },
+    ]);
+    for (const p of ids)
+      reject(s, p, {
+        type: 'chooseRole',
+        team: 'red',
+        role: 'operative',
+        version: s.setupVersion,
+      });
+  });
+  test('assassin immediately loses for active team regardless of forged team', () => {
+    for (const activeTeam of ['red', 'blue'] as const) {
+      const s = clued({ ...dealt(), activeTeam });
+      const n = action(s, operative(s), {
+        type: 'guess',
+        card: s.board.findIndex((c) => c.identity === 'assassin'),
+        team: activeTeam === 'red' ? 'blue' : 'red',
+      });
+      expect(n.result).toEqual({
+        team: activeTeam === 'red' ? 'blue' : 'red',
+        reason: 'assassin',
+      });
+      expect(n.phase).toBe('finished');
+      expect(n.events.map((e) => e.type)).toEqual([
+        'cardRevealed',
+        'gameFinished',
+      ]);
+      expect(view(n, 'ro').public.board.every((c) => c.identity)).toBe(true);
+      expect(n.clueHistory.at(-1)!.guesses.at(-1)!.identity).toBe('assassin');
+      reject(n, operative(n), { type: 'guess', card: 0 });
+    }
+  });
+  test('last agent wins before handoff, including the opponent last agent and exhausted budget', () => {
+    for (const team of ['red', 'blue'] as const)
+      for (const activeTeam of ['red', 'blue'] as const) {
+        let s = clued({ ...dealt(), activeTeam }, 1);
+        const target = s.board.findIndex((c) => c.identity === team);
+        s.board.forEach((c, i) => {
+          if (c.identity === team && i !== target) c.revealed = true;
+        });
+        s.used = 1;
+        s = action(s, operative(s), { type: 'guess', card: target });
+        expect(s.result).toEqual({ team, reason: 'agents' });
+        expect(s.phase).toBe('finished');
+        expect(s.events.map((e) => e.type)).toEqual([
+          'cardRevealed',
+          'gameFinished',
+        ]);
+        expect(view(s, operative(s)).public.remaining[team]).toBe(0);
+      }
   });
   test('metamorphic privacy: unseen key permutations do not alter any operative projection', () => {
-    const s = guessing(),
+    const s = guess(clued(), 'civilian'),
       other = structuredClone(s);
-    const temp = other.board[0]!.identity;
-    other.board[0]!.identity = other.board[1]!.identity;
-    other.board[1]!.identity = temp;
+    const hidden = other.board.filter((c) => !c.revealed);
+    const identities = hidden.map((c) => c.identity).reverse();
+    hidden.forEach((c, i) => {
+      c.identity = identities[i]!;
+    });
     for (const p of ['ro', 'bo']) {
       expect(JSON.stringify(view(s, p))).toBe(JSON.stringify(view(other, p)));
       expect(view(s, p).private.key).toBeUndefined();
-      expect(view(s, p).public.board.every((c) => !('identity' in c))).toBe(
-        true,
-      );
+      expect(
+        view(s, p)
+          .public.board.filter((c) => !c.revealed)
+          .every((c) => !('identity' in c)),
+      ).toBe(true);
     }
     const changed = structuredClone(s);
     changed.board.reverse();
@@ -273,26 +307,21 @@ describe('Codenames authoritative rules', () => {
     );
     expect(JSON.stringify(view(s, 'ro'))).not.toContain('packVersion');
   });
-  test('accepted setup actions clear event batch; history bounded and projections detached', () => {
+  test('accepted setup actions clear event batch; all projection data is detached', () => {
     let s = setup();
     s = action(s, 'rs', { type: 'ready', version: s.setupVersion });
     expect(s.events).toEqual([]);
-    let n = dealt();
-    for (let i = 0; i < 110; i++) {
-      n = action(n, actor(n), { type: 'submitClue', word: 'again', count: 1 });
-      n = action(n, actor(n, 'spymaster', true), {
-        type: 'reviewClue',
-        allow: false,
-      });
-      n = action(n, actor(n, 'spymaster', true), {
-        type: 'takePenalty',
-        card: null,
-      });
-    }
-    expect(n.history.length).toBe(200);
-    const projection = view(n, 'ro');
+    const n = dealt();
+    const projection = view(n, 'rs');
     projection.public.assignments.rs!.team = 'blue';
+    projection.public.options.boardLanguage = 'es';
+    projection.public.board[0]!.word = 'changed';
+    projection.private.key![0] = 'assassin';
+    projection.public.events[0]!.sequence = 999;
     expect(n.assignments.rs!.team).toBe('red');
+    expect(n.options.boardLanguage).toBe('en');
+    expect(n.board[0]!.word).not.toBe('changed');
+    expect(n.events[0]!.sequence).not.toBe(999);
   });
   test('presentation gates mount, duplicates, gaps, regressions, reconnect old snapshots, role and resets', () => {
     const gate = eventGate(),
@@ -350,82 +379,19 @@ describe('Codenames authoritative rules', () => {
   });
 });
 
-test('all finite counts, malformed options and every role/phase permission reject without mutation', () => {
-  for (const options of [
-    true,
-    [],
-    { boardLanguage: 'fr' },
-    { allowAbbreviations: 1 },
-    { allowMultiwordNames: 'yes' },
-  ])
+test('invalid options and random values reject; board language is fixed at deal', () => {
+  for (const options of [true, [], { boardLanguage: 'fr' }])
     expect(() => create(ids, seeded(1), options)).toThrow();
-  for (let count = 1; count <= 9; count++)
-    expect(guessing(dealt(), count).budget).toEqual({
-      kind: 'finite',
-      cap: count + 1,
-    });
-  const clue = dealt(),
-    review = action(clue, actor(clue), {
-      type: 'submitClue',
-      word: 'Sea',
-      count: 2,
-    }),
-    guess = guessing(clue),
-    penalty = action(review, actor(review, 'spymaster', true), {
-      type: 'reviewClue',
-      allow: false,
-    });
-  for (const state of [clue, review, guess, penalty]) {
-    const cases = [
-      {
-        input: { type: 'submitClue', word: 'Sea', count: 2 },
-        phase: 'clue',
-        role: 'spymaster',
-        opponent: false,
-      },
-      {
-        input: { type: 'reviewClue', allow: true },
-        phase: 'clueReview',
-        role: 'spymaster',
-        opponent: true,
-      },
-      {
-        input: { type: 'takePenalty', card: null },
-        phase: 'penalty',
-        role: 'spymaster',
-        opponent: true,
-      },
-      {
-        input: { type: 'guess', card: 0 },
-        phase: 'guessing',
-        role: 'operative',
-        opponent: false,
-      },
-    ];
-    for (const { input, phase, role, opponent } of cases)
-      for (const player of ids) {
-        if (state.phase === phase && player === actor(state, role, opponent))
-          continue;
-        reject(state, player, input);
-      }
-    for (const input of [null, [], 'guess', { type: 'undo' }])
-      reject(state, 'ro', input);
-    reject(state, 'unknown', { type: 'guess', card: 0 });
-    const changed = structuredClone(state);
-    const left = changed.board.findIndex((c) => !c.revealed),
-      right = changed.board.findIndex(
-        (c) => !c.revealed && c.identity !== changed.board[left]!.identity,
-      );
-    [changed.board[left]!.identity, changed.board[right]!.identity] = [
-      changed.board[right]!.identity,
-      changed.board[left]!.identity,
-    ];
-    for (const operative of ['ro', 'bo'])
-      expect(view(changed, operative)).toEqual(view(state, operative));
-    expect(view(changed, 'rs').private.key).not.toEqual(
-      view(state, 'rs').private.key,
-    );
-  }
+  let s = setup();
+  for (const p of ids.slice(0, 3))
+    s = action(s, p, { type: 'ready', version: s.setupVersion });
+  for (const value of [-1, 1, Infinity, NaN])
+    expect(() =>
+      apply(s, 'bo', { type: 'ready', version: s.setupVersion }, () => value),
+    ).toThrow();
+  expect(s.board).toEqual([]);
+  const spanish = create(ids, seeded(1), { boardLanguage: 'es' });
+  expect(spanish.options).toEqual({ boardLanguage: 'es' });
 });
 
 test('presentation cancels active effects on discontinuities, but repeated snapshots leave live motion alone', () => {
@@ -438,7 +404,7 @@ test('presentation cancels active effects on discontinuities, but repeated snaps
   gate.consume('round:seat:role', 4, [], true, {});
   expect(cancellations).toBe(first + 1);
   const event = {
-    type: 'turnEnded' as const,
+    type: 'boardDealt' as const,
     team: 'red' as const,
     sequence: 5,
     index: 0,
@@ -452,4 +418,52 @@ test('presentation cancels active effects on discontinuities, but repeated snaps
   expect(cancellations).toBe(first + 3);
   gate.reset();
   expect(cancellations).toBe(first + 4);
+});
+
+test('local midgame history is coherent with public reveals and never enters production creation', () => {
+  for (const language of ['en', 'es'] as const) {
+    const s = practice('midgame', language, 8).state;
+    expect(s.players).toHaveLength(8);
+    expect(s.phase).toBe('guessing');
+    expect(s.turn).toBe(3);
+    expect(s.activeTeam).toBe('red');
+    expect(s.used).toBe(2);
+    expect(s.clueHistory.map((c) => c.guesses.length)).toEqual([1, 3, 2]);
+    for (const team of ['red', 'blue'])
+      expect(
+        s.board.filter((c) => c.revealed && c.identity === team),
+      ).toHaveLength(3);
+    expect(s.board.find((c) => c.identity === 'assassin')!.revealed).toBe(
+      false,
+    );
+    const projected = view(s, 'training-1');
+    for (const r of projected.public.clueHistory)
+      for (const g of r.guesses)
+        expect(projected.public.board[g.card]!.identity).toBe(g.identity);
+    const clone = structuredClone(s);
+    const v = view(clone, 'training-0');
+    v.public.clueHistory[0]!.guesses[0]!.word = 'changed';
+    v.public.clue!.word = 'changed';
+    if (v.public.budget.kind === 'finite') v.public.budget.cap = 100;
+    expect(clone).toEqual(s);
+  }
+  expect(create(ids, seeded(1)).clueHistory).toEqual([]);
+});
+test('presentation admits new clue and turn events once and suppresses reconnect replay', () => {
+  const gate = eventGate();
+  let s = dealt();
+  expect(gate.consume('one', s.actionSequence, s.events, true, s)).toEqual([]);
+  s = clued(s);
+  expect(
+    gate.consume('one', s.actionSequence, s.events, true, s).map((e) => e.type),
+  ).toEqual(['clueSubmitted']);
+  s = guess(s, 'civilian');
+  expect(
+    gate.consume('one', s.actionSequence, s.events, true, s).map((e) => e.type),
+  ).toEqual(['cardRevealed', 'turnEnded']);
+  expect(gate.consume('one', s.actionSequence, s.events, true, s)).toEqual([]);
+  gate.consume('one', s.actionSequence, s.events, false, s);
+  expect(
+    gate.consume('one', s.actionSequence, s.events, true, { ...s }),
+  ).toEqual([]);
 });

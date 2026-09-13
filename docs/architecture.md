@@ -12,7 +12,7 @@ The catalog runs on Bun workspaces, TypeScript, SvelteKit, Bun and Socket.IO. Bu
 | `games/catan`          | Catan board/rules, private/public projection and lazily imported Svelte table                               |
 | `games/carcassonne`    | Big Box 3.1 tiles, connected features, resumable decisions and lazy SVG table                               |
 | `games/azul`           | Standard-wall tile drafting, conservation, scoring and ceramic table                                        |
-| `games/codenames`      | Team/role setup, clue review, recipient-private key and dossier table                                       |
+| `games/codenames`      | Team/role consent, authoritative clues/turns, public history and private key table                          |
 | `games/sushi-go-party` | Simultaneous drafting, full standard menu, resumable effects and private hands                              |
 
 ## Authority and state delivery
@@ -101,8 +101,8 @@ and expansion fixtures. See [ADR 012](adr/012-carcassonne-table.md) and the
 ## Azul, Codenames and Sushi Go Party
 
 The three games retain the same authoritative contract and game-owned rules,
-readiness, effects and private projections. Each fills the viewport with corner
-rules/settings overlays; room controls arrive through `settingsContent`, and host
+readiness, effects and private projections. Each fills the viewport with
+rules/settings overlays (Codenames places them in its header); room controls arrive through `settingsContent`, and host
 results use the optional `canRematch`/`rematch` props. Local practice routes and
 illustrated library lessons load separately from game initialization and metadata.
 
@@ -111,7 +111,7 @@ The room protocol now preserves structured stale/match errors. An authenticated
 own action ID. The client keeps that ID for at most three attempts, revalidating
 eligible Carcassonne/Codenames readiness and Sushi readiness/picks after each
 synchronization. Round/turn/prompt/ownership changes, commitment or disconnected
-seats stop retries. Azul drafts and Codenames guesses are never automatically
+seats stop retries. Azul drafts and Codenames clues, guesses and end-turn are never automatically
 reconfirmed. A missing acknowledgement is synchronized before any resubmission.
 See [ADR 013](adr/013-three-game-delivery.md) for the precise boundaries.
 
@@ -120,6 +120,15 @@ Azul's table presentation is being reworked to Table Light, recorded in
 layout in [Azul redesign](azul-redesign/README.md). It changes no rules, no
 projection and no event, and the game keeps its colours in a game-owned palette
 module rather than in shared packages.
+
+Codenames uses setup/clue/guessing/finished with authoritative active teams,
+clues, guess budgets and public revealed-only history. Only active spymasters give
+clues and active operatives guess/end turns. The group still judges clue legality.
+A paper word grid, header, team panels, players/history and private key panel form
+the viewport table. Original local WebP wood/transparent props are an approved
+Codenames-only exception to CSS/SVG visuals; UI text stays in Svelte. Reconnects
+cancel pending selections and events. See [ADR 019](adr/019-codenames-table-turns.md).
+Client and server ship together for this protocol migration.
 
 ## Little Secret
 

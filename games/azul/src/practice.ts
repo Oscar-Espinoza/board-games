@@ -17,6 +17,11 @@ export const seats = ['Ada', 'Bea', 'Clara', 'Diego'].map((name, i) => ({
 export const scenarios = [
   'start2',
   'start4',
+  'start3',
+  'crowded',
+  'cleanup',
+  'no_wall',
+  'cross100',
   'overflow',
   'scoring',
   'finish',
@@ -52,17 +57,33 @@ export function inventory(s: State) {
 }
 export function fixture(scenario: Scenario = 'start2'): State {
   const s = create(
-    seats.slice(0, scenario === 'start4' ? 4 : 2).map((p) => p.id),
+    seats
+      .slice(0, scenario === 'start4' ? 4 : scenario === 'start3' ? 3 : 2)
+      .map((p) => p.id),
     seeded(),
   );
   s.turn = 0;
   s.starter = 0;
-  if (scenario === 'start2' || scenario === 'start4') return s;
+  if (scenario === 'start2' || scenario === 'start4' || scenario === 'start3')
+    return s;
   s.factories = s.factories.map(() => []);
   s.center = [];
   s.bag = [];
   s.discard = [];
-  if (scenario === 'overflow') {
+  if (scenario === 'crowded') {
+    s.center = colors.flatMap((c) => Array<Color>(12).fill(c));
+    s.factories[0] = ['blue', 'yellow', 'red', 'white'];
+  } else if (scenario === 'cleanup' || scenario === 'no_wall') {
+    s.center = ['blue', 'blue'];
+    s.boards[0].floor = ['red', 'yellow'];
+    s.boards[0].score = s.boards[0].wallPoints = 2;
+    if (scenario === 'cleanup') {
+      s.boards[0].patterns[1] = { color: 'blue', count: 1 };
+      s.boards[0].patterns[3] = { color: 'red', count: 4 };
+      s.boards[1].patterns[4] = { color: 'yellow', count: 5 };
+      s.boards[1].floor = ['white', 'black'];
+    }
+  } else if (scenario === 'overflow') {
     s.center = ['blue', 'blue', 'blue', 'blue', 'yellow', 'red'];
     s.factories[0] = ['white', 'black', 'white', 'black'];
     s.boards[0].floor = ['red', 'yellow', 'black', 'white', 'red', 'yellow'];
@@ -81,7 +102,7 @@ export function fixture(scenario: Scenario = 'start2'): State {
     s.factories[0] = ['blue'];
     s.boards.forEach((b, i) => {
       b.wall[0] = [false, true, true, true, true];
-      b.score = b.wallPoints = 9;
+      b.score = b.wallPoints = scenario === 'cross100' ? 99 : 9;
       if (i) b.patterns[0] = { color: 'blue', count: 1 };
     });
   }

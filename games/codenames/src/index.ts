@@ -41,22 +41,13 @@ export function create(
   if (input != null && (typeof input !== 'object' || Array.isArray(input)))
     fail();
   const o = (input ?? {}) as Partial<Options>;
-  if (
-    (o.boardLanguage !== undefined &&
-      !['en', 'es'].includes(o.boardLanguage)) ||
-    (o.allowAbbreviations !== undefined &&
-      typeof o.allowAbbreviations !== 'boolean') ||
-    (o.allowMultiwordNames !== undefined &&
-      typeof o.allowMultiwordNames !== 'boolean')
-  )
+  if (o.boardLanguage !== undefined && !['en', 'es'].includes(o.boardLanguage))
     fail();
   return {
     players: [...players],
     assignments: {},
     options: {
       boardLanguage: o.boardLanguage ?? 'en',
-      allowAbbreviations: o.allowAbbreviations ?? false,
-      allowMultiwordNames: o.allowMultiwordNames ?? false,
     },
     packVersion,
     setupVersion: 0,
@@ -64,15 +55,16 @@ export function create(
     connectedPlayers: [...players],
     phase: 'setup',
     board: [],
+    startingTeam: 'red',
     activeTeam: 'red',
     turn: 0,
     clue: null,
-    budget: { kind: 'finite', cap: 1 },
+    budget: { kind: 'unlimited' },
     used: 0,
+    clueHistory: [],
     result: null,
     actionSequence: 0,
     events: [],
-    history: [],
   };
 }
 export function validRoster(s: State): boolean {
@@ -92,8 +84,8 @@ export function presence(
   connectedPlayers: string[],
   replacedPlayer?: string,
 ): State {
-  if (s.phase !== 'setup') return s;
   const connected = s.players.filter((p) => connectedPlayers.includes(p));
+  if (s.phase !== 'setup') return { ...s, connectedPlayers: connected };
   return {
     ...s,
     connectedPlayers: connected,
@@ -109,6 +101,7 @@ export function apply(
 ): State {
   if (
     !s.players.includes(player) ||
+    !s.connectedPlayers.includes(player) ||
     s.phase === 'finished' ||
     !input ||
     typeof input !== 'object' ||
@@ -126,20 +119,27 @@ export function apply(
       index: n.events.length,
     } as PublicEvent;
     n.events.push(event);
-    n.history.push(event);
-    n.history = n.history.slice(-200);
   };
   const next = () => {
     n.activeTeam = other(n.activeTeam);
     n.turn++;
-    n.phase = 'clue';
     n.clue = null;
     n.used = 0;
+    n.budget = { kind: 'unlimited' };
+    n.phase = 'clue';
     emit({ type: 'turnEnded', team: n.activeTeam });
+  };
+  const requireActor = (role: Assignment['role']) => {
+    const actor = s.assignments[player];
+    if (actor?.team !== s.activeTeam || actor.role !== role) fail();
   };
   const reveal = (index: number) => {
     const c = n.board[index]!;
     c.revealed = true;
+    n.used++;
+    n.clueHistory
+      .at(-1)!
+      .guesses.push({ card: index, word: c.word, identity: c.identity });
     emit({
       type: 'cardRevealed',
       card: index,
@@ -148,7 +148,7 @@ export function apply(
     });
     const won =
       c.identity === 'assassin'
-        ? other(n.activeTeam)
+        ? other(s.activeTeam)
         : (['red', 'blue'] as Team[]).find(
             (t) => !n.board.some((c) => c.identity === t && !c.revealed),
           );
@@ -176,14 +176,6 @@ export function apply(
     return a.card as number;
   };
   const actor = s.assignments[player];
-  const requireActor = (
-    phase: State['phase'],
-    role: Assignment['role'],
-    team = s.activeTeam,
-  ) => {
-    if (s.phase !== phase || actor?.role !== role || actor.team !== team)
-      fail();
-  };
   if (a.type === 'chooseRole') {
     if (
       s.phase !== 'setup' ||
@@ -221,10 +213,10 @@ export function apply(
     n.ready.push(player);
     if (n.ready.length === n.players.length) {
       const pool = shuffle(words[n.options.boardLanguage], random);
-      n.activeTeam = random() < 0.5 ? 'red' : 'blue';
+      n.startingTeam = random() < 0.5 ? 'red' : 'blue';
       const identities: Identity[] = [
-        ...Array<Identity>(9).fill(n.activeTeam),
-        ...Array<Identity>(8).fill(other(n.activeTeam)),
+        ...Array<Identity>(9).fill(n.startingTeam),
+        ...Array<Identity>(8).fill(other(n.startingTeam)),
         ...Array<Identity>(7).fill('civilian'),
         'assassin',
       ];
@@ -233,16 +225,24 @@ export function apply(
         identity,
         revealed: false,
       }));
-      n.phase = 'clue';
+      n.activeTeam = n.startingTeam;
       n.turn = 1;
-      emit({ type: 'boardDealt', team: n.activeTeam });
+      n.phase = 'clue';
+      emit({ type: 'boardDealt', team: n.startingTeam });
     }
   } else if (a.type === 'submitClue') {
-    requireActor('clue', 'spymaster');
+    if (s.phase !== 'clue') fail();
+    requireActor('spymaster');
+    if (typeof a.word !== 'string' || /[\p{Cc}\p{Cf}]/u.test(a.word)) fail();
+    const word = (a.word as string).normalize('NFC').trim();
+    const length = [
+      ...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(
+        word,
+      ),
+    ].length;
     if (
-      typeof a.word !== 'string' ||
-      a.word.length > 320 ||
-      /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(a.word) ||
+      length < 1 ||
+      length > 80 ||
       !(
         a.count === 'unlimited' ||
         (typeof a.count === 'number' &&
@@ -252,46 +252,29 @@ export function apply(
       )
     )
       fail();
-    const word = (a.word as string).normalize('NFC').trim();
-    if (!word || [...word].length > 80) fail();
-    n.clue = {
-      word,
-      count: a.count as number | 'unlimited',
-      team: n.activeTeam,
-    };
-    n.phase = 'clueReview';
-    emit({ type: 'clueSubmitted', clue: n.clue });
-  } else if (a.type === 'reviewClue') {
-    requireActor('clueReview', 'spymaster', other(s.activeTeam));
-    if (typeof a.allow !== 'boolean') fail();
-    n.phase = a.allow ? 'guessing' : 'penalty';
-    n.used = 0;
+    const count = a.count as number | 'unlimited';
+    n.clue = { word, count, team: n.activeTeam };
     n.budget =
-      n.clue!.count === 0 || n.clue!.count === 'unlimited'
+      count === 0 || count === 'unlimited'
         ? { kind: 'unlimited' }
-        : { kind: 'finite', cap: n.clue!.count + 1 };
-    emit({ type: 'clueReviewed', allow: a.allow as boolean });
-  } else if (a.type === 'takePenalty') {
-    requireActor('penalty', 'spymaster', other(s.activeTeam));
-    if (a.card !== null) {
-      const i = cell();
-      if (n.board[i]!.identity !== other(s.activeTeam)) fail();
-      if (reveal(i)) return n;
-    }
-    next();
+        : { kind: 'finite', cap: count + 1 };
+    n.used = 0;
+    n.clueHistory.push({ ...n.clue, turn: n.turn, guesses: [] });
+    n.phase = 'guessing';
+    emit({ type: 'clueSubmitted', clue: { ...n.clue } });
   } else if (a.type === 'guess') {
-    requireActor('guessing', 'operative');
-    const i = cell();
-    n.used++;
-    if (reveal(i)) return n;
+    if (s.phase !== 'guessing') fail();
+    requireActor('operative');
+    const index = cell();
     if (
-      n.board[i]!.identity !== n.activeTeam ||
-      (n.budget.kind === 'finite' && n.used >= n.budget.cap)
+      !reveal(index) &&
+      (n.board[index]!.identity !== n.activeTeam ||
+        (n.budget.kind === 'finite' && n.used >= n.budget.cap))
     )
       next();
   } else if (a.type === 'endTurn') {
-    requireActor('guessing', 'operative');
-    if (s.used < 1) fail();
+    if (s.phase !== 'guessing' || s.used < 1) fail();
+    requireActor('operative');
     next();
   } else fail();
   return n;
@@ -299,17 +282,15 @@ export function apply(
 function publicEvent(e: PublicEvent): PublicEvent {
   const id = { sequence: e.sequence, index: e.index };
   switch (e.type) {
-    case 'boardDealt':
-    case 'turnEnded':
-      return { ...id, type: e.type, team: e.team };
     case 'clueSubmitted':
       return {
         ...id,
         type: e.type,
         clue: { word: e.clue.word, count: e.clue.count, team: e.clue.team },
       };
-    case 'clueReviewed':
-      return { ...id, type: e.type, allow: e.allow };
+    case 'turnEnded':
+    case 'boardDealt':
+      return { ...id, type: e.type, team: e.team };
     case 'cardRevealed':
       return {
         ...id,
@@ -342,8 +323,6 @@ export function view(s: State, player: string): View {
       ),
       options: {
         boardLanguage: s.options.boardLanguage,
-        allowAbbreviations: s.options.allowAbbreviations,
-        allowMultiwordNames: s.options.allowMultiwordNames,
       },
       setupVersion: s.setupVersion,
       ready: [...s.ready],
@@ -357,6 +336,7 @@ export function view(s: State, player: string): View {
           ? { identity: c.identity }
           : {}),
       })),
+      startingTeam: s.startingTeam,
       activeTeam: s.activeTeam,
       turn: s.turn,
       clue: s.clue
@@ -367,6 +347,15 @@ export function view(s: State, player: string): View {
           ? { kind: 'finite', cap: s.budget.cap }
           : { kind: 'unlimited' },
       used: s.used,
+      clueHistory: s.clueHistory.map((record) => ({
+        turn: record.turn,
+        team: record.team,
+        word: record.word,
+        count: record.count,
+        guesses: record.guesses
+          .filter((g) => s.board[g.card]?.revealed)
+          .map((g) => ({ card: g.card, word: g.word, identity: g.identity })),
+      })),
       result: s.result
         ? { team: s.result.team, reason: s.result.reason }
         : null,
@@ -377,7 +366,6 @@ export function view(s: State, player: string): View {
       },
       actionSequence: s.actionSequence,
       events: s.events.map(publicEvent),
-      history: s.history.map(publicEvent),
     },
     private: {
       assignment,

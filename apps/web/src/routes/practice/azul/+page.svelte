@@ -24,6 +24,12 @@
   const labels = {
     start2: m.azul_start2,
     start4: m.azul_start4,
+    start3: m.azul_start3,
+    crowded: m.azul_crowded,
+    cleanup: m.azul_cleanup,
+    no_wall: m.azul_no_wall,
+    cross100: m.azul_cross100,
+
     overflow: m.azul_overflow,
     scoring: m.azul_scoring,
     finish: m.azul_finish,

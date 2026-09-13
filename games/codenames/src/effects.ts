@@ -9,20 +9,17 @@ export function soundEffects() {
         if (context.state === 'suspended') await context.resume();
       } catch {}
     },
-    play(volume: number, cue: 'clue' | 'reveal' | 'handoff' | 'finish') {
+    play(volume: number, cue: 'reveal' | 'finish') {
       try {
         if (!context || context.state !== 'running') return;
         const oscillator = context.createOscillator(),
           gain = context.createGain();
         // Brief original cues depend only on accepted public event types.
         const [start, end, duration] = {
-          clue: [900, 300, 0.09],
           reveal: [150, 75, 0.16],
-          handoff: [220, 280, 0.16],
           finish: [440, 660, 0.28],
         }[cue];
-        oscillator.type =
-          cue === 'clue' || cue === 'handoff' ? 'triangle' : 'sine';
+        oscillator.type = 'sine';
         oscillator.frequency.setValueAtTime(start!, context.currentTime);
         oscillator.frequency.exponentialRampToValueAtTime(
           end!,

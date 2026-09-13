@@ -44,24 +44,42 @@ palette is not a demonstrated shared concept. The catalog cover art keeps its ow
 deliberately lighter palette and is not folded in. Display and interface faces are
 self-hosted and scoped to the Azul table, so no other game is restyled.
 
-Existing motion is restyled, not replaced. Every accepted event, delay and travel
-duration is preserved, including the flight appearance that is assigned in
-JavaScript on a body-level node and cannot be reached by scoped styles.
+The main screen fits the viewport without scrolling, superseding the earlier
+scrolling proposal. Wide layouts place supply and the playable board side by side
+under a shallow opponent row, including all three opponents in four-player games.
+At widths ≤900px or heights ≤680px, whole 56px factory buttons open a colour
+dialog, followed by a full-size destination/confirmation dialog with 44px targets.
+The table retains an inspectable local miniature. Short landscape screens place
+the ring beside the board overview. Round details and results use dialogs.
+Real safe-area insets remain. Compact boards are explicitly noninteractive;
+separate inspect buttons open upright full-size dialogs that emit no table anchors.
+Only desktop previews tilt. Exact scores remain uncapped; only the decorative
+0–100 rail clamps, with a `100+` endpoint indicator.
+
+A pure local presentation planner derives timed steps from previous and accepted
+public snapshots and existing events. Wall points use `scoring.points`, floor
+loss uses `penalty.loss`, and accepted bonuses follow cleanup. Final-draft slots
+are reconstructed before surplus/floor cleanup; the marker returns separately.
+Draft/spill durations and wall-row delays stay; refill waits for cleanup, and
+completion follows the full timeline. Real tile artwork is mounted inside each
+body-level flight wrapper. Existing audio remains unchanged.
 
 ## Consequences
 
 Three contracts now constrain presentation work that previously looked free. The
 `data-azul-location` anchors are measured for every flight and a missing or
-zero-sized anchor drops that animation silently. The flying tile is styled outside
-the component tree, so restyling the tile component alone leaves flights stale.
+zero-sized anchor drops that animation silently. Flights live outside the table and must carry explicit artwork styles.
+Inspection copies emit no anchors; scattered tiles have distinct presentation
+keys with canonical centre and summary fallbacks.
 The browser suite pins class names, accessible names and geometric assertions, so
 the loose centre pool and the opponent boards must land with their test updates in
 the same change.
 
-The redesign is documented rather than implemented; see
-[Azul redesign](../azul-redesign/README.md) for the phased migration, tokens,
+The corrected redesign is implemented in game-local presentation; see
+[Azul redesign](../azul-redesign/README.md) for the dependent migration milestones, tokens,
 components, motion and mobile layout. The mockups there are design targets and are
 explicitly not browser evidence. Catalog-wide tokens, the unloaded global font
-declarations and the gray-side board variant remain out of scope. Safari on a real
+declarations and the gray-side board variant remain out of scope. Automated captures do not compare screenshot baselines; explicit visual review
+and endpoint assertions are required. Safari on a real
 device, touch quality, iOS audio and Spanish editorial review still require human
 validation after implementation.

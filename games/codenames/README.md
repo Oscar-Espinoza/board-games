@@ -1,13 +1,22 @@
 # Codenames
 
-Classic word Codenames for 4–8 friends. Bun owns authoritative in-memory rules;
-Svelte renders only recipient projections. No bots, timers, chat or accounts.
+Authoritative clue-and-turn Codenames for 4–8 friends. Bun owns in-memory rules;
+Svelte renders a fixed 5×5 paper table with real room information, team counts,
+turn banner, public history, players and a private spymaster panel.
 
-`src/index.ts` owns setup, role consent, clue review, penalty, guesses and wins.
-`words.ts` contains original server-only English/Spanish packs. `Board.svelte`
-imports rule types only; practice fixtures are a separate export and local route.
-`guide.ts` and `GuideScene.svelte` are lightweight standalone lesson content shared
-with the lazy library guide.
+Phases: setup → clue → guessing → finished. Active spymasters submit clues;
+active operatives reveal and end turns after at least one guess. Finite budgets
+allow count + 1; zero/unlimited remove the numerical cap. Opponent/civilian guesses
+hand off; last agents and assassins finish immediately. Groups judge clue legality.
 
-Rules and architecture: [game reference](../../docs/games/codenames.md),
-[ADR 015](../../docs/adr/015-codenames-dossiers.md).
+Operatives never receive unrevealed identities. Setup readiness is versioned and
+unanimous. Only unchanged readiness retries; clues, guesses and end-turn do not.
+The host can rematch. Production packs and practice fixtures stay separate.
+
+Original optimized WebP table materials are bundled under `src/table/` with
+provenance. All interface text/cards use Svelte/CSS. Archivo is self-hosted.
+No runtime dependencies or sounds were added. Build and deploy client/server together.
+
+See [rules](../../docs/games/codenames.md), [ADR 019](../../docs/adr/019-codenames-table-turns.md),
+[redesign](../../docs/codenames-redesign/README.md) and
+[evidence](../../docs/evidence/codenames/table-redesign/README.md).
