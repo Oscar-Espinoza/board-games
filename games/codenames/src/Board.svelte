@@ -108,7 +108,7 @@
     mounted = $state(false),
     showKey = $state(true),
     enlarged = $state(false),
-    narrow = $state(false),
+    narrow = $state(window.innerWidth < 1024),
     clueWord = $state(''),
     clueCount = $state<string>('2');
   const canClue = $derived(
@@ -480,17 +480,20 @@
   aria-label={m.cn_title()}
 >
   <span class="text-measure" aria-hidden="true"></span>
-  <div class="props" aria-hidden="true">
-    <img class="prop foliage" src={foliage} alt="" /><img
-      class="prop coaster"
-      src={coaster}
-      alt=""
-    /><img class="prop mug" src={mug} alt="" /><img
-      class="prop notepad"
-      src={notepad}
-      alt=""
-    /><img class="prop books" src={books} alt="" />
-  </div>
+  <!-- Compact layouts hide props; not rendering them skips ~330 KB of downloads. -->
+  {#if !narrow}
+    <div class="props" aria-hidden="true">
+      <img class="prop foliage" src={foliage} alt="" /><img
+        class="prop coaster"
+        src={coaster}
+        alt=""
+      /><img class="prop mug" src={mug} alt="" /><img
+        class="prop notepad"
+        src={notepad}
+        alt=""
+      /><img class="prop books" src={books} alt="" />
+    </div>
+  {/if}
   <header class="table-header glass">
     <div class="brand">
       <Icon name="logo" />

@@ -246,9 +246,7 @@ test('desktop composition stays compact from 1024px through ultrawide screens', 
       };
     });
   let layout = await placement();
-  expect(Math.abs(layout.history.y - layout.teams.y)).toBeLessThan(
-    1,
-  );
+  expect(Math.abs(layout.history.y - layout.teams.y)).toBeLessThan(1);
   await capture(page, info.outputPath('empty-history.webp'));
   await scenario(page, 'midgame');
   await settings(page);
@@ -279,11 +277,11 @@ test('desktop composition stays compact from 1024px through ultrawide screens', 
     expect(layout.table.y - layout.header.bottom).toBeLessThanOrEqual(15);
     expect(layout.board.y).toBeGreaterThanOrEqual(layout.teams.bottom);
     expect(layout.bottom.y).toBeGreaterThanOrEqual(layout.lastCard.bottom);
-    expect(
-      Math.abs(layout.history.y - layout.teams.y),
-    ).toBeLessThan(1);
+    expect(Math.abs(layout.history.y - layout.teams.y)).toBeLessThan(1);
     expect(layout.history.x).toBeGreaterThan(layout.board.right);
-    expect(layout.history.height).toBeLessThanOrEqual(layout.board.bottom - layout.teams.y + 1);
+    expect(layout.history.height).toBeLessThanOrEqual(
+      layout.board.bottom - layout.teams.y + 1,
+    );
     await expect(page.locator('.key-panel')).toBeVisible();
     await expect(page.locator('.key-panel .key-cell').last()).toBeInViewport();
     await capture(
@@ -888,6 +886,22 @@ test('wood and props load and decode through the asset pipeline', async ({
       ).toBe(true);
     }
   }
+});
+
+test('compact layouts never download the hidden props', async ({ page }) => {
+  const props: string[] = [];
+  page.on('request', (request) => {
+    if (/(foliage|coaster|mug|notepad|books)\b.*\.webp/.test(request.url()))
+      props.push(request.url());
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/practice/codenames');
+  await expect(page.locator('.cn-table')).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  expect(props).toEqual([]);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(page.locator('.props')).toBeVisible();
+  await expect.poll(() => props.length).toBe(5);
 });
 
 test('paper and translucent panel materials retain accessible text contrast', async ({
