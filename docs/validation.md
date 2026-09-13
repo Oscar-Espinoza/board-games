@@ -17,6 +17,8 @@ Rules tests should exercise important legal/illegal moves and victory transition
 
 This document lists validation commands and expectations, not a claim that a run passed. Report actual results, unavailable checks and intentionally deferred manual observations with each change. The old Rust/WASI and WebRTC validation commands no longer apply to this repository.
 
+Checked-in evidence stays small: commit screenshots as WebP (`cwebp -q 90 -m 6 -sharp_yuv`) and recordings as VP9 WebM (`ffmpeg -c:v libvpx-vp9 -crf 32 -b:v 0 -an`), never raw PNG or Playwright's VP8 output. Keep byte-identical captures once.
+
 ## Zombies
 
 Zombies validation belongs to `../zombies-game`. Its independent README and Makefile document Rust/target tests, native/WASI replay comparisons, browser-support tests and graphics diagnostics. Detailed pre-migration Survival evidence and the original source snapshot were preserved during extraction; they do not describe the TypeScript catalog's validation status.
@@ -639,3 +641,18 @@ WebKit contrast required a slightly brighter brand over the repositioned foliage
 Final [WebP captures](evidence/codenames/table-redesign/README.md) include short
 laptops, 1920px desktop, 2560px ultrawide and empty history. Physical Safari/iOS
 remains unverified.
+
+## Evidence media size and compact Codenames props — September 13, 2026
+
+Documentation screenshots moved from PNG to WebP (quality 90) and recordings from
+Playwright VP8 to VP9 WebM (CRF 32); side-by-side crops showed no visible loss.
+Nine byte-identical Azul captures were kept once, and every Markdown image link
+resolves. The Sushi Go Party spec now writes WebP evidence. Compact Codenames
+layouts no longer mount the hidden decorative props, avoiding about 330 KB of
+downloads on phones and tablets.
+
+Type/Svelte checks, all 320 unit/server tests and the production build passed.
+Five Codenames asset/layout cases passed in Chromium and WebKit, including a new
+network assertion that fails against the previous component. All six Sushi Go
+Party cases passed in both engines with WebP capture. Physical Safari/iOS remains
+unverified.

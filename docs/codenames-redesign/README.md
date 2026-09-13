@@ -44,8 +44,8 @@ become stored, enforced state again, which supersedes part of
 Everything under `images/` is a **design mockup or reference, not a capture of the
 running app**.
 
-| File                                                    | What it is                                                                                                              |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| File                                                      | What it is                                                                                                              |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | [`design-desktop.webp`](images/design-desktop.webp)       | 1440×900 render of `source/Main.dc.html` at 1:1. Structural target; materials defer to the realistic reference.         |
 | [`design-top@2x.webp`](images/design-top@2x.webp)         | 2× crop: header and team row                                                                                            |
 | [`design-grid@2x.webp`](images/design-grid@2x.webp)       | 2× crop: word grid, paper and revealed card materials                                                                   |

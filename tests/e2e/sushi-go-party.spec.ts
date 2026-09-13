@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import {
   test,
@@ -9,8 +10,27 @@ import {
 const evidence = 'docs/evidence/sushi-go-party';
 mkdirSync(evidence, { recursive: true });
 test.use({ video: 'on' });
+// Checked-in evidence is WebP; Playwright's PNG buffer is piped directly to cwebp.
+function webp(png: Buffer, name: string) {
+  execFileSync(
+    'cwebp',
+    [
+      '-quiet',
+      '-q',
+      '90',
+      '-m',
+      '6',
+      '-sharp_yuv',
+      '-o',
+      `${evidence}/${name}.webp`,
+      '--',
+      '-',
+    ],
+    { input: png },
+  );
+}
 async function capture(page: Page, name: string, project: string) {
-  await page.screenshot({ path: `${evidence}/${project}-${name}.png` });
+  webp(await page.screenshot(), `${project}-${name}`);
 }
 async function room(page: Page, browser: Browser, count: number) {
   const contexts: BrowserContext[] = [];
@@ -469,9 +489,10 @@ test('all 26 illustrated lessons teach three distinct frames in English and Span
         expect(descriptions.size).toBe(3);
         if ((await lesson.getAttribute('data-lesson')) === 'onigiri') {
           await page.setViewportSize({ width: 360, height: 640 });
-          await lesson.getByRole('img').screenshot({
-            path: `${evidence}/${info.project.name}-lesson-onigiri-${locale}.png`,
-          });
+          webp(
+            await lesson.getByRole('img').screenshot(),
+            `${info.project.name}-lesson-onigiri-${locale}`,
+          );
           expect(
             await page
               .getByRole('dialog')
