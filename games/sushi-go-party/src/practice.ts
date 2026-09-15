@@ -147,6 +147,7 @@ export function arrangeHand(
   assertConservation(s);
 }
 export const scenarios = [
+  'table',
   'draft',
   'wasabi',
   'uramaki',
@@ -159,6 +160,7 @@ export const scenarios = [
 export type Scenario = (typeof scenarios)[number];
 export function scenario(name: Scenario, count = 4) {
   const menus: Record<Scenario, Menu> = {
+    table: presets.original,
     draft: presets.original,
     wasabi: presets.original,
     uramaki: presets.points,
@@ -180,6 +182,71 @@ export function scenario(name: Scenario, count = 4) {
   );
   const { random } = fixture;
   let s = fixture.state;
+  if (name === 'table') {
+    // Reach the illustrated midgame through accepted rules actions, conserving
+    // every physical card. This fixture is never imported by room initialization.
+    for (let guard = 0; s.phase !== 'round-end' && guard < 400; guard++) {
+      const actor = s.players.find((id) => demonstrationAction(s, id, () => 0));
+      if (!actor) throw new Error('Table fixture cannot progress');
+      s = apply(s, actor, demonstrationAction(s, actor, random)!, random);
+    }
+    if (s.phase !== 'round-end')
+      throw new Error('Table fixture did not finish round one');
+    for (const actor of s.players)
+      s = apply(
+        s,
+        actor,
+        { type: 'READY', round: s.round, version: s.setupVersion },
+        random,
+      );
+    const dishes: Kind[][] = [
+      ['maki', 'tempura', 'pudding'],
+      ['nigiri', 'sashimi', 'dumpling'],
+      ['maki', 'dumpling', 'nigiri'],
+      ['sashimi', 'nigiri', 'maki'],
+      ['dumpling', 'maki', 'tempura'],
+      ['nigiri', 'tempura', 'sashimi'],
+      ['nigiri', 'dumpling', 'tempura'],
+      ['maki', 'nigiri', 'sashimi'],
+    ];
+    for (let turn = 0; turn < 3; turn++) {
+      s.players.forEach((_, seat) =>
+        arrangeHand(s, seat, [dishes[seat][turn]]),
+      );
+      for (const actor of s.players) {
+        const v = view(s, actor);
+        s = apply(
+          s,
+          actor,
+          {
+            type: 'PICK',
+            round: s.round,
+            turn: s.turn,
+            promptId: v.private.pickPromptId!,
+            card: v.private.hand[0].handle,
+            utensils: [],
+          },
+          random,
+        );
+      }
+    }
+    arrangeHand(
+      s,
+      0,
+      (
+        [
+          ['nigiri', 'salmon'],
+          'sashimi',
+          'dumpling',
+          'maki',
+          'tempura',
+          'pudding',
+        ] as (Kind | [Kind, string])[]
+      ).slice(0, s.hands[0].length),
+    );
+    assertConservation(s);
+    return { state: s, random };
+  }
   const first: Partial<Record<Scenario, (Kind | [Kind, string])[]>> = {
     wasabi: ['wasabi'],
     uramaki: [['uramaki', '5']],

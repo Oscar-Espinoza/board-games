@@ -656,3 +656,72 @@ Five Codenames asset/layout cases passed in Chromium and WebKit, including a new
 network assertion that fails against the previous component. All six Sushi Go
 Party cases passed in both engines with WebP capture. Physical Safari/iOS remains
 unverified.
+
+## Azul Rich & Dramatic production migration — September 14, 2026
+
+[ADR 020](adr/020-azul-rich-dramatic.md) replaces Azul's Table Light materials
+and desktop arrangement while retaining its rules, state, sockets, actions,
+privacy, accepted-event flights, audio and measurable-location contracts.
+
+- `bun run check` passed with zero Svelte errors or warnings and a clean root
+  TypeScript check. `bun run test` passed all **320 tests** with 78,898 assertions.
+  The final production frontend/server build passed after the isolated `/dev`
+  prototype was removed.
+- Azul's viewport and gameplay specs passed all **22 Chromium cases** and all
+  **22 WebKit cases**. They cover 360×640, 390×844, 720×450, 768×1024,
+  1100×700, 1280×720, 1440×900 and 1728×960; 2/3/4-player factory geometry;
+  compact tray/pickers; keyboard/focus; 200% text; English/Spanish; accepted
+  scoring flights; 100+ scores; and real 2/4-client rooms and reconnects.
+- Final capture checks decoded every raster asset, rejected failed requests and
+  console/page errors, checked stable geometry and zero document overflow, and
+  compared fixture text, assets, anchors and bounds across a clean reload.
+  Chromium's settled reload was also pixel-identical. The inspected
+  [Chromium/WebKit tables and close-ups](evidence/azul/rich-dramatic/README.md)
+  are actual production component renders at a 1728×960 CSS viewport.
+- `git diff --check` and scoped Prettier checks for every changed source/document
+  passed. The repository-wide `bun run format:check` still reports the unchanged,
+  out-of-scope `games/codenames/src/tokens.css`; this migration did not reformat
+  that unrelated file.
+
+WebKit used the existing temporary `/tmp/cn-webkit-libs/webkit` wrapper to supply
+codec libraries missing from this Linux host; no system or application dependency
+was installed. Physical Safari/iOS, real-device touch/audio and subjective speaker
+review remain unverified. Playwright-owned servers and the implementation dev
+server were stopped after verification.
+
+## Sushi Go Party illustrated production table — September 15, 2026
+
+[ADR 021](adr/021-sushi-illustrated-table.md) migrates the approved desktop
+prototype's shared Svelte/CSS/SVG primitives into actual recipient-view gameplay.
+Rules/settings, all 26 cards, 2–8 players, private prompts, localization, accepted
+presentation events, audio preferences and guarded action retries are retained.
+The deterministic practice scene remains separate from multiplayer initialization.
+
+- Type/Svelte checks passed with zero errors or warnings; the production build
+  passed. All **323 unit/server tests** passed (79,302 assertions).
+- All **nine distinct Chromium** and **nine distinct WebKit** Sushi cases passed
+  across the full and final focused runs. They cover real desktop-host/phone-guest
+  2/8-client matches, reconnect, three-round scoring/rematch, advanced choices,
+  all 26 bilingual lessons, privacy, accepted motion/cancellation, the archived
+  prototype and the new illustrated practice scene. No game rules were changed.
+- Browser review includes exact **1440×900, device scale factor 1** desktop and
+  board/opponent/hand close-ups, settings/rules, Spanish and accepted passing;
+  the layout matrix checks 2–8 desktop seats and 768×1024, 390×844, 360×640 and
+  844×390 compact screens. It checks no document overflow, separated opponent
+  trays/practice controls, usable targets and actual compact advance clicks.
+- Review corrected long-hand clipping, the dessert-control overlap, landscape
+  tray collisions, basic-rule popovers covering tableaus, practice presentation
+  revision gaps and a hover transform that displaced the compact advance button.
+  Screenshot capture now settles finite CSS transitions before comparing the
+  archived static fixture; Chromium reload pixels match exactly.
+- Scoped formatting, whitespace and documentation-link checks passed. Final
+  screenshots and component/state mapping are in the
+  [migration handoff](sushi-go-party-redesign.md).
+
+WebKit required the existing temporary extracted-library wrapper and
+`JSC_useJIT=false`: default-JIT runs on this Linux browser build produced
+closed-page/invalid-attribute failures during longer multiplayer journeys.
+The passing workaround is explicitly an automation-environment limitation, not
+proof of normal Safari/JIT behavior. Native Safari, physical touch/audio and a
+human group playtest remain unverified. All agent-started development/test
+servers were stopped. Existing unrelated Azul changes were preserved.

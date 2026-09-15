@@ -1,4 +1,10 @@
-# Azul Table Light: before, design and implementation
+# Azul presentation: before, Table Light and Rich & Dramatic
+
+The current production after-captures are the
+[Rich & Dramatic evidence](../evidence/azul/rich-dramatic/README.md). They show the
+1728×960 Chromium/WebKit table, ceramic/factory/player-board close-ups and the
+compact tray in both states. These browser renders supersede Table Light; the
+comparison below remains the historical path to the accepted interaction model.
 
 Before-images are preserved from the September 12 implementation. Design studies remain separately labelled under `images/`. The September 13 after-images are actual browser captures; they are not screenshot-baseline comparisons. The latest [viewport-fit evidence](../evidence/azul/table-light/viewport-fit/README.md) supersedes the first scrolling iteration below, which is preserved for comparison.
 

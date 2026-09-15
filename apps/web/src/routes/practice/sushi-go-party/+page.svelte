@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import Board from '@board-games/sushi-go-party/Board.svelte';
   import {
     scenario,
@@ -14,20 +15,21 @@
     setLocale,
     type Locale,
   } from '@board-games/shared/runtime';
-  let scene = $state<Scenario>('draft'),
-    count = $state(4),
-    fixture = scenario('draft'),
+  let scene = $state<Scenario>('table'),
+    count = $state(5),
+    fixture = scenario('table', 5),
     gameState = $state.raw(fixture.state),
     seat = $state(fixture.state.players[0]),
     epoch = $state(1),
     error = $state('');
   let locale = $state<Locale>(getLocale());
+  let advancing = $state(false);
   const names = [
     'Marina',
-    'Tomás',
-    'Sakura',
     'Kai',
-    'Lucía',
+    'Sakura',
+    'Tomás',
+    'Emi',
     'Ren',
     'Valentina de la Costa',
     'Nicolás del Río',
@@ -55,7 +57,9 @@
       error = e instanceof Error ? e.message : String(e);
     }
   }
-  function others() {
+  async function others() {
+    if (advancing) return;
+    advancing = true;
     try {
       let guard = 0;
       const turn = gameState.turn,
@@ -68,6 +72,9 @@
           const action = demonstrationAction(gameState, player, fixture.random);
           if (action) {
             gameState = apply(gameState, player, action, fixture.random);
+            // Deliver every accepted revision, as the live room does. Skipping
+            // revisions correctly suppresses presentation after a state gap.
+            await tick();
             moved = true;
             break;
           }
@@ -83,6 +90,8 @@
       }
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
+    } finally {
+      advancing = false;
     }
   }
   function setup() {
@@ -95,6 +104,7 @@
     error = '';
   }
   const sceneLabels = {
+    table: m.sgp_table_scene,
     draft: m.sgp_scene_draft,
     wasabi: m.sgp_scene_wasabi,
     uramaki: m.sgp_scene_uramaki,
@@ -106,7 +116,10 @@
   };
 </script>
 
-<svelte:head><title>Sushi Go Party! · {m.sgp_practice()}</title></svelte:head>
+<svelte:head
+  ><title>Sushi Go Party! · {m.sgp_practice({}, { locale })}</title
+  ></svelte:head
+>
 <main class="practice-table">
   {#key locale}<Board
       view={view(gameState, seat)}
@@ -125,34 +138,37 @@
     />{/key}
   <button
     class="practice-advance"
+    disabled={advancing}
     onclick={others}
-    data-testid="sgp-practice-others">{m.sgp_practice_step()}</button
+    data-testid="sgp-practice-others"
+    >{m.sgp_practice_step({}, { locale })}</button
   >
   {#if error}<p class="practice-error" role="alert">{error}</p>{/if}
 </main>
 {#snippet settingsContent()}
   <div class="practice-controls">
-    <h3>{m.sgp_practice()}</h3>
+    <h3>{m.sgp_practice({}, { locale })}</h3>
     <label
-      >{m.sgp_practice_scene()}<select
-        aria-label={m.sgp_practice_scene()}
+      >{m.sgp_practice_scene({}, { locale })}<select
+        aria-label={m.sgp_practice_scene({}, { locale })}
         bind:value={scene}
         onchange={reset}
-        >{#each scenarios as s}<option value={s}>{sceneLabels[s]()}</option
+        >{#each scenarios as s}<option value={s}
+            >{sceneLabels[s]({}, { locale })}</option
           >{/each}</select
       ></label
     >
     <label
-      >{m.sgp_practice_seat()}<select
-        aria-label={m.sgp_practice_seat()}
+      >{m.sgp_practice_seat({}, { locale })}<select
+        aria-label={m.sgp_practice_seat({}, { locale })}
         bind:value={seat}
         >{#each players as p}<option value={p.id}>{p.name}</option
           >{/each}</select
       ></label
     >
     <label
-      >{m.sgp_guests()}<select
-        aria-label={m.sgp_guests()}
+      >{m.sgp_guests({}, { locale })}<select
+        aria-label={m.sgp_guests({}, { locale })}
         bind:value={count}
         onchange={reset}
         >{#each [2, 3, 4, 5, 6, 7, 8] as n}<option value={n}>{n}</option
@@ -160,8 +176,8 @@
       ></label
     >
     <label
-      >{m.sgp_language()}<select
-        aria-label={m.sgp_language()}
+      >{m.sgp_language({}, { locale })}<select
+        aria-label={m.sgp_language({}, { locale })}
         value={locale}
         onchange={(e) => {
           locale = e.currentTarget.value as Locale;
@@ -171,9 +187,10 @@
         ></select
       ></label
     >
-    <button onclick={reset}>{m.sgp_practice_reset()}</button><button
-      onclick={setup}>{m.sgp_practice_setup()}</button
-    ><a href="/">← {m.sgp_library()}</a>
+    <button onclick={reset}>{m.sgp_practice_reset({}, { locale })}</button
+    ><button onclick={setup}>{m.sgp_practice_setup({}, { locale })}</button><a
+      href="/">← {m.sgp_library({}, { locale })}</a
+    >
   </div>
 {/snippet}
 
@@ -235,11 +252,16 @@
   .practice-controls a {
     color: inherit;
   }
-  @media (max-width: 500px) {
+  @media (max-width: 1099px), (max-height: 679px) {
+    :global(.practice-table .table-wordmark) {
+      display: none;
+    }
     .practice-advance {
-      top: 58px;
-      right: 9px;
-      max-width: 110px;
+      top: 9px;
+      right: auto;
+      left: 50%;
+      translate: -50% 0;
+      max-width: min(180px, calc(100vw - 145px));
       font-size: 9px;
       padding: 5px;
       min-height: 44px;
@@ -247,8 +269,7 @@
   }
   @media (max-height: 500px) and (min-width: 650px) {
     .practice-advance {
-      top: 14px;
-      right: 75px;
+      top: 8px;
       max-width: 160px;
       min-height: 44px;
       font-size: 9px;

@@ -27,3 +27,10 @@ Chromium/WebKit after-captures, actual motion recordings and endpoint assertions
 All original captures above remain the before-images. The latest
 [viewport-fit revision](table-light/viewport-fit/README.md) keeps the main screen
 fixed and uses colour/destination dialogs on compact screens.
+
+## Rich & Dramatic — September 14
+
+The [production Rich & Dramatic evidence](rich-dramatic/README.md) supersedes
+Table Light visually. It includes Chromium and WebKit 1728×960 tables, rendered-size
+material close-ups, and the collapsed/open compact board tray. The earlier images
+remain historical before-captures.

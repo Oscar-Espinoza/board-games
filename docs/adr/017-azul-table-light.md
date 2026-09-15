@@ -1,6 +1,6 @@
 # ADR 017: Azul Table Light presentation
 
-Date: 2026-09-13. Status: accepted.
+Date: 2026-09-13. Status: superseded visually by [ADR 020](020-azul-rich-dramatic.md); interaction and presentation-event contracts retained.
 
 ## Context
 

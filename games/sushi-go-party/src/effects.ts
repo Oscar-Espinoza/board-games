@@ -69,13 +69,20 @@ export function passBundles(
     bundle.className = 'sushi-passing-bundle';
     bundle.setAttribute('aria-hidden', 'true');
     bundle.style.cssText =
-      'position:absolute;width:29px;height:41px;border:3px solid #fff4dd;border-radius:6px;background:repeating-linear-gradient(45deg,#619488 0px,#619488 5px,#83aa9c 5px,#83aa9c 7px);box-shadow:3px 3px 0 #3b6c61,5px 5px 0 #fff4dd;pointer-events:none;z-index:8;left:0;top:0';
+      'position:absolute;width:29px;height:41px;border:2px solid #f9dfbc;border-radius:6px;background:repeating-radial-gradient(ellipse at 50% 95%,transparent 0 3px,#f2aa9244 4px 5px,transparent 6px 8px),#aa474a;background-size:26px 27px;box-shadow:3px 3px 0 #8a4245,5px 5px 0 #fff4dd;pointer-events:none;z-index:8;left:0;top:0;display:grid;place-items:center;color:#f0b0a0';
+    bundle.textContent = '✿';
+    const large = root.dataset.layout === 'desktop';
+    if (large) {
+      bundle.style.width = '60px';
+      bundle.style.height = '78px';
+      bundle.style.fontSize = '32px';
+    }
     root.append(bundle);
     elements.push(bundle);
-    const x1 = from.x + from.width / 2 - bounds.x - 15,
-      y1 = from.y + from.height / 2 - bounds.y - 20,
-      x2 = to.x + to.width / 2 - bounds.x - 15,
-      y2 = to.y + to.height / 2 - bounds.y - 20;
+    const x1 = from.x + from.width / 2 - bounds.x - (large ? 30 : 15),
+      y1 = from.y + from.height / 2 - bounds.y - (large ? 39 : 20),
+      x2 = to.x + to.width / 2 - bounds.x - (large ? 30 : 15),
+      y2 = to.y + to.height / 2 - bounds.y - (large ? 39 : 20);
     const anim = bundle.animate(
       [
         { transform: `translate(${x1}px,${y1}px) rotate(-9deg)`, opacity: 0 },

@@ -6,7 +6,8 @@
     "./server": "./src/index.ts",
     "./Board.svelte": "./src/Board.svelte",
     "./practice": "./src/practice.ts",
-    "./Dish.svelte": "./src/Dish.svelte"
+    "./Dish.svelte": "./src/Dish.svelte",
+    "./prototype/Table.svelte": "./src/prototype/Table.svelte"
   },
   "dependencies": {
     "@board-games/game-core": "workspace:*",

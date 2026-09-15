@@ -30,20 +30,25 @@ import { ringGeometry, railPosition } from './geometry.js';
 import { fixture, inventory, scenarios, seeded } from './practice.js';
 import { apply, view, type Destination } from './index.js';
 
-for (const phone of [true, false])
+for (const mode of ['compact', 'tabletop'] as const)
   for (const count of [5, 7, 9])
-    test(`${count} factories ${phone ? 'phone' : 'desktop'} clear neighbours and centre controls`, () => {
-      const g = ringGeometry(count, phone);
+    test(`${count} factories ${mode} clear neighbours and centre controls`, () => {
+      const g = ringGeometry(count, mode);
       // Conservative rectangular control bounds (whole phone disc; desktop 2×44).
-      const control = phone ? 56 : 88;
+      const control = mode === 'compact' ? 56 : 88;
       for (const [i, p] of g.points.entries()) {
-        expect(Math.hypot(p.x - g.size / 2, p.y - g.size / 2)).toBeCloseTo(
-          g.radius,
-        );
+        expect(
+          Math.hypot(
+            (p.x - g.width / 2) / g.radiusX,
+            (p.y - g.height / 2) / g.radiusY,
+          ),
+        ).toBeCloseTo(1);
         expect(p.x - g.disc / 2).toBeGreaterThanOrEqual(0);
-        expect(p.y + g.disc / 2).toBeLessThanOrEqual(g.size);
-        const dx = Math.abs(p.x - g.size / 2),
-          dy = Math.abs(p.y - g.size / 2);
+        expect(p.x + g.disc / 2).toBeLessThanOrEqual(g.width);
+        expect(p.y - g.disc / 2).toBeGreaterThanOrEqual(0);
+        expect(p.y + g.disc / 2).toBeLessThanOrEqual(g.height);
+        const dx = Math.abs(p.x - g.width / 2),
+          dy = Math.abs(p.y - g.height / 2);
         expect(
           dx >= (control + g.center.width) / 2 ||
             dy >= (control + g.center.height) / 2,

@@ -1,10 +1,12 @@
-# Azul Table Light
+# Azul Rich & Dramatic
 
-Table Light keeps a walnut surface, circular factories, loose centre tiles, miniature opponent boards and a score rail. The corrected design is implemented in the game-owned presentation layer. Rules, projections, actions, accepted events, networking and retry policy are unchanged; see [ADR 017](../adr/017-azul-table-light.md).
+Rich & Dramatic is the production Azul table defined by [ADR 020](../adr/020-azul-rich-dramatic.md). Generated raster artwork supplies photographed ceramic, textile, board and aged-brass material beneath real Svelte state. Rules, projections, actions, accepted events, networking, retry policy and presentation sequencing are unchanged.
 
-![Table Light design study](images/table-light-desktop.webp)
+The desktop table places every factory around a protected loose centre and fixes the playable board beneath the complete ring. Compact screens keep the established colour/destination dialogs and use a collapsed-by-default local board tray. The main table has no scroll range. [ADR 017](../adr/017-azul-table-light.md) remains the history for the retained interaction and anchor contracts; its Table Light materials and side-by-side desktop layout are superseded.
 
-This is a design mockup, not browser evidence. The corrected written specification takes precedence: existing corner controls stay in place, “in hand” is an uncommitted selection preview, and the main screen must fit without scrolling. Desktop places supply and the playable board side by side under a row containing every opponent. Compact screens use colour and destination dialogs while retaining an inspectable local overview.
+The earlier Table Light study remains labelled historical evidence:
+
+![Historical Table Light design study](images/table-light-desktop.webp)
 
 | Document                      | Purpose                                              |
 | ----------------------------- | ---------------------------------------------------- |

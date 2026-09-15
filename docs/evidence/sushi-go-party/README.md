@@ -1,8 +1,12 @@
 # Sushi Go Party browser evidence
 
-Captured September 12, 2026 from the real built application. All names are test
+Originally captured September 12, 2026; refreshed for the illustrated-table
+migration on September 15, 2026 from the real built application. All names are test
 participants. Chromium and Playwright WebKit used independent browser contexts
 and real Socket.IO rooms; practice fixtures are explicitly identified below.
+
+The new five-player desktop, board/seat/hand close-ups, rules/settings and accepted
+passing captures are indexed in the [migration handoff](../../sushi-go-party-redesign.md).
 
 | Files (each has `chromium-` and `webkit-` variants)                                        | What they show                                                                                                                  |
 | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |

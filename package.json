@@ -17,7 +17,7 @@
     "format:check": "bun --bun prettier --check ."
   },
   "devDependencies": {
-    "@playwright/test": "1.63.0",
+    "@playwright/test": "^1.63.0",
     "@types/bun": "^1.4.2",
     "@types/node": "^24.0.0",
     "prettier": "3.9.6",

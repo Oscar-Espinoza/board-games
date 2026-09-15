@@ -68,6 +68,6 @@ Rule tests include independent scoring examples, exact wall mapping, invalid pay
 
 ## Table presentation
 
-The accepted visual direction for the table is Table Light, recorded in [ADR 017](../adr/017-azul-table-light.md) with the migration, tokens, components, motion and mobile layout in [Azul redesign](../azul-redesign/README.md). It changes presentation only: the rules, conventions and boundaries above are unaffected. Two rulebook details it depends on are worth repeating here, because both are easy to get backwards: the retail player board is flat printed cardboard with nothing recessed, and the faded tile motifs are printed on the wall rather than on the pattern lines.
+The accepted visual direction is Rich & Dramatic, recorded in [ADR 020](../adr/020-azul-rich-dramatic.md), with implementation details in [Azul redesign](../azul-redesign/README.md). Generated ceramic, textile, board and brass imagery sits under live state-driven components; no rule, convention or architecture boundary above changes. Two rulebook details remain important: the retail player board is flat printed cardboard with nothing recessed, and faded tile motifs are printed on the wall rather than the pattern lines.
 
 Actual Safari on macOS/iOS, device touch/audio quality, a multi-human game and fluent Spanish editorial review require human validation and are not established by WebKit automation.

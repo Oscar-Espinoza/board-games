@@ -7,3 +7,12 @@ export const palette = {
   white: { glaze: '#faf2da', motif: '#368c9e' },
   marker: { glaze: '#f5e8c9', motif: '#15364c' },
 } as const;
+
+/** Optimized browser artwork for the approved Rich & Dramatic table. */
+export const richTileArtwork = {
+  blue: '/games/azul/rich/tile-blue.webp',
+  yellow: '/games/azul/rich/tile-yellow.webp',
+  red: '/games/azul/rich/tile-red.webp',
+  black: '/games/azul/rich/tile-black.webp',
+  white: '/games/azul/rich/tile-white.webp',
+} as const;

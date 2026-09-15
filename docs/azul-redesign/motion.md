@@ -1,4 +1,4 @@
-# Azul Table Light: presentation sequence
+# Azul Rich & Dramatic: presentation sequence
 
 `planPresentation(previous, accepted)` is a pure game-local planner. It consumes public snapshots and existing accepted events, producing temporary visual steps and timed flights. It never calls the rules engine, draws randomness, changes accepted events or infers new scoring outcomes. The revision gate still permits only uninterrupted consecutive accepted revisions for the same match and seat.
 
@@ -16,7 +16,7 @@ Reconstruct newly occupied pattern/floor slots from travel destinations before d
 
 Completion comes from the full timeline. There is no separate fixed animation timeout controlling acceptance. The server still transitions atomically, and newer accepted snapshots immediately supersede temporary presentation.
 
-Flights are body-level `.azul-flight` wrappers, with Web Animations on the wrapper and real `Tile` SVG artwork mounted inside. The tile explicitly reads its game palette; table-scoped variables are not required for its appearance. Endpoint position and scale match measured destination bounds, including compact opponents. Completion and cancellation unmount every tile and remove wrappers, timers and scheduled sounds.
+Flights are body-level `.azul-flight` wrappers, with Web Animations on the wrapper and the real raster-backed `Tile` component mounted inside. Endpoint position and scale match measured destination bounds, including compact opponents and the collapsed local-board miniature. Completion and cancellation unmount every tile and remove wrappers, timers and scheduled sounds.
 
 Measure table anchors only, never dialog copies. Canonical keys include factory slots, per-player pattern/wall/floor slots, marker, summary, bag, discard and centre colours. Scattered tiles additionally have `center/{color}/{slot}` keys. Canonical centre keys and summary anchors remain fallbacks; zero-sized elements cannot serve as destinations.
 

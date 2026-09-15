@@ -16,8 +16,14 @@
   import { t, cardName, hues } from './labels.js';
   import { EventCursor } from './presentation.js';
   import { tableAudio, passBundles } from './effects.js';
-  import Dish from './Dish.svelte';
+  import Dish from './table/FoodArt.svelte';
   import Card from './Card.svelte';
+  import PartyBoard from './table/PartyBoard.svelte';
+  import ScorePawn from './table/ScorePawn.svelte';
+  import TableDecor from './table/TableDecor.svelte';
+  import OpponentSeat from './table/OpponentSeat.svelte';
+  import { desktopSeats, tableMenu, pawnColors } from './table/layout.js';
+  import './table/table.css';
   let {
     view,
     playerId,
@@ -50,6 +56,22 @@
   const pub = $derived(view.public),
     priv = $derived(view.private);
   const own = $derived(pub.players.find((p) => p.id === playerId)!);
+  let viewportWidth = $state(1440),
+    viewportHeight = $state(900);
+  const rich = $derived(viewportWidth >= 1100 && viewportHeight >= 680);
+  const scale = $derived(Math.min(viewportWidth / 1440, viewportHeight / 900));
+  const richSeats = $derived(desktopSeats(pub.players.length - 1));
+  const color = (id: string) =>
+    pawnColors[pub.players.findIndex((p) => p.id === id) % pawnColors.length];
+  const scorePlayers = $derived(
+    pub.players.map((p) => ({
+      id: p.id,
+      name: name(p.id),
+      score: p.score,
+      color: color(p.id),
+    })),
+  );
+  const richMenu = $derived(tableMenu(pub.menu, pub.players.length, locale));
   const friends = $derived([
     ...pub.players.slice(pub.players.findIndex((p) => p.id === playerId) + 1),
     ...pub.players.slice(
@@ -112,7 +134,7 @@
       i < top
         ? ((i + 0.5) * 100) / top
         : 100 - ((i - top + 0.5) * 100) / (n - top);
-    return `--x:${50 + 40 * Math.cos(angle)}%;--y:${48 - 33 * Math.sin(angle)}%;--short-x:${shortX}%;--short-y:${i < top ? 96 : 170}px;`;
+    return `--x:${50 + 40 * Math.cos(angle)}%;--y:${48 - 33 * Math.sin(angle)}%;--short-x:${shortX}%;--short-y:${i < top ? 96 : 170}px;--seat-fraction:${(i + 0.5) / n};--seat-count:${n};`;
   }
   function toggle(list: string[], id: string) {
     return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
@@ -298,11 +320,19 @@
   });
 </script>
 
+<svelte:window
+  bind:innerWidth={viewportWidth}
+  bind:innerHeight={viewportHeight}
+/>
+
 <div
   class="sushi-table"
   bind:this={root}
   class:reduce={!motion || systemReduced}
   class:scoring
+  class:rich
+  style:--table-scale={scale}
+  data-layout={rich ? 'desktop' : 'compact'}
   role="group"
   aria-label="Sushi Go Party!"
   data-phase={pub.phase}
@@ -335,454 +365,574 @@
   <span class="table-wordmark">SUSHI GO <b>PARTY!</b></span>
   <span class="sr-only" role="status" aria-live="polite">{announcement}</span>
 
-  {#each friends as friend, i (friend.id)}
-    <div
-      class="seat"
-      style={seatPosition(i, friends.length)}
-      data-seat={friend.id}
-    >
-      <button
-        class="friend-plate"
-        class:ready={pub.ready.includes(friend.id) ||
-          pub.committed.includes(friend.id)}
-        onclick={() => open('tray', friend.id)}
-        aria-label={`${name(friend.id)} · ${label('score', { score: friend.score })} · ${label('tableau')}`}
-      >
-        <span
-          class="friend-avatar"
-          style={`--guest:${['#db9b8c', '#c3b16e', '#8cacb4', '#b69eb7', '#b7ba8f', '#d2ad86', '#92b5a3'][i]}`}
-          >{name(friend.id).slice(0, 1).toUpperCase()}</span
-        >
-        <span class="friend-name" title={name(friend.id)}
-          >{name(friend.id)}</span
-        ><span class="friend-score">{friend.score} <small>✦</small></span>
-        <span class="friend-foods" aria-hidden="true"
-          >{#each friend.tableau.slice(-3) as card}<span
-              ><Dish {card} boxed={card.boxed} /></span
-            >{/each}{#if !friend.tableau.length}<span class="plate-line"
-            ></span>{/if}</span
-        >
-        <span class="friend-details"
-          >{pub.committed.includes(friend.id) || pub.ready.includes(friend.id)
-            ? '✓'
-            : `${friend.count} ▧`} · {friend.desserts.length +
-            friend.tableau.filter(
-              (c) =>
-                desserts.includes(c.kind as (typeof desserts)[number]) &&
-                !c.boxed,
-            ).length} ♡</span
-        >
-      </button>
-    </div>
-  {/each}
-
-  {#if pub.phase === 'setup'}
-    <section class="menu-setup">
-      <div class="setup-platter">
-        <Dish card={face('nigiri', 'salmon')} /><Dish
-          card={face('maki', '3')}
-        /><Dish card={face('dumpling')} />
-      </div>
-      <p class="eyebrow">SUSHI GO PARTY! · {pub.players.length}</p>
-      <h1>{label('menu_title')}</h1>
-      <p>{label('menu_intro')}</p>
-      <div class="presets">
-        {#each Object.entries(presets) as [key, menu]}<button
-            class:chosen={JSON.stringify(menu) === JSON.stringify(pub.menu)}
-            disabled={!allowed || !validMenu(menu, pub.players.length)}
-            title={!validMenu(menu, pub.players.length)
-              ? label('unavailable')
-              : menuKinds(menu)
-                  .map((k) => label(k))
-                  .join(', ')}
-            onclick={() => propose(menu)}
-            ><span class="preset-art"><Dish card={face(menu.roll)} /></span
-            ><span>{label('preset_' + key)}</span></button
-          >{/each}
-      </div>
-      <button
-        class="text-button"
-        onclick={() => {
-          custom = !custom;
-          customMenu = {
-            roll: pub.menu.roll,
-            appetizers: [...pub.menu.appetizers],
-            specials: [...pub.menu.specials],
-            dessert: pub.menu.dessert,
-          };
+  <div class="table-stage" data-guests={pub.players.length}>
+    {#if rich}
+      <TableDecor
+        notes={[
+          label('table_note_one'),
+          label('table_note_two'),
+          label('table_note_three'),
+        ]}
+      />
+      <PartyBoard
+        players={scorePlayers}
+        scoreLabel={(n, s) => `${n}: ${label('score', { score: s })}`}
+        menu={richMenu}
+        round={pub.round}
+        pick={pub.turn}
+        totalPicks={pub.players.length <= 3
+          ? 10
+          : pub.players.length <= 5
+            ? 9
+            : pub.players.length <= 7
+              ? 8
+              : 7}
+        boardLabel={label('table_board')}
+        indicator={pub.phase === 'setup'
+          ? label('menu_title')
+          : label('table_pick', {
+              round: pub.round,
+              pick: pub.turn,
+              total:
+                pub.players.length <= 3
+                  ? 10
+                  : pub.players.length <= 5
+                    ? 9
+                    : pub.players.length <= 7
+                      ? 8
+                      : 7,
+            })}
+        onrule={(kind) => {
+          search = label(kind);
+          void open('guide');
         }}
-        aria-expanded={custom}>{label('custom')} {custom ? '−' : '+'}</button
+      />
+      <p class="passing-note">
+        {#each label('table_clockwise').split('|') as line}<span>{line}</span
+          >{/each}
+      </p>
+      {#if pub.players.length === 5}<svg
+          class="passing-arrows"
+          viewBox="0 0 1440 900"
+          aria-hidden="true"
+          ><defs
+            ><marker
+              id="sushi-live-arrow"
+              markerWidth="12"
+              markerHeight="12"
+              refX="9"
+              refY="5"
+              orient="auto"
+              markerUnits="userSpaceOnUse"
+              ><path d="m0 0 12 5-12 5 3-5Z" fill="#dfedcd" /></marker
+            ></defs
+          ><path d="M220 650Q177 559 204 453" /><path
+            d="M290 199Q346 112 465 112"
+          /><path
+            d="M975 112Q1119 119 1176 199"
+          />{#if pub.players.length >= 5}<path
+              d="M1299 452Q1293 495 1242 530"
+            /><path d="M1340 758Q1370 830 1270 865" />{/if}</svg
+        >{/if}
+    {/if}
+
+    {#each friends as friend, i (friend.id)}
+      <div
+        class="seat"
+        style={rich
+          ? `--seat-x:${richSeats[i].x}px;--seat-y:${richSeats[i].y}px;--seat-w:${richSeats[i].w}px;--seat-h:${richSeats[i].h}px`
+          : seatPosition(i, friends.length)}
+        data-seat={friend.id}
+        class:top-seat={rich && richSeats[i].top}
       >
-      {#if custom}<div class="custom-menu">
-          <label
-            >{label('rolls')}<select bind:value={customMenu.roll}
-              >{#each rolls as k}<option value={k}>{label(k)}</option
-                >{/each}</select
-            ></label
+        {#if rich}<OpponentSeat
+            name={name(friend.id)}
+            score={friend.score}
+            color={color(friend.id)}
+            count={friend.count}
+            tableau={friend.tableau}
+            saved={friend.desserts.length}
+            status={revealCards.length
+              ? 'passing'
+              : pub.ready.includes(friend.id) ||
+                  pub.committed.includes(friend.id)
+                ? 'ready'
+                : 'choosing'}
+            top={richSeats[i].top}
+            newlyPlayed={revealCards
+              .filter((r) => r.seat === friend.id)
+              .map((r) => r.card.id)}
+            {locale}
+            onclick={() => open('tray', friend.id)}
+          />{:else}
+          <button
+            class="friend-plate"
+            class:ready={pub.ready.includes(friend.id) ||
+              pub.committed.includes(friend.id)}
+            onclick={() => open('tray', friend.id)}
+            aria-label={`${name(friend.id)} · ${label('score', { score: friend.score })} · ${label('tableau')}`}
           >
-          {#each [0, 1, 2] as i}<label
-              >{label('appetizers')}
-              {i + 1}<select bind:value={customMenu.appetizers[i]}
-                >{#each appetizers as k}<option
-                    value={k}
-                    disabled={k === 'edamame' && pub.players.length === 2}
-                    >{label(k)}</option
+            <span
+              class="friend-avatar"
+              style={`--guest:${['#db9b8c', '#c3b16e', '#8cacb4', '#b69eb7', '#b7ba8f', '#d2ad86', '#92b5a3'][i]}`}
+              >{name(friend.id).slice(0, 1).toUpperCase()}</span
+            >
+            <span class="friend-name" title={name(friend.id)}
+              >{name(friend.id)}</span
+            ><span class="friend-score">{friend.score} <small>✦</small></span>
+            <span class="friend-foods" aria-hidden="true"
+              >{#each friend.tableau.slice(-3) as card}<span
+                  ><Dish {card} boxed={card.boxed} /></span
+                >{/each}{#if !friend.tableau.length}<span class="plate-line"
+                ></span>{/if}</span
+            >
+            <span class="friend-details"
+              >{pub.committed.includes(friend.id) ||
+              pub.ready.includes(friend.id)
+                ? '✓'
+                : `${friend.count} ▧`} · {friend.desserts.length +
+                friend.tableau.filter(
+                  (c) =>
+                    desserts.includes(c.kind as (typeof desserts)[number]) &&
+                    !c.boxed,
+                ).length} ♡</span
+            >
+          </button>
+        {/if}
+      </div>
+    {/each}
+
+    {#if pub.phase === 'setup'}
+      <section class="menu-setup">
+        <div class="setup-platter">
+          <Dish card={face('nigiri', 'salmon')} /><Dish
+            card={face('maki', '3')}
+          /><Dish card={face('dumpling')} />
+        </div>
+        <p class="eyebrow">SUSHI GO PARTY! · {pub.players.length}</p>
+        <h1>{label('menu_title')}</h1>
+        <p>{label('menu_intro')}</p>
+        <div class="presets">
+          {#each Object.entries(presets) as [key, menu]}<button
+              class:chosen={JSON.stringify(menu) === JSON.stringify(pub.menu)}
+              disabled={!allowed || !validMenu(menu, pub.players.length)}
+              title={!validMenu(menu, pub.players.length)
+                ? label('unavailable')
+                : menuKinds(menu)
+                    .map((k) => label(k))
+                    .join(', ')}
+              onclick={() => propose(menu)}
+              ><span class="preset-art"><Dish card={face(menu.roll)} /></span
+              ><span>{label('preset_' + key)}</span></button
+            >{/each}
+        </div>
+        <button
+          class="text-button"
+          onclick={() => {
+            custom = !custom;
+            customMenu = {
+              roll: pub.menu.roll,
+              appetizers: [...pub.menu.appetizers],
+              specials: [...pub.menu.specials],
+              dessert: pub.menu.dessert,
+            };
+          }}
+          aria-expanded={custom}>{label('custom')} {custom ? '−' : '+'}</button
+        >
+        {#if custom}<div class="custom-menu">
+            <label
+              >{label('rolls')}<select bind:value={customMenu.roll}
+                >{#each rolls as k}<option value={k}>{label(k)}</option
                   >{/each}</select
               ></label
-            >{/each}
-          {#each [0, 1] as i}<label
-              >{label('specials')}
-              {i + 1}<select bind:value={customMenu.specials[i]}
-                >{#each specials as k}<option
-                    value={k}
-                    disabled={(k === 'spoon' && pub.players.length === 2) ||
-                      ((k === 'menu' || k === 'special_order') &&
-                        pub.players.length >= 7)}>{label(k)}</option
+            >
+            {#each [0, 1, 2] as i}<label
+                >{label('appetizers')}
+                {i + 1}<select bind:value={customMenu.appetizers[i]}
+                  >{#each appetizers as k}<option
+                      value={k}
+                      disabled={k === 'edamame' && pub.players.length === 2}
+                      >{label(k)}</option
+                    >{/each}</select
+                ></label
+              >{/each}
+            {#each [0, 1] as i}<label
+                >{label('specials')}
+                {i + 1}<select bind:value={customMenu.specials[i]}
+                  >{#each specials as k}<option
+                      value={k}
+                      disabled={(k === 'spoon' && pub.players.length === 2) ||
+                        ((k === 'menu' || k === 'special_order') &&
+                          pub.players.length >= 7)}>{label(k)}</option
+                    >{/each}</select
+                ></label
+              >{/each}
+            <label
+              >{label('desserts')}<select bind:value={customMenu.dessert}
+                >{#each desserts as k}<option value={k}>{label(k)}</option
                   >{/each}</select
               ></label
+            ><button
+              disabled={!allowed || !validMenu(customMenu, pub.players.length)}
+              onclick={() => propose(customMenu)}>{label('propose')}</button
+            >
+          </div>{/if}
+        <div class="menu-strip">
+          {#each menuKinds(pub.menu) as k}<button
+              title={label('rule_' + k)}
+              onclick={() => {
+                search = label(k);
+                void open('guide');
+              }}
+              ><span
+                ><Dish
+                  card={face(
+                    k,
+                    k === 'nigiri'
+                      ? 'salmon'
+                      : k === 'onigiri'
+                        ? 'triangle'
+                        : '',
+                  )}
+                /></span
+              >{label(k)}</button
             >{/each}
-          <label
-            >{label('desserts')}<select bind:value={customMenu.dessert}
-              >{#each desserts as k}<option value={k}>{label(k)}</option
-                >{/each}</select
-            ></label
-          ><button
-            disabled={!allowed || !validMenu(customMenu, pub.players.length)}
-            onclick={() => propose(customMenu)}>{label('propose')}</button
-          >
-        </div>{/if}
-      <div class="menu-strip">
-        {#each menuKinds(pub.menu) as k}<button
-            title={label('rule_' + k)}
-            onclick={() => {
-              search = label(k);
-              void open('guide');
-            }}
-            ><span
+        </div>
+        <button
+          class="primary"
+          data-testid="sgp-ready"
+          disabled={!allowed || pub.ready.includes(playerId)}
+          onclick={ready}
+          >{label(
+            pub.ready.includes(playerId) ? 'ready_wait' : 'menu_ready',
+          )}</button
+        >
+        <p class="ready-count">
+          {label('waiting', {
+            count: pub.ready.length,
+            total: pub.players.length,
+          })}
+        </p>
+      </section>
+    {:else}
+      <div class="table-center">
+        <p class="eyebrow">
+          {label('round_turn', { round: pub.round, turn: pub.turn })}
+        </p>
+        <h1>
+          {pub.phase === 'finished'
+            ? label('finished')
+            : pub.phase === 'round-end'
+              ? label('round_end')
+              : label('current_menu')}
+        </h1>
+        <div class="menu-mini">
+          {#each menuKinds(pub.menu) as k}<button
+              title={`${label(k)}: ${label('rule_' + k)}`}
+              onclick={() => {
+                search = label(k);
+                void open('guide');
+              }}
+              style={`--dish:${hues[k]}`}
               ><Dish
                 card={face(
                   k,
                   k === 'nigiri' ? 'salmon' : k === 'onigiri' ? 'triangle' : '',
                 )}
-              /></span
-            >{label(k)}</button
-          >{/each}
-      </div>
-      <button
-        class="primary"
-        data-testid="sgp-ready"
-        disabled={!allowed || pub.ready.includes(playerId)}
-        onclick={ready}
-        >{label(
-          pub.ready.includes(playerId) ? 'ready_wait' : 'menu_ready',
-        )}</button
-      >
-      <p class="ready-count">
-        {label('waiting', {
-          count: pub.ready.length,
-          total: pub.players.length,
-        })}
-      </p>
-    </section>
-  {:else}
-    <div class="table-center">
-      <p class="eyebrow">
-        {label('round_turn', { round: pub.round, turn: pub.turn })}
-      </p>
-      <h1>
-        {pub.phase === 'finished'
-          ? label('finished')
-          : pub.phase === 'round-end'
-            ? label('round_end')
-            : label('current_menu')}
-      </h1>
-      <div class="menu-mini">
-        {#each menuKinds(pub.menu) as k}<button
-            title={`${label(k)}: ${label('rule_' + k)}`}
-            onclick={() => {
-              search = label(k);
-              void open('guide');
-            }}
-            style={`--dish:${hues[k]}`}
-            ><Dish
-              card={face(
-                k,
-                k === 'nigiri' ? 'salmon' : k === 'onigiri' ? 'triangle' : '',
-              )}
-            /><span class="sr-only">{label(k)}</span></button
-          >{/each}
-      </div>
-      {#if pub.phase === 'draft'}<p class="ready-count">
-          {label('waiting', {
-            count: pub.committed.length,
-            total: pub.players.length,
-          })}
-        </p>{/if}
-      {#if pub.prompt && !priv.prompt}<p class="waiting-prompt">
-          {label('prompt_wait', { name: name(pub.prompt.actorId) })}<small
-            >{label('prompt_' + pub.prompt.kind)}</small
-          >
-        </p>{/if}
-      {#if !allowed && pub.connected.length < pub.players.length}<p
-          class="waiting-prompt"
-        >
-          {label('disconnected')}
-        </p>{/if}
-    </div>
-
-    {#if priv.prompt}
-      <section
-        class="decision"
-        aria-label={label('prompt_' + priv.prompt.kind)}
-        data-testid={`sgp-prompt-${priv.prompt.kind}`}
-        data-prompt={priv.prompt.id}
-      >
-        <p class="eyebrow">{name(playerId)}</p>
-        <h2>{label('prompt_' + priv.prompt.kind)}</h2>
-        {#if ['menu', 'chopsticks', 'supplier'].includes(priv.prompt.kind)}<div
-            class="choice-cards"
-          >
-            {#each priv.prompt.cards as card}<button
-                data-handle={card.handle}
-                disabled={!allowed}
-                title={label('rule_' + card.kind)}
-                aria-label={cardName(card, locale)}
-                onclick={() => resolve({ type: 'card', card: card.handle })}
-                ><Card {card} {locale} /></button
-              >{/each}
-          </div>
-        {:else if priv.prompt.kind === 'copy' || priv.prompt.kind === 'attach'}<div
-            class="choice-cards"
-          >
-            {#each priv.prompt.targets as card}<button
-                disabled={!allowed}
-                aria-label={cardName(card, locale)}
-                onclick={() =>
-                  resolve(
-                    priv.prompt!.kind === 'copy'
-                      ? { type: 'copy', target: card.id }
-                      : { type: 'attach', wasabi: card.id },
-                  )}><Card {card} {locale} /></button
-              >{/each}
-          </div>
-          {#if priv.prompt.kind === 'attach'}<button
-              onclick={() => resolve({ type: 'attach', wasabi: null })}
-              disabled={!allowed}>{label('no_attach')}</button
-            >{/if}
-        {:else if priv.prompt.kind === 'takeout'}<div class="choice-cards">
-            {#each priv.prompt.targets as card}<button
-                class:chosen={boxes.includes(card.id)}
-                aria-pressed={boxes.includes(card.id)}
-                disabled={!allowed}
-                aria-label={cardName(card, locale)}
-                onclick={() => (boxes = toggle(boxes, card.id))}
-                ><Card {card} {locale} /></button
-              >{/each}
-          </div>
-          <button
-            class="primary"
-            disabled={!allowed}
-            onclick={() => resolve({ type: 'takeout', cards: boxes })}
-            >{label(boxes.length ? 'box_selected' : 'flip_none')}</button
-          >
-        {:else if priv.prompt.kind === 'spoon'}<div class="request-row">
-            <select
-              aria-label={label('ask')}
-              bind:value={requestKind}
-              onchange={() => {
-                requestVariant = '';
-                requestPriority = '';
-              }}
-              >{#each priv.prompt.requests as r}<option value={r.kind}
-                  >{label(r.kind)}</option
-                >{/each}</select
-            ><select
-              aria-label={label('request_any')}
-              bind:value={requestVariant}
-              ><option value="">{label('request_any')}</option
-              >{#each priv.prompt.requests
-                .find((r) => r.kind === requestKind)
-                ?.variants.filter(Boolean) ?? [] as v}<option value={v}
-                  >{cardName(
-                    face(
-                      requestKind,
-                      v,
-                      0,
-                      0,
-                      requestKind === 'fruit'
-                        ? v.split('').map(Number)
-                        : [0, 0, 0],
-                    ),
-                    locale,
-                  )}</option
-                >{/each}</select
-            >{#if priv.prompt.requests.find((r) => r.kind === requestKind)?.priorities.length}<select
-                aria-label={label('priority', { number: '' })}
-                bind:value={requestPriority}
-                ><option value="">{label('request_any')}</option
-                >{#each priv.prompt.requests.find((r) => r.kind === requestKind)?.priorities ?? [] as n}<option
-                    value={String(n)}>{label('priority', { number: n })}</option
-                  >{/each}</select
-              >{/if}<button
-              class="primary"
-              disabled={!allowed}
-              onclick={() =>
-                resolve({
-                  type: 'request',
-                  kind: requestKind,
-                  ...(requestVariant ? { variant: requestVariant } : {}),
-                  ...(requestPriority
-                    ? { priority: Number(requestPriority) }
-                    : {}),
-                })}>{label('ask')}</button
-            >
-          </div>{/if}
-      </section>
-    {/if}
-
-    {#if pub.phase === 'round-end' || pub.phase === 'finished'}
-      <section class="results">
-        <h2>
-          {pub.phase === 'finished'
-            ? label('winners', { names: pub.winners.map(name).join(', ') })
-            : label('receipt')}
-        </h2>
-        <div class="receipts">
-          {#each pub.receipts.filter((r) => r.round === pub.round) as receipt}<details
-              open={receipt.playerId === playerId}
-            >
-              <summary
-                ><span>{name(receipt.playerId)}</span><strong
-                  >{receipt.total} ✦</strong
-                ></summary
-              >
-              <p>
-                {label('round_delta', {
-                  points: receipt.delta,
-                  immediate: receipt.immediate,
-                })}
-              </p>
-              {#each receipt.groups as g}<div class="score-line">
-                  <span>{label(g.kind)}</span><strong
-                    >{g.amount > 0 ? '+' : ''}{g.amount}</strong
-                  >
-                </div>{/each}
-            </details>{/each}
-        </div>
-        {#if pub.phase === 'round-end'}<button
-            class="primary"
-            data-testid="sgp-ready"
-            disabled={!allowed || pub.ready.includes(playerId)}
-            onclick={ready}
-            >{label(
-              pub.ready.includes(playerId) ? 'ready_wait' : 'next_round',
-            )}</button
-          >{:else if canRematch && rematch}<button
-            class="primary"
-            onclick={() => rematch?.()}>{label('rematch')}</button
-          >{/if}
-      </section>
-    {/if}
-
-    <section class="own-area" data-seat={playerId} aria-label={label('plate')}>
-      <div class="own-label">
-        <span>{name(playerId)} <small>{label('you')}</small></span><strong
-          >{own.score} ✦</strong
-        ><button class="dessert-badge" onclick={() => open('tray', playerId)}
-          >{label('saved', { count: own.desserts.length })} ♡</button
-        >
-      </div>
-      <div class="own-plate" class:empty={!own.tableau.length}>
-        {#if !own.tableau.length}<p>
-            {label('empty_plate')}
-          </p>{/if}{#each own.tableau.toSorted((a, b) => a.color.localeCompare(b.color) || a.id.localeCompare(b.id)) as card (card.id)}<button
-            class:wasabi-linked={card.wasabi}
-            class:score-hit={scoredCards.includes(card.id)}
-            title={`${cardName(card, locale)}: ${label('rule_' + card.kind)}`}
-            aria-label={cardName(card, locale)}
-            onclick={() => {
-              search = label(card.kind);
-              void open('guide');
-            }}><Card {card} {locale} small /></button
-          >{/each}
-      </div>
-    </section>
-    {#if pub.phase === 'draft'}
-      <section class="hand-area" aria-label={label('hand')}>
-        {#if selectedCard && !priv.committed}<div class="selection-details">
-            <span>{label('rule_' + selectedCard.kind)}</span
-            >{#if priv.legalUtensils.length}<div class="utensil-choices">
-                <b>{label('utensils')}</b
-                >{#each priv.legalUtensils as id}{@const utensil =
-                    own.tableau.find((c) => c.id === id)!}<button
-                    class:chosen={armed.includes(id)}
-                    aria-pressed={armed.includes(id)}
-                    onclick={() => (armed = toggle(armed, id))}
-                    >{label(utensil.kind)} {utensil.priority}</button
-                  >{/each}
-              </div>{/if}
-            {#if selectedCard.kind === 'special_order'}<div
-                class="copy-choices"
-              >
-                {#if priv.copyTargets.length}<label
-                    >{label('copy_target')}<select bind:value={copyTarget}
-                      ><option value="">{label('copy_target')}</option
-                      >{#each priv.copyTargets as c}<option value={c.id}
-                          >{cardName(c, locale)}{c.boxed
-                            ? ` · ${label('boxed')}`
-                            : ''}</option
-                        >{/each}</select
-                    ></label
-                  >{#if copyTarget}<span class="ghost-copy"
-                      ><Dish
-                        card={priv.copyTargets.find(
-                          (c) => c.id === copyTarget,
-                        )!}
-                      /><span>{label('copy_preview')}</span></span
-                    >{/if}{:else}<span>{label('copy_first')}</span>{/if}
-              </div>{/if}
-          </div>{/if}
-        <div class="hand" data-testid="sgp-hand">
-          {#each priv.hand as card (card.handle)}<button
-              data-handle={card.handle}
-              class:selected={selection === card.handle}
-              class:committed={priv.committed?.card === card.handle}
-              disabled={!allowed || !!priv.committed}
-              aria-pressed={selection === card.handle}
-              aria-label={`${cardName(card, locale)}: ${label('rule_' + card.kind)}`}
-              onclick={() => {
-                selection = card.handle;
-                copyTarget = '';
-              }}><Card {card} {locale} /></button
+              /><span class="sr-only">{label(k)}</span></button
             >{/each}
         </div>
-        <div class="confirmation">
-          <span
-            >{label(
-              priv.committed ? 'locked' : selectedCard ? 'keep' : 'select',
-            )}</span
-          ><button
-            class="primary"
-            data-testid="sgp-keep"
-            disabled={!allowed ||
-              !selectedCard ||
-              !!priv.committed ||
-              (selectedCard.kind === 'special_order' &&
-                priv.copyTargets.length > 0 &&
-                !copyTarget)}
-            onclick={keep}>{priv.committed ? '✓' : label('keep')}</button
+        {#if pub.phase === 'draft'}<p class="ready-count">
+            {label('waiting', {
+              count: pub.committed.length,
+              total: pub.players.length,
+            })}
+          </p>{/if}
+        {#if pub.prompt && !priv.prompt}<p class="waiting-prompt">
+            {label('prompt_wait', { name: name(pub.prompt.actorId) })}<small
+              >{label('prompt_' + pub.prompt.kind)}</small
+            >
+          </p>{/if}
+        {#if !allowed && pub.connected.length < pub.players.length}<p
+            class="waiting-prompt"
+          >
+            {label('disconnected')}
+          </p>{/if}
+      </div>
+
+      {#if priv.prompt}
+        <section
+          class="decision"
+          aria-label={label('prompt_' + priv.prompt.kind)}
+          data-testid={`sgp-prompt-${priv.prompt.kind}`}
+          data-prompt={priv.prompt.id}
+        >
+          <p class="eyebrow">{name(playerId)}</p>
+          <h2>{label('prompt_' + priv.prompt.kind)}</h2>
+          {#if ['menu', 'chopsticks', 'supplier'].includes(priv.prompt.kind)}<div
+              class="choice-cards"
+            >
+              {#each priv.prompt.cards as card}<button
+                  data-handle={card.handle}
+                  disabled={!allowed}
+                  title={label('rule_' + card.kind)}
+                  aria-label={cardName(card, locale)}
+                  onclick={() => resolve({ type: 'card', card: card.handle })}
+                  ><Card {card} {locale} /></button
+                >{/each}
+            </div>
+          {:else if priv.prompt.kind === 'copy' || priv.prompt.kind === 'attach'}<div
+              class="choice-cards"
+            >
+              {#each priv.prompt.targets as card}<button
+                  disabled={!allowed}
+                  aria-label={cardName(card, locale)}
+                  onclick={() =>
+                    resolve(
+                      priv.prompt!.kind === 'copy'
+                        ? { type: 'copy', target: card.id }
+                        : { type: 'attach', wasabi: card.id },
+                    )}><Card {card} {locale} /></button
+                >{/each}
+            </div>
+            {#if priv.prompt.kind === 'attach'}<button
+                onclick={() => resolve({ type: 'attach', wasabi: null })}
+                disabled={!allowed}>{label('no_attach')}</button
+              >{/if}
+          {:else if priv.prompt.kind === 'takeout'}<div class="choice-cards">
+              {#each priv.prompt.targets as card}<button
+                  class:chosen={boxes.includes(card.id)}
+                  aria-pressed={boxes.includes(card.id)}
+                  disabled={!allowed}
+                  aria-label={cardName(card, locale)}
+                  onclick={() => (boxes = toggle(boxes, card.id))}
+                  ><Card {card} {locale} /></button
+                >{/each}
+            </div>
+            <button
+              class="primary"
+              disabled={!allowed}
+              onclick={() => resolve({ type: 'takeout', cards: boxes })}
+              >{label(boxes.length ? 'box_selected' : 'flip_none')}</button
+            >
+          {:else if priv.prompt.kind === 'spoon'}<div class="request-row">
+              <select
+                aria-label={label('ask')}
+                bind:value={requestKind}
+                onchange={() => {
+                  requestVariant = '';
+                  requestPriority = '';
+                }}
+                >{#each priv.prompt.requests as r}<option value={r.kind}
+                    >{label(r.kind)}</option
+                  >{/each}</select
+              ><select
+                aria-label={label('request_any')}
+                bind:value={requestVariant}
+                ><option value="">{label('request_any')}</option
+                >{#each priv.prompt.requests
+                  .find((r) => r.kind === requestKind)
+                  ?.variants.filter(Boolean) ?? [] as v}<option value={v}
+                    >{cardName(
+                      face(
+                        requestKind,
+                        v,
+                        0,
+                        0,
+                        requestKind === 'fruit'
+                          ? v.split('').map(Number)
+                          : [0, 0, 0],
+                      ),
+                      locale,
+                    )}</option
+                  >{/each}</select
+              >{#if priv.prompt.requests.find((r) => r.kind === requestKind)?.priorities.length}<select
+                  aria-label={label('priority', { number: '' })}
+                  bind:value={requestPriority}
+                  ><option value="">{label('request_any')}</option
+                  >{#each priv.prompt.requests.find((r) => r.kind === requestKind)?.priorities ?? [] as n}<option
+                      value={String(n)}
+                      >{label('priority', { number: n })}</option
+                    >{/each}</select
+                >{/if}<button
+                class="primary"
+                disabled={!allowed}
+                onclick={() =>
+                  resolve({
+                    type: 'request',
+                    kind: requestKind,
+                    ...(requestVariant ? { variant: requestVariant } : {}),
+                    ...(requestPriority
+                      ? { priority: Number(requestPriority) }
+                      : {}),
+                  })}>{label('ask')}</button
+              >
+            </div>{/if}
+        </section>
+      {/if}
+
+      {#if pub.phase === 'round-end' || pub.phase === 'finished'}
+        <section class="results">
+          <h2>
+            {pub.phase === 'finished'
+              ? label('winners', { names: pub.winners.map(name).join(', ') })
+              : label('receipt')}
+          </h2>
+          <div class="receipts">
+            {#each pub.receipts.filter((r) => r.round === pub.round) as receipt}<details
+                open={receipt.playerId === playerId}
+              >
+                <summary
+                  ><span>{name(receipt.playerId)}</span><strong
+                    >{receipt.total} ✦</strong
+                  ></summary
+                >
+                <p>
+                  {label('round_delta', {
+                    points: receipt.delta,
+                    immediate: receipt.immediate,
+                  })}
+                </p>
+                {#each receipt.groups as g}<div class="score-line">
+                    <span>{label(g.kind)}</span><strong
+                      >{g.amount > 0 ? '+' : ''}{g.amount}</strong
+                    >
+                  </div>{/each}
+              </details>{/each}
+          </div>
+          {#if pub.phase === 'round-end'}<button
+              class="primary"
+              data-testid="sgp-ready"
+              disabled={!allowed || pub.ready.includes(playerId)}
+              onclick={ready}
+              >{label(
+                pub.ready.includes(playerId) ? 'ready_wait' : 'next_round',
+              )}</button
+            >{:else if canRematch && rematch}<button
+              class="primary"
+              onclick={() => rematch?.()}>{label('rematch')}</button
+            >{/if}
+        </section>
+      {/if}
+
+      <section
+        class="own-area"
+        data-seat={playerId}
+        aria-label={label('plate')}
+      >
+        <div class="own-label">
+          {#if rich}<ScorePawn color={color(playerId)} />{/if}
+          <span>{name(playerId)} <small>{label('you')}</small></span><strong
+            >{own.score} ✦</strong
+          >{#if rich}<span class="own-hand-count"
+              >{label('hand_count', { count: own.count })}</span
+            >{/if}<button
+            class="dessert-badge"
+            aria-label={label('saved', { count: own.desserts.length })}
+            onclick={() => open('tray', playerId)}
+            >{rich
+              ? `♡ ${own.desserts.length}`
+              : `${label('saved', { count: own.desserts.length })} ♡`}</button
           >
         </div>
+        {#if rich}<span class="own-caption">{label('table_my_dishes')}</span
+          >{/if}
+        <div class="own-plate" class:empty={!own.tableau.length}>
+          {#if !own.tableau.length}<p>
+              {label('empty_plate')}
+            </p>{/if}{#each own.tableau as card (card.id)}<button
+              class:wasabi-linked={card.wasabi}
+              class:score-hit={scoredCards.includes(card.id)}
+              class:settling={revealCards.some((r) => r.card.id === card.id)}
+              title={`${cardName(card, locale)}: ${label('rule_' + card.kind)}`}
+              aria-label={cardName(card, locale)}
+              onclick={() => {
+                search = label(card.kind);
+                void open('guide');
+              }}><Card {card} {locale} small /></button
+            >{/each}
+        </div>
       </section>
+      {#if pub.phase === 'draft'}
+        <section class="hand-area" aria-label={label('hand')}>
+          {#if selectedCard && !priv.committed}<div class="selection-details">
+              <span>{label('rule_' + selectedCard.kind)}</span
+              >{#if priv.legalUtensils.length}<div class="utensil-choices">
+                  <b>{label('utensils')}</b
+                  >{#each priv.legalUtensils as id}{@const utensil =
+                      own.tableau.find((c) => c.id === id)!}<button
+                      class:chosen={armed.includes(id)}
+                      aria-pressed={armed.includes(id)}
+                      onclick={() => (armed = toggle(armed, id))}
+                      >{label(utensil.kind)} {utensil.priority}</button
+                    >{/each}
+                </div>{/if}
+              {#if selectedCard.kind === 'special_order'}<div
+                  class="copy-choices"
+                >
+                  {#if priv.copyTargets.length}<label
+                      >{label('copy_target')}<select bind:value={copyTarget}
+                        ><option value="">{label('copy_target')}</option
+                        >{#each priv.copyTargets as c}<option value={c.id}
+                            >{cardName(c, locale)}{c.boxed
+                              ? ` · ${label('boxed')}`
+                              : ''}</option
+                          >{/each}</select
+                      ></label
+                    >{#if copyTarget}<span class="ghost-copy"
+                        ><Dish
+                          card={priv.copyTargets.find(
+                            (c) => c.id === copyTarget,
+                          )!}
+                        /><span>{label('copy_preview')}</span></span
+                      >{/if}{:else}<span>{label('copy_first')}</span>{/if}
+                </div>{/if}
+            </div>{/if}
+          <div class="hand" data-testid="sgp-hand">
+            {#each priv.hand as card, i (card.handle)}<button
+                style:--card-angle={`${(i - (priv.hand.length - 1) / 2) * 2.3}deg`}
+                style:--card-rise={`${Math.min(12, Math.abs(i - (priv.hand.length - 1) / 2) * 5)}px`}
+                style:--hand-overlap={`${priv.hand.length > 6 ? (562 - priv.hand.length * 90) / (priv.hand.length - 1) : 0}px`}
+                data-handle={card.handle}
+                class:selected={selection === card.handle}
+                class:committed={priv.committed?.card === card.handle}
+                disabled={!allowed || !!priv.committed}
+                aria-pressed={selection === card.handle}
+                aria-label={`${cardName(card, locale)}: ${label('rule_' + card.kind)}`}
+                onclick={() => {
+                  selection = card.handle;
+                  copyTarget = '';
+                }}><Card {card} {locale} /></button
+              >{/each}
+          </div>
+          <div class="confirmation">
+            <span
+              >{label(
+                priv.committed ? 'locked' : selectedCard ? 'keep' : 'select',
+              )}</span
+            ><button
+              class="primary"
+              data-testid="sgp-keep"
+              disabled={!allowed ||
+                !selectedCard ||
+                !!priv.committed ||
+                (selectedCard.kind === 'special_order' &&
+                  priv.copyTargets.length > 0 &&
+                  !copyTarget)}
+              onclick={keep}>{priv.committed ? '✓' : label('keep')}</button
+            >
+          </div>
+        </section>
+      {/if}
     {/if}
-  {/if}
-  {#each revealCards as reveal, i}<div
-      class="reveal-card"
-      style={`--rx:${20 + (i * 60) / Math.max(1, revealCards.length - 1)}%`}
-      aria-hidden="true"
-    >
-      <Card card={reveal.card} {locale} /><span>{name(reveal.seat)}</span>
-    </div>{/each}
+    {#each rich ? [] : revealCards as reveal, i}<div
+        class="reveal-card"
+        style={`--rx:${20 + (i * 60) / Math.max(1, revealCards.length - 1)}%`}
+        aria-hidden="true"
+      >
+        <Card card={reveal.card} {locale} /><span>{name(reveal.seat)}</span>
+      </div>{/each}
+  </div>
 </div>
 
 <dialog
@@ -2128,8 +2278,9 @@
       height: 100dvh;
     }
     .seat {
-      width: 82px;
-      top: calc(var(--y) * 0.36 + 30px);
+      width: min(82px, calc((100vw - 128px) / var(--seat-count) - 6px));
+      left: calc(64px + (100% - 128px) * var(--seat-fraction));
+      top: 86px;
     }
     .friend-plate {
       grid-template-rows: auto 25px auto;
@@ -2144,9 +2295,7 @@
       font-size: 12px;
     }
     .friend-avatar {
-      width: 23px;
-      height: 23px;
-      top: -17px;
+      display: none;
     }
     .friend-foods > span {
       width: 25px;
@@ -2214,7 +2363,7 @@
     }
     .confirmation .primary {
       width: 100%;
-      min-height: 43px;
+      min-height: 44px;
       padding: 8px;
       font-size: 13px;
     }

@@ -47,18 +47,21 @@ See [ADR 013](docs/adr/013-three-game-delivery.md), [Azul rules](docs/games/azul
 [Codenames rules](docs/games/codenames.md) and
 [Sushi Go Party rules](docs/games/sushi-go-party.md).
 
-Azul's accepted table presentation is Table Light: one circle of factory displays
-at every player count, a loose centre pool inside it, opponents rendered as real
-boards rather than text, and a decorative 0–100 score track with uncapped exact scores and a `100+`
-indicator. The main table must fit the viewport without scrolling. Compact layouts
-use whole-factory buttons, a colour dialog and a full-size destination dialog. Compact boards are noninteractive and dialog
-copies emit no table anchors. Stage scoring/cleanup only from accepted public
-events and snapshots; keep the existing audio system. Take colours from the game-owned
-palette module rather than restating hex values, and keep every
+Azul's accepted table presentation is Rich & Dramatic: generated raster materials
+under real Svelte/HTML state, one collision-free circle of factory plates around a
+loose centre pool, opponents rendered as real boards, and a decorative 0–100 score
+track with uncapped exact scores and a `100+` indicator. The desktop board stays
+below the complete ring. Compact layouts use whole-factory buttons, colour and
+destination dialogs, and a collapsed-by-default local board tray; only an explicitly
+expanded tray may cover lower factories. Compact boards are noninteractive and
+dialog copies emit no table anchors. The main table never scrolls. Stage
+scoring/cleanup only from accepted public events and snapshots; keep the existing
+audio system. Take colours and artwork from game-owned modules, and keep every
 `data-azul-location` anchor — a missing or zero-sized anchor drops its flight
-silently, and the flying tile is styled in JavaScript outside the component tree.
-This is presentation only. See [ADR 017](docs/adr/017-azul-table-light.md) and the
-[Azul redesign](docs/azul-redesign/README.md) migration documents.
+silently, and flying tiles live outside the component tree. This is presentation
+only. [ADR 020](docs/adr/020-azul-rich-dramatic.md) supersedes ADR 017's visual
+choice while preserving its behavioral contracts; see the
+[Azul redesign](docs/azul-redesign/README.md) documents.
 
 Little Secret uses Spanish classic 3–9-player rules and the pinned seven-type
 classic power set. Keep production words and selection server-only; practice
@@ -78,3 +81,12 @@ follow [ADR 019](docs/adr/019-codenames-table-turns.md). Original locally bundle
 WebP materials/transparent props are approved for Codenames only; gameplay and
 interface text remain Svelte/CSS. See the [redesign](docs/codenames-redesign/README.md)
 and [rules](docs/games/codenames.md).
+
+Sushi Go Party uses the approved illustrated desktop table with eight real-text
+menu tiles, ivory trays and a perimeter score track. Shared CSS/SVG components
+live under the game's `src/table/`; the archived prototype fixture stays isolated.
+Use actual recipient views and accepted public reveal/pass events only. Preserve
+all 26 cards, 2–8 seats, private prompts, compact layouts, rules/settings controls,
+localization and cancellation/no-replay behavior. See
+[ADR 021](docs/adr/021-sushi-illustrated-table.md) and the
+[migration handoff](docs/sushi-go-party-redesign.md).

@@ -9,7 +9,7 @@ import {
 } from '@playwright/test';
 const evidence = 'docs/evidence/sushi-go-party';
 mkdirSync(evidence, { recursive: true });
-test.use({ video: 'on' });
+test.use({ video: 'on', deviceScaleFactor: 1 });
 // Checked-in evidence is WebP; Playwright's PNG buffer is piped directly to cwebp.
 function webp(png: Buffer, name: string) {
   execFileSync(
@@ -46,7 +46,12 @@ async function room(page: Page, browser: Browser, count: number) {
   await expect(page).toHaveURL(/\/room\//);
   const url = page.url();
   for (let i = 1; i < count; i++) {
-    const context = await browser.newContext();
+    // Exercise a desktop host with independent phone guests. Rendering eight
+    // Retina desktops on one software WebKit process is not a device test.
+    const context = await browser.newContext({
+      deviceScaleFactor: 1,
+      viewport: { width: 390, height: 844 },
+    });
     contexts.push(context);
     const guest = await context.newPage();
     pages.push(guest);
@@ -246,7 +251,8 @@ test('eight independent seats use Spoon/Chopsticks and remain readable across vi
   page,
   browser,
 }, info) => {
-  test.setTimeout(180000);
+  // Eight rendered WebKit clients are slower on Linux's software renderer.
+  test.setTimeout(info.project.name === 'webkit' ? 360000 : 180000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.setViewportSize({ width: 1440, height: 900 });

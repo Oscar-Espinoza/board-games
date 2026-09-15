@@ -133,7 +133,8 @@ which identifies the whole match.
 [`/practice/sushi-go-party`](/practice/sushi-go-party) uses the real apply/view
 rules with seeded, physically conserved fixtures. Its separate module never
 enters multiplayer initialization. A visible local control advances other seats;
-settings select seat, scene and capacity. Scenes cover drafting, Wasabi, Uramaki,
+settings select seat, scene and capacity. The default five-player illustrated
+table reaches round two through real engine actions. Scenes also cover drafting, Wasabi, Uramaki,
 Miso, Menu, Spoon, copied utensils and Takeout.
 
 Implementation validation is recorded in the handoff and evidence index. Pure
@@ -143,3 +144,7 @@ Physical Safari and a live human group playtest remain unverified.
 
 The [independent review](../handoffs/sushi-go-party-review.md) records rules/privacy
 assessment, presentation fixes, exact viewport evidence and remaining device limits.
+
+The [illustrated production migration](../sushi-go-party-redesign.md) adds the
+approved desktop board, score pawns and player trays without changing these
+rules. Rules/settings remain available in both desktop and compact layouts.

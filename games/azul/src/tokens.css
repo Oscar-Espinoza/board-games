@@ -15,27 +15,16 @@
 .azul-table {
   --azul-title: 'Azul Marcellus', Georgia, serif;
   --azul-body: 'Azul Karla', Arial, sans-serif;
-  --azul-ink: #293c40;
-  --azul-soft-ink: #514c40;
-  --azul-table-ink: #fff4dc;
-  --azul-table-soft: #f0dfbd;
-  --azul-board: linear-gradient(158deg, #fdf7e8, #f5ead3 52%, #eddfc2);
-  --azul-board-edge: #c9b28c;
-  --azul-board-shadow:
-    0 20px 32px -15px #0009, 0 5px 12px #0005, inset 0 1px #fffdf4;
-  --azul-disc: radial-gradient(
-    circle at 36% 28%,
-    #fdf5e2,
-    #f0e3c4 56%,
-    #dbc79c
-  );
-  --azul-disc-shadow:
-    0 12px 20px -10px #000a, 0 4px 7px #0005, inset 0 1px #fffdf3;
-  --azul-wood: radial-gradient(
-    ellipse at 50% 30%,
-    #6d4b2c,
-    #513723 38%,
-    #31210f 72%,
-    #1c1208
-  );
+  --azul-ink: #253844;
+  --azul-soft-ink: #655c4d;
+  --azul-table-ink: #f2e6ce;
+  --azul-table-soft: #b9ad97;
+  --azul-aged-brass: #b78943;
+  --azul-deep-navy: #061624;
+  --azul-board: transparent;
+  --azul-board-edge: transparent;
+  --azul-board-shadow: none;
+  --azul-disc: transparent;
+  --azul-disc-shadow: none;
+  --azul-wood: #061624;
 }

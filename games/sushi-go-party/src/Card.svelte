@@ -1,5 +1,6 @@
 <script lang="ts">
-  import Dish from './Dish.svelte';
+  import Dish from './table/FoodArt.svelte';
+  import { menu } from './table/data.js';
   import { t, variation, hues, patterns } from './labels.js';
   import type { Face } from './cards.js';
   import type { Locale } from '@board-games/shared/runtime';
@@ -18,7 +19,7 @@
   class="food-card"
   class:small
   class:boxed={card.boxed}
-  style={`--dish-color:${card.boxed ? '#c4b69a' : hues[card.color]}`}
+  style={`--dish-color:${card.boxed ? '#c4b69a' : (menu.find((tile) => tile.kind === card.kind)?.accent ?? hues[card.color])}`}
 >
   <span class="pattern" aria-hidden="true"
     >{card.boxed
@@ -77,17 +78,18 @@
     flex-direction: column;
     align-items: center;
     justify-content: space-between;
-    width: 112px;
-    height: 166px;
+    width: var(--card-width, 112px);
+    height: var(--card-height, 166px);
     padding: 8px 7px 6px;
-    background: #fff9e9;
+    background: linear-gradient(108deg, #fff7e5, #fbf0d7 57%, #eddfbf);
     color: #294d45;
-    border: 1px solid #d8d3b8;
+    border: 1px solid #c3ac8a;
     border-bottom: 6px solid var(--dish-color);
-    border-radius: 12px;
+    border-radius: 8px;
     box-shadow:
-      0 3px 0 #284e4512,
-      0 5px 12px #284e4510;
+      inset 0 0 0 3px #fff9e6,
+      1px 4px 3px #6b614338,
+      1px 7px 10px #5c523121;
     overflow: hidden;
     font-size: 10px;
     text-align: center;
@@ -102,7 +104,7 @@
   }
   .illustration {
     height: 76px;
-    width: 96px;
+    width: 100%;
   }
   .pattern {
     position: absolute;
@@ -134,8 +136,13 @@
     color: #a46c92;
   }
   .small {
-    width: 58px;
-    height: 72px;
+    background: linear-gradient(
+      120deg,
+      #fff3d7,
+      color-mix(in srgb, var(--dish-color) 35%, #fff5de)
+    );
+    width: var(--small-card-width, 58px);
+    height: var(--small-card-height, 72px);
     padding: 4px;
     border-bottom-width: 4px;
     border-radius: 8px;

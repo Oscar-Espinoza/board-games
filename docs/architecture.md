@@ -115,11 +115,11 @@ seats stop retries. Azul drafts and Codenames clues, guesses and end-turn are ne
 reconfirmed. A missing acknowledgement is synchronized before any resubmission.
 See [ADR 013](adr/013-three-game-delivery.md) for the precise boundaries.
 
-Azul's table presentation is being reworked to Table Light, recorded in
-[ADR 017](adr/017-azul-table-light.md) with tokens, components, motion and mobile
-layout in [Azul redesign](azul-redesign/README.md). It changes no rules, no
-projection and no event, and the game keeps its colours in a game-owned palette
-module rather than in shared packages.
+Azul's table uses the Rich & Dramatic presentation recorded in
+[ADR 020](adr/020-azul-rich-dramatic.md), which supersedes ADR 017's visual
+choice while retaining its interaction, animation and anchor contracts. Generated
+raster materials sit under live Svelte/HTML state; the change affects no rules,
+projection or event. Colours and artwork remain game-owned rather than shared.
 
 Codenames uses setup/clue/guessing/finished with authoritative active teams,
 clues, guess budgets and public revealed-only history. Only active spymasters give
@@ -129,6 +129,12 @@ the viewport table. Original local WebP wood/transparent props are an approved
 Codenames-only exception to CSS/SVG visuals; UI text stays in Svelte. Reconnects
 cancel pending selections and events. See [ADR 019](adr/019-codenames-table-turns.md).
 Client and server ship together for this protocol migration.
+
+Sushi Go Party's approved illustrated desktop table is recorded in
+[ADR 021](adr/021-sushi-illustrated-table.md). Shared game-owned Svelte/CSS/SVG
+primitives render real recipient views; the archived prototype fixture remains
+isolated. Compact layouts, actor-only prompts and the existing accepted-event,
+privacy, audio and retry contracts remain intact.
 
 ## Little Secret
 

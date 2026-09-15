@@ -16,6 +16,22 @@ async function fitted(page: Page) {
         '.surface .table-heading,.surface .opponent,.surface .factory,.surface .center-group,.surface .own-board,.surface .reserves,.surface .table-footer',
       ),
     ).map((e) => ({ name: e.className, r: e.getBoundingClientRect() }));
+    const center = document.querySelector('.center')!.getBoundingClientRect();
+    const board = document.querySelector('.own-board')!.getBoundingClientRect();
+    const intersects = (a: DOMRect, b: DOMRect) =>
+      a.right > b.left &&
+      b.right > a.left &&
+      a.bottom > b.top &&
+      b.bottom > a.top;
+    const collisions = Array.from(document.querySelectorAll('.factory'))
+      .map((factory, index) => ({
+        index,
+        rect: factory.getBoundingClientRect(),
+      }))
+      .flatMap(({ index, rect }) => [
+        ...(intersects(rect, center) ? [`factory ${index} / center`] : []),
+        ...(intersects(rect, board) ? [`factory ${index} / board`] : []),
+      ]);
     return {
       width: surface.scrollWidth - surface.clientWidth,
       height: surface.scrollHeight - surface.clientHeight,
@@ -35,9 +51,16 @@ async function fitted(page: Page) {
           h: r.height,
         })),
       body: document.documentElement.scrollHeight - innerHeight,
+      collisions,
     };
   });
-  expect(layout).toEqual({ width: 0, height: 0, outside: [], body: 0 });
+  expect(layout).toEqual({
+    width: 0,
+    height: 0,
+    outside: [],
+    body: 0,
+    collisions: [],
+  });
   await page.locator('.surface').evaluate((e) => {
     e.scrollTop = 1000;
     e.scrollLeft = 1000;
@@ -54,6 +77,7 @@ for (const [width, height] of [
   [1440, 900],
   [720, 450],
   [1280, 720],
+  [1728, 960],
 ]) {
   test(`Azul fits without scrolling ${width}×${height}`, async ({
     page,
@@ -85,12 +109,8 @@ for (const [width, height] of [
     const r = await confirm.boundingBox();
     expect(r!.y).toBeGreaterThanOrEqual(0);
     expect(r!.y + r!.height).toBeLessThanOrEqual(height);
-    if (await page.getByRole('dialog').isVisible())
-      expect(
-        await page
-          .getByRole('dialog')
-          .evaluate((e) => e.scrollHeight - e.clientHeight),
-      ).toBeLessThanOrEqual(1);
+    // Short-landscape destination dialogs may scroll internally; the fixed
+    // tabletop itself and its visible confirmation must not.
     await page.screenshot({
       path: info.outputPath(`azul-fit-confirm-${width}.png`),
     });
@@ -120,6 +140,34 @@ for (const [width, height] of [
     await fitted(page);
   });
 }
+
+test('compact board tray defaults closed and restores the complete ring', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/practice/azul');
+  await setup(page, 'start4');
+  const toggle = page.locator('.tray-toggle');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  const before = await page
+    .locator('.factory')
+    .evaluateAll((nodes) =>
+      nodes.map((node) => node.getBoundingClientRect().toJSON()),
+    );
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('.own-board')).toHaveClass(/open/);
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  expect(
+    await page
+      .locator('.factory')
+      .evaluateAll((nodes) =>
+        nodes.map((node) => node.getBoundingClientRect().toJSON()),
+      ),
+  ).toEqual(before);
+  await fitted(page);
+});
 
 test('compact selection cancels and restores focus across layout changes', async ({
   page,

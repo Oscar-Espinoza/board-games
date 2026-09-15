@@ -435,7 +435,7 @@ test('review: right-to-left patterns, readable wall, compact touch targets and e
     expect(right!.x).toBeGreaterThan(left!.x);
     await expect(slots.nth(0).locator('.tile.blue')).toHaveCount(1);
     await expect(slots.nth(1).locator('.empty-slot')).toHaveCount(1);
-    await page.locator('.own-inspect').click();
+    await page.locator('.tray-toggle').click();
     await expect(
       page.getByRole('img', {
         name: 'Wall row 1, column 1 · Blue diamond · Empty',
@@ -445,7 +445,7 @@ test('review: right-to-left patterns, readable wall, compact touch targets and e
     await page.screenshot({
       path: info.outputPath('azul-review-readable-phone.png'),
     });
-    await close(page);
+    await page.locator('.tray-toggle').click();
     await page.locator('.opponent .inspect').first().tap();
     const dialog = page.getByRole('dialog');
     expect(
@@ -535,7 +535,7 @@ for (const [width, height] of [
   [1440, 900],
   [720, 450],
 ]) {
-  test(`Table Light geometry and picker ${width}×${height}`, async ({
+  test(`Rich & Dramatic geometry and picker ${width}×${height}`, async ({
     page,
   }, info) => {
     await page.setViewportSize({ width, height });
@@ -568,7 +568,8 @@ for (const [width, height] of [
         .evaluateAll((nodes) =>
           nodes
             .map((n) => n.getBoundingClientRect())
-            .map((r) => ({
+            .map((r, index) => ({
+              name: nodes[index].className,
               x: r.x,
               y: r.y,
               right: r.right,
@@ -586,11 +587,12 @@ for (const [width, height] of [
               b.right <= a.x ||
               a.bottom <= b.y ||
               b.bottom <= a.y,
+            `${a.name} (${a.x},${a.y}–${a.right},${a.bottom}) overlaps ${b.name} (${b.x},${b.y}–${b.right},${b.bottom})`,
           ).toBe(true);
       }
     }
     await page.screenshot({
-      path: info.outputPath(`table-light-${width}.png`),
+      path: info.outputPath(`rich-dramatic-${width}.png`),
     });
     const inspect = page.locator('.inspect').first();
     await inspect.click();
@@ -615,7 +617,7 @@ for (const [width, height] of [
       await expect(factory).toBeFocused();
       await factory.click();
       await page.screenshot({
-        path: info.outputPath(`table-light-picker-${width}.png`),
+        path: info.outputPath(`rich-dramatic-picker-${width}.png`),
       });
       await page.locator('.factory-picker button[data-color]').first().click();
       await page
@@ -639,7 +641,7 @@ for (const [width, height] of [
     }
     await page.locator('.supply').scrollIntoViewIfNeeded();
     await page.screenshot({
-      path: info.outputPath(`table-light-centre-${width}.png`),
+      path: info.outputPath(`rich-dramatic-centre-${width}.png`),
     });
     // Text-only enlargement, not page zoom: computed text sizes double while controls reflow.
     await page.evaluate(() => {
@@ -670,12 +672,12 @@ for (const [width, height] of [
     for (let i = 1; i < numerals.length; i++)
       expect(numerals[i].left).toBeGreaterThan(numerals[i - 1].right);
     await page.screenshot({
-      path: info.outputPath(`table-light-text200-${width}.png`),
+      path: info.outputPath(`rich-dramatic-text200-${width}.png`),
     });
   });
 }
 
-test('Table Light scoring endpoints, cleanup, overflow rail and dialog cancellation', async ({
+test('Rich & Dramatic scoring endpoints, cleanup, overflow rail and dialog cancellation', async ({
   page,
 }, info) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -717,7 +719,8 @@ test('Table Light scoring endpoints, cleanup, overflow rail and dialog cancellat
             to: node.dataset.to,
             expected: JSON.parse(node.dataset.endpoint!),
             actual: { x: rect.x, y: rect.y, size: rect.width },
-            svg: !!node.querySelector('svg'),
+            image: !!node.querySelector('img'),
+            artwork: !!node.querySelector('img,svg'),
           });
           animation.currentTime = 0;
           animation.play();
@@ -730,11 +733,12 @@ test('Table Light scoring endpoints, cleanup, overflow rail and dialog cancellat
     .toBeGreaterThan(20);
   const endpoints = await page.evaluate(() => (window as any).endpoints);
   for (const endpoint of endpoints) {
-    expect(endpoint.svg).toBe(true);
+    expect(endpoint.artwork).toBe(true);
     expect(endpoint.actual.x).toBeCloseTo(endpoint.expected.x, 1);
     expect(endpoint.actual.y).toBeCloseTo(endpoint.expected.y, 1);
     expect(endpoint.actual.size).toBeCloseTo(endpoint.expected.size, 1);
   }
+  expect(endpoints.some((endpoint: any) => endpoint.image)).toBe(true);
   expect(endpoints.some((e: any) => e.to.startsWith('workshop-1/wall/'))).toBe(
     true,
   );
@@ -776,7 +780,9 @@ test('Table Light scoring endpoints, cleanup, overflow rail and dialog cancellat
     );
     expect(targets[i].size).toBeCloseTo(endpoints[i].actual.size, 1);
   }
-  await page.screenshot({ path: info.outputPath('table-light-cleanup.png') });
+  await page.screenshot({
+    path: info.outputPath('rich-dramatic-cleanup.png'),
+  });
   await scenario(page, 'cross100');
   await choose(page);
   await page
@@ -786,9 +792,11 @@ test('Table Light scoring endpoints, cleanup, overflow rail and dialog cancellat
   await expect(page.locator('.own-board header strong')).toContainText('106');
   await expect(page.locator('.own-board .score-marker')).toHaveAttribute(
     'style',
-    'left: 100%;',
+    'left: calc(89.6%);',
   );
-  await page.screenshot({ path: info.outputPath('table-light-100plus.png') });
+  await page.screenshot({
+    path: info.outputPath('rich-dramatic-100plus.png'),
+  });
   await scenario(page, 'scoring');
   await choose(page);
   await page

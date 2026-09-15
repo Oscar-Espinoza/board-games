@@ -81,10 +81,13 @@
     systemReduced = $state(false),
     mounted = $state(false),
     phone = $state(false),
+    trayExpanded = $state(false),
     picker = $state<number | null>(null),
     awaitingPresentation = $state(false);
   let pickerOpener: HTMLElement | null = null;
-  const ring = $derived(ringGeometry(visual.factories.length, phone));
+  const ring = $derived(
+    ringGeometry(visual.factories.length, phone ? 'compact' : 'tabletop'),
+  );
   const gate = new RevisionGate(),
     audio = ceramicAudio(),
     flights = tileFlights();
@@ -282,10 +285,11 @@
       if (['system', 'reduced', 'full'].includes(saved.motion))
         motion = saved.motion;
     } catch {}
-    const phoneMedia = matchMedia('(max-width: 900px), (max-height: 680px)');
+    const phoneMedia = matchMedia('(max-width: 900px), (max-height: 800px)');
     phone = phoneMedia.matches;
     const phoneChanged = () => {
       phone = phoneMedia.matches;
+      trayExpanded = false;
       clear();
       if (dialog?.open && (modal === 'factory' || modal === 'draft'))
         dialog.close();
@@ -413,6 +417,14 @@
     if (errorCode === 'STALE_REVISION' || errorCode === 'MATCH_CHANGED')
       untrack(() => clear(m.azul_changed()));
   });
+  let trayIdentity = '';
+  $effect(() => {
+    const identity = `${round}/${playerId}`;
+    if (identity !== trayIdentity) {
+      trayIdentity = identity;
+      trayExpanded = false;
+    }
+  });
   let resultShown = '';
   $effect(() => {
     const key = `${round}/${visual.revision}`;
@@ -433,6 +445,10 @@
       else clear();
     }
   }
+  function toggleTray() {
+    settle();
+    trayExpanded = !trayExpanded;
+  }
   const highlight = (id: string): [number, number][] =>
     recent.flatMap((e) =>
       e.type === 'wall' && e.player === id ? e.scoring.cells : [],
@@ -448,10 +464,33 @@
 <div
   class="azul-table"
   class:compact-table={phone}
+  class:tray-expanded={phone && trayExpanded}
   bind:this={root}
   lang={locale}
   data-game-revision={view.public.revision}
+  data-azul-layout={phone ? 'compact' : 'tabletop'}
 >
+  <img
+    class="table-prop lantern-prop"
+    src="/games/azul/rich/lantern-v2.webp"
+    alt=""
+    aria-hidden="true"
+    draggable="false"
+  />
+  <img
+    class="table-prop chest-prop"
+    src="/games/azul/rich/tile-chest.webp"
+    alt=""
+    aria-hidden="true"
+    draggable="false"
+  />
+  <img
+    class="table-prop tea-prop"
+    src="/games/azul/rich/tea-glass.webp"
+    alt=""
+    aria-hidden="true"
+    draggable="false"
+  />
   <button
     class="corner book"
     aria-label={m.azul_help()}
@@ -558,7 +597,7 @@
       <div class="supply">
         <div
           class="factories"
-          style="--ring:{ring.size}px;--disc:{ring.disc}px"
+          style="--ring-width:{ring.width}px;--ring-height:{ring.height}px;--disc:{ring.disc}px"
         >
           {#each visual.factories as factory, index}
             {@const position = ring.points[index]}
@@ -567,6 +606,13 @@
               style="--x:{position.x}px;--y:{position.y}px"
               aria-label={m.azul_factory({ number: index + 1 })}
             >
+              <img
+                class="factory-plate"
+                src="/games/azul/rich/factory-plate.webp"
+                alt=""
+                aria-hidden="true"
+                draggable="false"
+              />
               <span class="factory-number">{index + 1}</span>
               {#if phone}
                 <button
@@ -648,7 +694,7 @@
                             : undefined}
                         /></span
                       >{/each}
-                  </span><b>{count}</b></button
+                  </span>{#if count}<b>{count}</b>{/if}</button
                 >
               {/each}
               <span
@@ -695,10 +741,11 @@
         </div>
         {#if ownBoard}<div
             class="own-board"
+            class:open={phone && trayExpanded}
             data-azul-location="{playerId}/summary"
           >
             <PlayerBoard
-              density={phone ? 'compact' : 'full'}
+              density={phone && !trayExpanded ? 'compact' : 'full'}
               interactive={!phone}
               fitted={true}
               {hiddenLocations}
@@ -713,14 +760,13 @@
               highlights={highlight(playerId)}
             />
             {#if phone}<button
-                class="inspect own-inspect"
-                aria-label={m.azul_inspect({
-                  name: name(playerId),
-                  score: ownBoard.score,
-                })}
-                onclick={() => open('opponent', playerId)}
-              ></button><span class="own-caption"
-                >{name(playerId)} · {ownBoard.score}</span
+                class="tray-toggle"
+                aria-label={m.azul_board({ name: name(playerId) })}
+                aria-expanded={trayExpanded}
+                onclick={toggleTray}
+                ><span>{name(playerId)} · {ownBoard.score}</span><b
+                  aria-hidden="true">{trayExpanded ? '⌄' : '⌃'}</b
+                ></button
               >{/if}
           </div>{/if}
       </div>
@@ -1798,12 +1844,6 @@
   .explanations p {
     background: #e6d8bc;
   }
-  .own-caption {
-    display: block;
-    text-align: center;
-    font-size: 12px;
-    margin-top: 3px;
-  }
   .compact-table .wordmark {
     display: none;
   }
@@ -2013,6 +2053,681 @@
     }
     dialog.drafting :global(.player-board.fitted .score-rail) {
       margin-bottom: 8px;
+    }
+  }
+
+  /* Rich & Dramatic production composition. The photographs provide material;
+     these rules only compose live Svelte controls and state over them. */
+  .azul-table {
+    background: var(--azul-deep-navy) url('/games/azul/rich/tabletop-v2.webp')
+      center / cover no-repeat;
+  }
+  .azul-table::before {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    content: '';
+    pointer-events: none;
+    background:
+      linear-gradient(112deg, rgba(244, 177, 82, 0.07), transparent 29%),
+      radial-gradient(
+        circle at 50% 38%,
+        transparent 34%,
+        rgba(0, 3, 8, 0.46) 100%
+      );
+  }
+  .azul-table::after {
+    position: absolute;
+    z-index: 20;
+    inset: 0;
+    content: '';
+    pointer-events: none;
+    box-shadow: inset 0 0 95px 24px rgba(0, 2, 7, 0.38);
+  }
+  .surface,
+  .corner,
+  .table-prop {
+    z-index: 2;
+  }
+  .surface {
+    position: relative;
+  }
+  .table-prop {
+    position: absolute;
+    pointer-events: none;
+    user-select: none;
+  }
+  .lantern-prop {
+    top: -42px;
+    left: -18px;
+    width: 165px;
+    opacity: 0.92;
+    filter: drop-shadow(12px 18px 15px rgba(0, 0, 0, 0.72));
+  }
+  .chest-prop {
+    top: -135px;
+    right: 255px;
+    width: 325px;
+    transform: rotate(-7deg);
+    opacity: 0.76;
+    filter: brightness(0.78) drop-shadow(-9px 17px 14px rgba(0, 0, 0, 0.72));
+  }
+  .tea-prop {
+    bottom: -52px;
+    left: -58px;
+    width: 238px;
+    transform: rotate(7deg);
+    filter: brightness(0.74) saturate(0.82)
+      drop-shadow(10px 16px 13px rgba(0, 0, 0, 0.72));
+  }
+  .corner {
+    z-index: 24;
+    width: 44px;
+    height: 44px;
+    padding: 8px;
+    border: 1px solid #a77a36;
+    background: rgba(3, 18, 29, 0.86);
+    box-shadow:
+      inset 0 0 0 2px rgba(188, 139, 63, 0.11),
+      0 5px 10px rgba(0, 0, 0, 0.5);
+    color: #dfc795;
+  }
+
+  .azul-table:not(.compact-table) .surface {
+    padding: 0;
+  }
+  .azul-table:not(.compact-table) .table-content {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    margin: 0;
+  }
+  .azul-table:not(.compact-table) .table-heading {
+    position: absolute;
+    z-index: 8;
+    top: 2px;
+    left: 50%;
+    display: block;
+    width: 430px;
+    height: 76px;
+    min-height: 0;
+    padding: 0;
+    transform: translateX(-50%);
+    text-align: center;
+    text-shadow: 0 3px 12px #000;
+    pointer-events: none;
+  }
+  .azul-table:not(.compact-table) .wordmark {
+    display: block;
+    color: #c99a4a;
+    font-size: 43px;
+    font-weight: 400;
+    letter-spacing: 0.11em;
+    line-height: 1.05;
+  }
+  .azul-table:not(.compact-table) .round {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    color: #c2ad87;
+    font: 12px var(--azul-title);
+  }
+  .azul-table:not(.compact-table) .table-heading h1 {
+    display: inline;
+    margin: 0 0 0 12px;
+    color: #d7ae66;
+    font: 13px var(--azul-title);
+  }
+  .azul-table:not(.compact-table) .table-heading h1::before {
+    margin-right: 12px;
+    color: #b98c45;
+    content: '·';
+  }
+  .azul-table:not(.compact-table) .opponents {
+    position: absolute;
+    z-index: 5;
+    inset: 0;
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: none;
+    margin: 0;
+    pointer-events: none;
+  }
+  .azul-table:not(.compact-table) .opponent {
+    position: absolute;
+    display: block;
+    width: 234px;
+    height: 120px;
+    max-width: none;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    filter: brightness(0.9) saturate(0.92);
+    pointer-events: auto;
+  }
+  .azul-table:not(.compact-table) .opponent:nth-child(1) {
+    top: 108px;
+    left: 7.4%;
+    transform: rotate(-1.5deg);
+  }
+  .azul-table:not(.compact-table) .opponent:nth-child(2) {
+    top: 108px;
+    right: 7%;
+    transform: rotate(1deg);
+  }
+  .azul-table:not(.compact-table) .opponent:nth-child(3) {
+    top: 254px;
+    right: 4.5%;
+    transform: rotate(2deg);
+  }
+  .azul-table:not(.compact-table) .opponent-preview {
+    position: absolute;
+    inset: 0 0 22px;
+    width: 234px;
+  }
+  .azul-table:not(.compact-table) .opponent-heading {
+    position: absolute;
+    z-index: 3;
+    right: 11px;
+    bottom: 0;
+    display: flex;
+    min-width: 102px;
+    height: 31px;
+    align-items: center;
+    padding: 0 10px;
+    border: 1px solid rgba(181, 133, 60, 0.72);
+    background: rgba(3, 16, 27, 0.95);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.48);
+    color: #f1e7d2;
+  }
+  .azul-table:not(.compact-table) .opponent-name {
+    max-width: 78px;
+    color: #f1e7d2;
+    font-size: 12px;
+  }
+  .azul-table:not(.compact-table) .opponent strong {
+    color: #d5a65a;
+    font-size: 15px;
+    font-weight: 500;
+  }
+  .azul-table:not(.compact-table) .opponent.turn .opponent-heading {
+    border-color: #e2b560;
+    box-shadow:
+      inset 0 0 8px rgba(224, 172, 82, 0.16),
+      0 4px 8px rgba(0, 0, 0, 0.48);
+  }
+  .azul-table:not(.compact-table) .opponent .risk,
+  .azul-table:not(.compact-table) .opponent .offline {
+    display: none;
+  }
+
+  .azul-table:not(.compact-table) .supply {
+    position: absolute;
+    z-index: 6;
+    top: 57px;
+    left: 50%;
+    width: var(--ring-width);
+    height: var(--ring-height);
+    margin: 0;
+    transform: translateX(-50%);
+  }
+  .factories {
+    position: relative;
+    width: var(--ring-width);
+    height: var(--ring-height);
+  }
+  .factory {
+    isolation: isolate;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .factory::before {
+    display: none;
+  }
+  .factory-plate {
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 50%;
+    filter: brightness(0.86) saturate(0.92)
+      drop-shadow(4px 8px 6px rgba(0, 2, 7, 0.72));
+    pointer-events: none;
+    user-select: none;
+  }
+  .factory-number {
+    z-index: 4;
+    top: -2px;
+    display: none;
+    width: 17px;
+    height: 17px;
+    place-items: center;
+    border: 1px solid rgba(164, 122, 59, 0.55);
+    border-radius: 50%;
+    background: rgba(3, 22, 36, 0.9);
+    color: #d7be8d;
+    font-size: 8px;
+  }
+  .azul-table:not(.compact-table) .factory-tiles {
+    grid-template-columns: repeat(2, 44px);
+    grid-template-rows: repeat(2, 44px);
+    gap: -1px;
+    transform: translateY(1px);
+  }
+  .azul-table:not(.compact-table) .factory-tiles button {
+    padding: 2px;
+  }
+  .factory-tiles button:not(:disabled):hover,
+  .factory-tiles button.selected {
+    border-radius: 5px;
+    background: rgba(210, 168, 92, 0.14);
+    outline-color: #d3a755;
+    transform: none;
+  }
+  .factory-empty {
+    border-color: transparent;
+    background: transparent;
+  }
+  .azul-table:not(.compact-table) .center {
+    width: 198px;
+    height: 160px;
+  }
+  .center h2 {
+    color: #8d9a9c;
+    font: 8px var(--azul-body);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    text-shadow: 0 2px 6px #000;
+  }
+  .azul-table:not(.compact-table) .center-colors {
+    grid-template-columns: repeat(3, 54px);
+    grid-auto-rows: 62px;
+    justify-content: center;
+    gap: 2px 9px;
+  }
+  .azul-table:not(.compact-table) .center-group {
+    width: 54px;
+    height: 62px;
+  }
+  .azul-table:not(.compact-table) .cluster {
+    width: 50px;
+    height: 45px;
+  }
+  .azul-table:not(.compact-table) .center-tile {
+    width: 31px;
+    height: 31px;
+  }
+  .center-group b {
+    border: 1px solid rgba(159, 113, 48, 0.46);
+    background: rgba(4, 22, 35, 0.92);
+    color: #e5cfaa;
+    font-size: 9px;
+  }
+  .center-group.selected {
+    border-color: #c99a4a;
+    background: rgba(190, 141, 63, 0.12);
+  }
+  .center-marker {
+    filter: drop-shadow(2px 4px 3px rgba(0, 0, 0, 0.62));
+  }
+
+  .azul-table:not(.compact-table) .table-bottom {
+    position: absolute;
+    z-index: 8;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    margin: 0;
+    grid-area: auto;
+    align-self: auto;
+    pointer-events: none;
+  }
+  .azul-table:not(.compact-table) .own-board {
+    position: absolute;
+    right: auto;
+    bottom: 0;
+    left: 50%;
+    width: min(820px, 58vw);
+    max-width: 820px;
+    margin: 0;
+    transform: translateX(-50%);
+    pointer-events: auto;
+  }
+  .azul-table:not(.compact-table) .reserves {
+    position: absolute;
+    right: 8px;
+    bottom: 22px;
+    display: grid;
+    width: 190px;
+    margin: 0;
+    place-items: end center;
+    gap: 0;
+    pointer-events: auto;
+  }
+  .azul-table:not(.compact-table) .reserves > span:first-child {
+    display: flex;
+    width: 185px;
+    height: 176px;
+    box-sizing: border-box;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0 0 18px;
+    background: url('/games/azul/rich/tile-bag.webp') center / contain no-repeat;
+    color: #d8c39b;
+    text-shadow: 0 2px 5px #000;
+    filter: drop-shadow(-8px 13px 10px rgba(0, 0, 0, 0.68));
+  }
+  .azul-table:not(.compact-table) .reserves > span:last-child {
+    min-width: 112px;
+    min-height: 29px;
+    justify-content: center;
+    padding: 0 8px;
+    transform: translateY(-11px);
+    border: 1px solid rgba(167, 122, 54, 0.62);
+    background: rgba(3, 20, 32, 0.9);
+    color: #cbb58c;
+  }
+  .azul-table:not(.compact-table) .reserves svg {
+    display: none;
+  }
+  .azul-table:not(.compact-table) .table-footer {
+    position: absolute;
+    z-index: 14;
+    right: auto;
+    bottom: 18px;
+    left: 18px;
+    display: block;
+    width: min(360px, 23vw);
+    min-width: 260px;
+  }
+  .azul-table:not(.compact-table) .confirmation {
+    display: grid;
+    border-color: rgba(170, 126, 59, 0.72);
+    background: rgba(3, 20, 32, 0.95);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+  }
+  .azul-table:not(.compact-table) .confirmation.hidden {
+    display: none;
+  }
+  .azul-table:not(.compact-table) .table-status {
+    justify-content: flex-start;
+    margin: 0;
+  }
+
+  .compact-table .table-prop {
+    display: none;
+  }
+  .compact-table .surface {
+    padding: max(5px, env(safe-area-inset-top))
+      max(6px, env(safe-area-inset-right)) max(5px, env(safe-area-inset-bottom))
+      max(6px, env(safe-area-inset-left));
+  }
+  .compact-table .table-content {
+    position: relative;
+    display: grid;
+    height: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 44px 66px 340px minmax(54px, 1fr) 44px;
+    gap: 3px;
+  }
+  .compact-table .table-heading {
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    gap: 7px;
+    padding: 0 42px;
+    text-shadow: 0 2px 7px #000;
+  }
+  .compact-table .round {
+    color: #c2ad87;
+    font: 11px var(--azul-title);
+  }
+  .compact-table .table-heading h1 {
+    color: #d7ae66;
+    font: 12px var(--azul-title);
+  }
+  .compact-table .opponents {
+    grid-column: 1;
+    grid-row: 2;
+    height: 66px;
+    gap: 5px;
+  }
+  .compact-table .opponent {
+    height: 66px;
+    padding: 2px 3px;
+    border-color: rgba(164, 122, 59, 0.28);
+    background: rgba(3, 19, 31, 0.64);
+  }
+  .compact-table .opponent-preview {
+    min-height: 36px;
+  }
+  .compact-table .supply {
+    grid-column: 1;
+    grid-row: 3;
+    width: 340px;
+    height: 340px;
+    align-self: center;
+    justify-self: center;
+    margin: 0;
+  }
+  .compact-table .factory {
+    width: var(--disc);
+    height: var(--disc);
+  }
+  .compact-table .factory-number {
+    display: none;
+  }
+  .compact-table .factory-open {
+    position: relative;
+    z-index: 2;
+  }
+  .compact-table .center h2 {
+    height: 16px;
+    margin-bottom: 0;
+  }
+  .compact-table .table-bottom {
+    position: relative;
+    z-index: 12;
+    grid-column: 1;
+    grid-row: 4;
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    margin: 0;
+    pointer-events: none;
+  }
+  .compact-table .own-board,
+  .compact-table .reserves {
+    pointer-events: auto;
+  }
+  .compact-table .reserves {
+    position: absolute;
+    right: 4px;
+    top: 4px;
+    bottom: auto;
+    flex-direction: column;
+    gap: 1px;
+    margin: 0;
+  }
+  .compact-table .reserves > span {
+    font-size: 9px;
+  }
+  .compact-table .reserves svg {
+    width: 21px;
+    height: 21px;
+  }
+  .compact-table .own-board {
+    position: absolute;
+    right: auto;
+    bottom: 0;
+    left: 50%;
+    display: block;
+    width: min(320px, calc(100vw - 20px));
+    height: 60px;
+    margin: 0;
+    overflow: hidden;
+    transform: translateX(-50%);
+    border: 1px solid rgba(169, 124, 57, 0.76);
+    border-radius: 7px 7px 0 0;
+    background: rgba(3, 18, 30, 0.96);
+    box-shadow:
+      inset 0 0 0 2px rgba(201, 157, 80, 0.08),
+      0 -5px 13px rgba(0, 0, 0, 0.42);
+  }
+  .compact-table .own-board:not(.open) :global(.player-board) {
+    position: absolute;
+    top: 8px;
+    left: 9px;
+    width: 116px;
+    height: 43px;
+  }
+  .tray-toggle {
+    position: absolute;
+    z-index: 8;
+    inset: 0;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    min-height: 44px;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 18px;
+    padding: 0 18px 0 134px;
+    border: 0;
+    background: transparent;
+    color: #e6d4b2;
+    text-shadow: 0 2px 5px #000;
+  }
+  .tray-toggle span {
+    overflow: hidden;
+    font: 12px var(--azul-title);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tray-toggle b {
+    color: #d3a85e;
+    font-size: 20px;
+  }
+  .compact-table .own-board.open {
+    position: fixed;
+    right: auto;
+    bottom: 0;
+    left: 50%;
+    z-index: 30;
+    width: min(820px, calc(100vw - 12px));
+    height: min(410px, calc(100dvh - 116px));
+    overflow: visible;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .compact-table .own-board.open :global(.player-board) {
+    width: 100%;
+    height: 100%;
+  }
+  .compact-table .own-board.open .tray-toggle {
+    top: -44px;
+    right: 6px;
+    bottom: auto;
+    left: auto;
+    width: 158px;
+    height: 44px;
+    padding: 0 12px;
+    border: 1px solid rgba(169, 124, 57, 0.76);
+    border-radius: 7px 7px 0 0;
+    background: rgba(3, 18, 30, 0.96);
+  }
+  .compact-table .table-footer {
+    z-index: 14;
+    grid-column: 1;
+    grid-row: 5;
+    min-width: 0;
+  }
+  .compact-table .table-status {
+    margin: 0 auto;
+  }
+
+  @media (min-width: 901px) and (max-width: 1499px) {
+    .azul-table:not(.compact-table) .supply {
+      top: -5px;
+      transform: translateX(-50%);
+    }
+    .azul-table:not(.compact-table) .own-board {
+      width: min(760px, 61vw);
+    }
+    .azul-table:not(.compact-table) .opponent:nth-child(1) {
+      left: 3%;
+    }
+    .azul-table:not(.compact-table) .opponent:nth-child(2),
+    .azul-table:not(.compact-table) .opponent:nth-child(3) {
+      right: 2.5%;
+    }
+    .azul-table:not(.compact-table) .reserves {
+      width: 150px;
+    }
+    .azul-table:not(.compact-table) .reserves > span:first-child {
+      width: 145px;
+      height: 138px;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .compact-table .table-content {
+      grid-template-rows: 44px 62px 340px minmax(54px, 1fr) 44px;
+    }
+    .compact-table .opponents {
+      height: 62px;
+    }
+    .compact-table .opponent {
+      height: 62px;
+    }
+    .compact-table .opponent-preview {
+      min-height: 32px;
+    }
+  }
+
+  @media (min-width: 601px) and (max-height: 680px) {
+    .compact-table .table-content {
+      grid-template-columns: minmax(340px, 1fr) minmax(0, 1fr);
+      grid-template-rows: 42px minmax(0, 1fr) 44px;
+      gap: 3px 8px;
+    }
+    .compact-table .table-heading {
+      grid-column: 1/-1;
+      grid-row: 1;
+    }
+    .compact-table .supply {
+      grid-column: 1;
+      grid-row: 2 / span 2;
+      transform: none;
+    }
+    .compact-table .opponents {
+      grid-column: 2;
+      grid-row: 2;
+      align-self: start;
+    }
+    .compact-table .table-bottom {
+      grid-column: 2;
+      grid-row: 2;
+      align-self: end;
+      min-width: 0;
+    }
+    .compact-table .own-board {
+      width: min(300px, calc(100% - 8px));
+    }
+    .compact-table .table-footer {
+      grid-column: 2;
+      grid-row: 3;
     }
   }
 </style>
