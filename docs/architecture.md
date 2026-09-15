@@ -60,10 +60,13 @@ Chromium and WebKit, with actual Safari device validation separate.
 Catan fills the viewport with an SVG island over ocean. Edge controls and internally
 scrolling panels keep the page stationary. Placement intentions first show a
 translucent preview; only an accepted revision produces a landing effect. The island fits the available space and supports bounded wheel/pinch/button zoom
-without drag-to-pan. Wheel zoom preserves the world point under the pointer; pinch zoom uses the fingers’ midpoint. Legal map targets reveal a translucent piece on hover or keyboard focus. Double-click submits the ordinary placement action; a single click retains preview/confirmation. Up to four civilizations occupy cardinal seats relative to the viewer;
-five and six use additional perimeter seats. Resource cards, illustrated harbors
-and a hooded robber replace the compact counters and text/glyph placeholders.
-A single Settings menu contains sound, motion, language, help and local scenario
+with drag/keyboard panning while zoomed. Wheel zoom preserves the world point under the pointer; pinch zoom uses the fingers’ midpoint. Legal map targets reveal a translucent piece on hover or keyboard focus. Double-click submits the ordinary placement action; a single click retains preview/confirmation. Up to four civilizations occupy cardinal seats relative to the viewer;
+five and six use additional perimeter seats. The physical tabletop uses local
+painted WebP scenery/terrain beneath SVG pieces, number discs, illustrated harbors
+and a black wooden robber. Four wooden plaques surround the island, with the
+local hand below its plaque, controls at lower left and parchment costs at lower
+right. A wooden toolbar exposes navigation, rules, invite, language, settings and
+connection state. Settings contains sound, motion, help and local scenario
 controls. Sound and motion preferences use Catan-specific localStorage keys;
 reduced motion removes moving effects and sound unlocks through a user gesture.
 
@@ -80,7 +83,8 @@ seeded randomness and four switchable seats. Separate finite-bank fixtures cover
 setup, building, production, robber, Monopoly, trade, army awards and victory.
 Only the selected seat's projection reaches the board. Practice creates no room,
 uses no bots, has no persistence, and never changes multiplayer initialization.
-See [ADR 011](adr/011-catan-presentation.md).
+See [ADR 011](adr/011-catan-presentation.md) and the current
+[physical tabletop presentation](adr/022-catan-physical-table.md).
 
 ## Carcassonne landscape and practice
 

@@ -5,6 +5,7 @@
   import { goto } from '$app/navigation';
   import { catalog } from '@board-games/shared';
   import { gameClients } from '$lib/games';
+  import Rulebook from '$lib/catalog/Rulebook.svelte';
   import {
     session,
     resume,
@@ -30,9 +31,13 @@
   const immersive = $derived(room?.game != null);
   const cornerControls = $derived(
     immersive &&
-      ['azul', 'codenames', 'sushi-go-party', 'little-secret'].includes(
-        room?.gameId ?? '',
-      ),
+      [
+        'azul',
+        'codenames',
+        'sushi-go-party',
+        'little-secret',
+        'catan',
+      ].includes(room?.gameId ?? ''),
   );
   const metadata = $derived(catalog.find((game) => game.id === room?.gameId));
   onMount(() => {
@@ -173,6 +178,7 @@
             roomId={room.id}
             maxPlayers={metadata?.maxPlayers ?? 8}
             onInvite={invite}
+            onLeave={leave}
             {copied}
             view={room.game}
             playerId={room.playerId}
@@ -188,7 +194,14 @@
             canRematch={room.status === 'finished' &&
               room.hostId === room.playerId}
             rematch={start}
-            >{#snippet settingsContent()}{#if room.gameId === 'carcassonne' || cornerControls}<a
+            >{#snippet rulesContent()}<Rulebook
+                game="catan"
+              />{/snippet}{#snippet settingsContent()}{#if room.gameId === 'catan'}
+                <p>{room.id}</p>
+                {#if room.status === 'finished' && room.hostId === room.playerId}<button
+                    onclick={start}>{m.rematch()}</button
+                  >{/if}
+              {:else if room.gameId === 'carcassonne' || cornerControls}<a
                   href="/"
                   onclick={() => leave()}>{m.back()}</a
                 ><button onclick={invite}

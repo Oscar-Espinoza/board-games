@@ -30,6 +30,14 @@ development cards recipient-only. `/practice/catan` uses separate local fixtures
 never import them into multiplayer initialization or eager catalog metadata.
 [ADR 011](docs/adr/011-catan-presentation.md) records this boundary.
 
+Catan's physical tabletop follows the supplied September 2026 reference: locally
+bundled painted WebP scenery and materials under the real SVG island, wooden
+cardinal player plaques, a local hand below its plaque, and parchment building
+costs. Keep game information and controls in SVG/Svelte, preserve recipient
+privacy and accepted-event effects, and keep desktop layouts within the viewport.
+The last public dice result may rest in the bowl without replaying an event.
+[ADR 022](docs/adr/022-catan-physical-table.md) records this presentation migration.
+
 Carcassonne uses explicit tile regions and field half-edges, recomputed feature
 components, and resumable actor-owned choices. Do not replace its graph with a
 merge-only cache: ferries disconnect roads. Preserve Big Box 3.1 builder/pig and

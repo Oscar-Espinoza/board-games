@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, type Component } from 'svelte';
   import { gameClients } from '$lib/games';
+  import Rulebook from '$lib/catalog/Rulebook.svelte';
   let Board = $state<Component<any> | null>(null);
   let loadingError = $state('');
   onMount(() => {
@@ -87,11 +88,6 @@
 
 <svelte:head><title>{m.catan_try()}</title></svelte:head>
 <main class="practice">
-  <nav>
-    <a href="/">{m.back()}</a><span
-      >{m.catan_practice()} {seats.find((p) => p.id === seat)?.name}</span
-    >
-  </nav>
   {#if error}<p class="practice-error" role="alert">
       {error}<button
         type="button"
@@ -108,6 +104,7 @@
       {chooseSeat}
       locale={getLocale()}
     >
+      {#snippet rulesContent()}<Rulebook game="catan" />{/snippet}
       {#snippet settingsContent()}
         <hr />
         <label class="auto-rotate"
@@ -161,20 +158,6 @@
     overflow: hidden;
     background: #123f50;
   }
-  nav {
-    position: absolute;
-    z-index: 6;
-    top: 12px;
-    left: 16px;
-    right: 65px;
-    display: flex;
-    gap: 12px;
-    color: #e1e6d8;
-    font-size: 10px;
-  }
-  nav span {
-    opacity: 0.7;
-  }
   label {
     margin: 12px 0;
   }
@@ -192,14 +175,5 @@
     background: #f6dfd9;
     color: #832d25;
     padding: 8px;
-  }
-  @media (max-width: 650px) {
-    nav {
-      font-size: 9px;
-      gap: 8px;
-    }
-    nav span {
-      max-width: 180px;
-    }
   }
 </style>

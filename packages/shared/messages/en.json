@@ -128,6 +128,8 @@
   "catan_robber": "Robber",
   "catan_move_robber": "Move robber",
   "catan_building_costs": "Costs: road = wood + brick; settlement = wood + brick + wool + wheat; city = 3 ore + 2 wheat; development = ore + wool + wheat.",
+  "catan_costs_title": "Building costs",
+  "catan_development": "Development",
   "catan_choose_location": "Choose location",
   "catan_hex": "Hex",
   "catan_confirm": "Confirm",

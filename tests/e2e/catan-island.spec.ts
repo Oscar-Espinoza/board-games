@@ -65,6 +65,85 @@ async function previewCity(page: Page) {
   await page.keyboard.press('Enter');
   await expect(page.locator('.preview path')).toBeVisible();
 }
+test('physical tabletop fits desktop viewports and keeps rules and language available', async ({
+  page,
+}) => {
+  await scenario(page, 'building');
+  await expect(page.locator('#sea-material')).toHaveCount(0);
+  const shore = await page.locator('.shore').boundingBox();
+  expect(shore?.width).toBeGreaterThan(0);
+  expect(shore?.height).toBeGreaterThan(0);
+  for (const viewport of [
+    { width: 1672, height: 941 },
+    { width: 1280, height: 720 },
+    { width: 900, height: 800 },
+  ]) {
+    await page.setViewportSize(viewport);
+    const layout = await page.evaluate(() => {
+      const box = (el: Element) => {
+        const r = el.getBoundingClientRect();
+        return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+      };
+      const seats = [...document.querySelectorAll('.roster > [data-seat]')];
+      return {
+        scrolls:
+          document.documentElement.scrollHeight > innerHeight ||
+          document.documentElement.scrollWidth > innerWidth,
+        controls: [
+          ...document.querySelectorAll(
+            '.table-navigation, .table-utilities, .controls, .resource-card, .building-costs, .roster > [data-seat]',
+          ),
+        ].map(box),
+        labelsCollide: seats.some((seat) => {
+          const identity = box(seat.querySelector('.seat-identity')!);
+          const stats = box(seat.querySelector('.seat-stats')!);
+          return (
+            identity.right > stats.left + 1 && identity.bottom > stats.top + 1
+          );
+        }),
+        harborsCovered: [...document.querySelectorAll('.harbor')].some(
+          (port) => {
+            const a = box(port);
+            return seats.some((seat) => {
+              const b = box(seat);
+              return (
+                a.left < b.right &&
+                a.right > b.left &&
+                a.top < b.bottom &&
+                a.bottom > b.top
+              );
+            });
+          },
+        ),
+      };
+    });
+    expect(layout.scrolls).toBe(false);
+    expect(layout.labelsCollide).toBe(false);
+    expect(layout.harborsCovered).toBe(false);
+    for (const box of layout.controls) {
+      expect(box.left).toBeGreaterThanOrEqual(0);
+      expect(box.top).toBeGreaterThanOrEqual(0);
+      expect(box.right).toBeLessThanOrEqual(viewport.width);
+      expect(box.bottom).toBeLessThanOrEqual(viewport.height);
+    }
+  }
+  await page.getByRole('button', { name: 'Rules', exact: true }).click();
+  await expect(page.locator('.rules-dialog')).toBeVisible();
+  await expect(page.locator('.rules-dialog')).toContainText('Catan');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.rules-dialog')).not.toBeVisible();
+  await page
+    .getByRole('combobox', { name: 'Language', exact: true })
+    .selectOption('es');
+  await expect(page.locator('.building-costs')).toContainText(
+    'Costos de construcción',
+  );
+  await expect(page.locator('.table-navigation')).toContainText('Reglas');
+  await page.reload();
+  await expect(page.locator('.building-costs')).toContainText(
+    'Costos de construcción',
+  );
+});
 test('zoomable ocean, cardinal civilizations, resource cards and hidden settings', async ({
   page,
 }) => {
@@ -78,6 +157,24 @@ test('zoomable ocean, cardinal civilizations, resource cards and hidden settings
   await expect(page.locator('.civilization-name')).toHaveCount(4);
   await expect(page.locator('.resource-card .resource-art')).toHaveCount(5);
   await expect(page.locator('.harbor')).toHaveCount(9);
+  await expect(page.locator('.harbor > g > image')).toHaveCount(5);
+  expect(
+    await page.locator('.harbor > g > image').evaluateAll((icons) =>
+      icons.every((icon) => {
+        const a = icon.getBoundingClientRect();
+        const b = icon
+          .parentElement!.querySelector('path')!
+          .getBoundingClientRect();
+        return (
+          a.width > 0 &&
+          a.left >= b.left &&
+          a.right <= b.right &&
+          a.top >= b.top &&
+          a.bottom <= b.bottom
+        );
+      }),
+    ),
+  ).toBe(true);
   await expect(page.locator('[data-robber] path').first()).toBeVisible();
   expect(await page.locator('.table>svg').textContent()).not.toContain('♟');
   expect(await page.locator('.table>svg').textContent()).not.toContain(
@@ -146,6 +243,34 @@ test('preview, cancel, accepted city landing and continuity', async ({
   await expect(page.locator('[data-position="south"]')).toContainText(
     '3 points',
   );
+});
+test('accepted development purchases keep the local plaque centered during feedback', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1672, height: 941 });
+  await scenario(page, 'building');
+  const seat = page.locator('[data-position="south"]');
+  const before = (await seat.boundingBox())!;
+  await page
+    .getByRole('button', { name: 'Buy development', exact: true })
+    .click();
+  await expect(page.locator('.development-card')).toHaveCount(1);
+  await seat.evaluate((el) => {
+    for (const animation of el.getAnimations()) {
+      animation.pause();
+      animation.currentTime =
+        Number(animation.effect!.getTiming().duration) / 2;
+    }
+  });
+  const during = (await seat.boundingBox())!;
+  expect(
+    Math.abs(during.x + during.width / 2 - before.x - before.width / 2),
+  ).toBeLessThan(2);
+  await seat.evaluate((el) =>
+    el.getAnimations().forEach((animation) => animation.finish()),
+  );
+  const after = (await seat.boundingBox())!;
+  expect(Math.abs(after.x - before.x)).toBeLessThan(2);
 });
 test('dice tumble to the result, production, theft, Monopoly and trade feedback', async ({
   page,
@@ -560,10 +685,11 @@ test('board dice clear after resource deliveries follow the roll in readable sta
   expect(dice!.y).toBeGreaterThan(bounds!.y);
   expect(dice!.x + dice!.width).toBeLessThan(bounds!.x + bounds!.width);
   expect(dice!.y + dice!.height).toBeLessThan(bounds!.y + bounds!.height);
-  await expect(page.locator('.dice')).toHaveCount(0, { timeout: 12000 });
+  await expect(page.locator('.board-dice')).toHaveCount(0, { timeout: 12000 });
+  await expect(page.locator('.dice-bowl .dice')).toHaveCount(1);
   await expect(page.locator('.production')).toHaveCount(0);
   await page.getByRole('button', { name: 'End turn', exact: true }).click();
-  await expect(page.locator('.dice')).toHaveCount(0);
+  await expect(page.locator('.board-dice')).toHaveCount(0);
   await scenario(page, 'victory');
   await previewCity(page);
   await page.getByRole('button', { name: 'Confirm', exact: true }).click();
@@ -760,7 +886,7 @@ test('practice names switch seats freely and auto rotation follows setup and tur
   );
 });
 
-test('zoomed island pans without placing pieces and the controlled seat sits beside the hand', async ({
+test('zoomed island pans without placing pieces and the controlled seat sits above the hand', async ({
   page,
 }) => {
   await scenario(page, 'setup');
@@ -792,9 +918,7 @@ test('zoomed island pans without placing pieces and the controlled seat sits bes
     await page.setViewportSize(viewport);
     const summary = await page.locator('[data-position="south"]').boundingBox();
     const hand = await page.locator('.hand').boundingBox();
-    if (viewport.width > 700)
-      expect(hand!.x).toBeGreaterThanOrEqual(summary!.x + summary!.width);
-    else expect(hand!.y).toBeGreaterThanOrEqual(summary!.y + summary!.height);
+    expect(hand!.y).toBeGreaterThanOrEqual(summary!.y + summary!.height);
     expect(summary!.x + summary!.width).toBeLessThanOrEqual(viewport.width);
     const overlaps = await page.locator('.harbor').evaluateAll(
       (nodes, seat) =>
@@ -828,7 +952,8 @@ test('reduced-motion dice show briefly and then leave the board clear', async ({
         nodes.every((el) => el.getAnimations().length === 0),
       ),
   ).toBe(true);
-  await expect(page.locator('.dice')).toHaveCount(0, { timeout: 3000 });
+  await expect(page.locator('.board-dice')).toHaveCount(0, { timeout: 3000 });
+  await expect(page.locator('.dice-bowl .dice')).toHaveCount(1);
   await expect(
     page.getByRole('button', { name: 'End turn', exact: true }),
   ).toBeEnabled();
@@ -875,7 +1000,9 @@ test('accepted offers are visible separately from bank exchanges', async ({
     .getByRole('button', { name: '+ Wool', exact: true })
     .click();
   await page.getByRole('button', { name: 'Send offer', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('Offer sent');
+  await expect(page.locator('.panels').getByRole('status')).toContainText(
+    'Offer sent',
+  );
   await expect(page.locator('.player-offer')).toHaveCount(1);
   await page.getByRole('button', { name: /Bank/ }).click();
   await expect(page.locator('.player-offer')).toHaveCount(0);

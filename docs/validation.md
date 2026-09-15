@@ -19,6 +19,40 @@ This document lists validation commands and expectations, not a claim that a run
 
 Checked-in evidence stays small: commit screenshots as WebP (`cwebp -q 90 -m 6 -sharp_yuv`) and recordings as VP9 WebM (`ffmpeg -c:v libvpx-vp9 -crf 32 -b:v 0 -an`), never raw PNG or Playwright's VP8 output. Keep byte-identical captures once.
 
+## Catan physical tabletop — September 15, 2026
+
+[ADR 022](adr/022-catan-physical-table.md) migrates the real Catan presentation to
+the supplied physical-board reference. Rules, sockets and recipient projections
+are retained. [Final captures](evidence/catan/physical-table/README.md) show the
+shared production component at 1672×941, 1280×720 and 390×844.
+
+- All **323 unit/server tests** passed (79,302 assertions).
+- `bun run check` passed with zero Svelte errors/warnings and a clean root
+  TypeScript check. The production frontend/server build passed.
+- The complete Catan island and catalog browser specs passed **53 cases** across
+  Chromium and WebKit. One native multi-touch case is Chromium-only and skipped
+  in WebKit. Coverage includes three/six-player rooms, reconnects, privacy,
+  placement/city continuity, accepted dice/production/theft/trade/development,
+  awards, reduced motion, language persistence and viewport geometry.
+- New regression checks cover unobscured harbors, plaque/stat layout, direct
+  rules/language controls and stable plaque centering during purchase feedback.
+  The hand-below-plaque and resting-dice expectations reflect the new design.
+- Final WebKit screenshot review corrected SVG resource-image placement, explicit
+  piece-face shading and native language-selector appearance. All ten focused
+  Chromium/WebKit cases passed after the corrections; typechecks and build passed.
+- Scoped formatting and `git diff --check` passed. Repository-wide
+  `bun run format:check` reports two unchanged files:
+  `games/codenames/src/tokens.css` and `tests/e2e/sushi-prototype.spec.ts`.
+- Follow-up sea-frame removal passed eight focused Chromium/WebKit checks for
+  layout, harbors, zoom/pan and dice placement. Typechecks/build passed and all
+  four evidence captures were refreshed with the island directly on the ocean.
+
+WebKit used the isolated `/tmp/catan-webkit.X2va7s/webkit` wrapper with locally
+extracted libavif16/libgav1/libyuv; the host was missing those codecs. The passing
+run used normal JIT settings. Actual Safari/iOS, physical touch/audio and a human
+group playtest remain unverified. The additional agent-started dev launcher was
+stopped; the pre-existing development server was preserved.
+
 ## Zombies
 
 Zombies validation belongs to `../zombies-game`. Its independent README and Makefile document Rust/target tests, native/WASI replay comparisons, browser-support tests and graphics diagnostics. Detailed pre-migration Survival evidence and the original source snapshot were preserved during extraction; they do not describe the TypeScript catalog's validation status.

@@ -5,7 +5,18 @@
   import type { playerView } from './index.js';
   import Dice from './Dice.svelte';
   import ResourceArt from './ResourceArt.svelte';
-  import ocean from '../assets/ocean.svg?url';
+  import ocean from '../assets/tabletop-ocean.webp?url';
+  import woodGrain from '../assets/table-wood.webp?url';
+  import developmentBack from '../assets/development-compass.webp?url';
+  import wood from '../assets/painted-wood.webp?url';
+  import wool from '../assets/painted-wool.webp?url';
+  import wheat from '../assets/painted-wheat.webp?url';
+  import brick from '../assets/painted-brick.webp?url';
+  import ore from '../assets/painted-ore.webp?url';
+  import desert from '../assets/painted-desert.webp?url';
+  import BuildingCosts from './table/BuildingCosts.svelte';
+  import PieceReserve from './table/PieceReserve.svelte';
+  import { resourceArtwork, shade } from './table/artwork.js';
   import { setLocale } from '@board-games/shared/runtime';
   import { m } from '@board-games/shared/messages';
   import type { Locale } from '@board-games/shared/runtime';
@@ -19,6 +30,10 @@
     connected = true,
     settingsContent,
     chooseSeat,
+    onLeave,
+    onInvite,
+    copied = false,
+    rulesContent,
   }: {
     view: ReturnType<typeof playerView>;
     playerId: string;
@@ -29,6 +44,10 @@
     connected?: boolean;
     settingsContent?: Snippet;
     chooseSeat?: (id: string) => void;
+    onLeave?: () => void;
+    onInvite?: () => void;
+    copied?: boolean;
+    rulesContent?: Snippet;
   } = $props();
 
   let root: HTMLElement;
@@ -37,6 +56,7 @@
     motion = $state(true),
     reduced = $state(false);
   let settings = $state(false);
+  let rulesDialog: HTMLDialogElement;
   let tradeOpen = $state(false),
     developmentOpen = $state('');
   let rolling = $state(false);
@@ -123,15 +143,6 @@
     if (!allowed('ROLL_DICE') || !connected) cancelCharge();
     if (!canTrade() && tradeMode === 'compose') tradeOpen = false;
   });
-  const developmentArt = import.meta.glob('../assets/development-*.svg', {
-    query: '?url',
-    import: 'default',
-    eager: true,
-  });
-  const developmentImage = (kind: string) =>
-    developmentArt[
-      '../assets/development-' + kind.toLowerCase().replaceAll('_', '') + '.svg'
-    ] as string;
   function openTrade(id = '') {
     if (id ? !canTradeWith(id) : !canTrade()) {
       if (sound) {
@@ -329,20 +340,12 @@
     };
   });
 
-  const terrain = Object.entries(
-    import.meta.glob('../assets/terrain-*-0.svg', {
-      query: '?url',
-      import: 'default',
-      eager: true,
-    }),
-  )
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([, url]) => url as string);
+  const terrain = [wood, wool, wheat, brick, ore, desert];
   const colors = [
-    '#e64f30',
-    '#198bd1',
-    '#f4cb63',
-    '#ed8534',
+    '#df261b',
+    '#008ce1',
+    '#f5c735',
+    '#f88719',
     '#54b877',
     '#ac79dd',
   ];
@@ -414,9 +417,11 @@
   ];
   const name = (id: string | undefined) =>
     players.find((p) => p.id === id)?.name ?? id ?? '';
+  const tileX = 50,
+    tileY = 26.75;
   const point = (v: number) => [
-    board.vertices[v][0] * 37,
-    board.vertices[v][1] * 21.4,
+    board.vertices[v][0] * tileX,
+    board.vertices[v][1] * tileY,
   ];
   const color = (id: string) =>
     colors[pub.players.find((p: any) => p.id === id)?.color ?? 0];
@@ -475,9 +480,9 @@
         : selected,
   );
   let bounds = $derived.by(() => {
-    const xs = board.vertices.map((v: number[]) => v[0] * 37),
-      ys = board.vertices.map((v: number[]) => v[1] * 21.4);
-    return `${Math.min(...xs) - 55} ${Math.min(...ys) - 55} ${Math.max(...xs) - Math.min(...xs) + 110} ${Math.max(...ys) - Math.min(...ys) + 110}`;
+    const xs = board.vertices.map((v: number[]) => v[0] * tileX),
+      ys = board.vertices.map((v: number[]) => v[1] * tileY);
+    return `${Math.min(...xs) - 58} ${Math.min(...ys) - 48} ${Math.max(...xs) - Math.min(...xs) + 116} ${Math.max(...ys) - Math.min(...ys) + 96}`;
   });
 </script>
 
@@ -485,7 +490,7 @@
   {#if action.vertex !== undefined}
     {@const p = point(action.vertex)}
     <path
-      transform={'translate(' + p[0] + ' ' + p[1] + ')'}
+      transform={'translate(' + p[0] + ' ' + p[1] + ') scale(1.25)'}
       d={action.type === 'BUILD_CITY'
         ? 'M -10 9 V -8 H -2 V -1 H 8 V 9 Z'
         : 'M -8 8 V -2 L 0 -10 L 8 -2 V 8 Z'}
@@ -510,9 +515,9 @@
     {@const h = board.hexes[action.hex]}
     <path
       transform={'translate(' +
-        ((2 * h.q + h.r) * 37 + 17) +
+        ((2 * h.q + h.r) * tileX + 17) +
         ' ' +
-        (3 * h.r * 21.4 - 7) +
+        (3 * h.r * tileY - 7) +
         ')'}
       d="M-10 5-7-12Q0-26 7-12L11 5Z"
       fill="#3c4550"
@@ -550,6 +555,7 @@
       developmentOpen = '';
       pending = null;
       settings = false;
+      rulesDialog?.close();
       root?.querySelectorAll('details[open]').forEach((panel) => {
         (panel as HTMLDetailsElement).open = false;
       });
@@ -562,13 +568,62 @@
   class:still={!motion || reduced}
   aria-label="CATAN"
   style:--ocean={'url("' + ocean + '")'}
+  style:--wood-grain={'url("' + woodGrain + '")'}
 >
-  <button
-    class="settings-trigger"
-    aria-label={m.catan_settings({}, { locale })}
-    aria-expanded={settings}
-    onclick={() => (settings = !settings)}>⚙</button
+  <nav class="table-navigation" aria-label={m.catalog({}, { locale })}>
+    <a href="/" onclick={() => onLeave?.()}
+      ><span aria-hidden="true">←</span> {m.back({}, { locale })}</a
+    >
+    <button onclick={() => rulesDialog.showModal()}
+      ><span aria-hidden="true">▤</span>
+      {m.library_rules({}, { locale })}</button
+    >
+  </nav>
+  <div class="table-utilities">
+    {#if onInvite}<button onclick={onInvite}
+        ><span aria-hidden="true">♟♟</span>
+        {copied ? m.copied({}, { locale }) : m.invite({}, { locale })}</button
+      >{:else}<span class="practice-label"
+        >{m.catan_practice({}, { locale })}</span
+      >{/if}
+    <label class="table-language"
+      ><span aria-hidden="true">◎</span><select
+        aria-label={m.language({}, { locale })}
+        value={locale}
+        onchange={(e) => setLocale(e.currentTarget.value as Locale)}
+        ><option value="en">EN</option><option value="es">ES</option></select
+      ></label
+    >
+    <button
+      class="settings-trigger"
+      aria-label={m.catan_settings({}, { locale })}
+      aria-expanded={settings}
+      onclick={() => (settings = !settings)}
+      ><span aria-hidden="true">⚙</span>
+      <span class="settings-label">{m.catan_settings({}, { locale })}</span
+      ></button
+    >
+    <span
+      class="table-connection connection"
+      class:online={connected}
+      role="status"
+      ><i></i>{connected
+        ? m.connected({}, { locale })
+        : m.disconnected({}, { locale })}</span
+    >
+  </div>
+  <dialog
+    class="rules-dialog"
+    bind:this={rulesDialog}
+    aria-label={m.library_rules({}, { locale })}
   >
+    <button
+      class="close-rules"
+      aria-label={m.catan_cancel({}, { locale })}
+      onclick={() => rulesDialog.close()}>×</button
+    >
+    {@render rulesContent?.()}
+  </dialog>
   {#if settings}<div
       class="settings-menu"
       role="dialog"
@@ -592,15 +647,6 @@
           onclick={() => preference('motion')}
           >{m.catan_motion({}, { locale })}
           {motion && !reduced ? '✓' : '×'}</button
-        >
-        <label
-          >{m.language({}, { locale })}<select
-            value={locale}
-            onchange={(e) => setLocale(e.currentTarget.value as Locale)}
-            ><option value="en">English</option><option value="es"
-              >Español</option
-            ></select
-          ></label
         >
       </div>
       <details>
@@ -644,16 +690,53 @@
               >{/if}</button
           >{/if}
         <span class="seat-stats"
-          >{p.id === playerId ? priv.points : p.points}
-          {m.catan_points({}, { locale })} · {p.resources}
-          {m.catan_resources({}, { locale })} · {p.development}
-          {m.catan_dev({}, { locale })}</span
-        >{#if pub.longest === p.id}<small
-            >{m.catan_longest_route({}, { locale })}</small
-          >{/if}{#if pub.army === p.id}<small
-            >{m.catan_largest_army({}, { locale })}</small
+          ><span class="points"
+            ><b>{p.id === playerId ? priv.points : p.points}</b>
+            {m.catan_points({}, { locale })}</span
+          ><span
+            >{p.resources}
+            {m.catan_resources({}, { locale })} · {p.development}
+            {m.catan_dev({}, { locale })}</span
+          ></span
+        >{#if p.id === playerId}<button
+            class="seat-trade"
+            aria-disabled={!canTrade()}
+            onclick={() => openTrade()}
+            aria-label={m.catan_trade({}, { locale })}
+            >{m.catan_trade({}, { locale })}</button
           >{/if}
+        {#if pub.longest === p.id || pub.army === p.id}<div class="awards">
+            {#if pub.longest === p.id}<small
+                ><span aria-hidden="true">⚒</span>
+                {m.catan_longest_route({}, { locale })}</small
+              >{/if}{#if pub.army === p.id}<small
+                ><span aria-hidden="true">♟</span>
+                {m.catan_largest_army({}, { locale })}</small
+              >{/if}
+          </div>{/if}
       </div>{/each}
+  </div>
+  {#each pub.players.filter( (p) => ['west', 'east'].includes(position(p.id)) ) as p}
+    <div
+      class="reserve"
+      data-reserve-position={position(p.id)}
+      aria-hidden="true"
+    >
+      <PieceReserve
+        color={colors[p.color]}
+        roads={15 - pub.roads.filter((owner) => owner === p.id).length}
+        settlements={5 -
+          pub.buildings.filter((b) => b && b.color === p.color && !b.city)
+            .length}
+        cities={4 -
+          pub.buildings.filter((b) => b && b.color === p.color && b.city)
+            .length}
+      />
+    </div>
+  {/each}
+  <BuildingCosts {locale} />
+  <div class="dice-bowl" aria-label={m.catan_roll_dice({}, { locale })}>
+    {#if pub.dice && !diceVisible}<Dice values={pub.dice} />{/if}
   </div>
   <p class="phase" aria-live="polite">
     {phaseText}{#if pub.paired}
@@ -726,6 +809,11 @@
             stop-color="#27180f"
             stop-opacity=".55"
           /></linearGradient
+        ><radialGradient id="robber-lacquer" cx=".3" cy=".2" r=".8"
+          ><stop stop-color="#686252" /><stop
+            offset=".4"
+            stop-color="#262623"
+          /><stop offset="1" stop-color="#080b0c" /></radialGradient
         ></defs
       >
       <defs
@@ -752,13 +840,13 @@
           zoom +
           ')'}
       >
+        <!-- Keep the island bounds available to accepted dice effects. -->
         <g
           class="shore"
-          fill="#63d1c0"
-          stroke="#8adfce"
-          stroke-width="18"
+          fill="#dab57a"
+          stroke="#f0d69d"
+          stroke-width="9"
           stroke-linejoin="round"
-          opacity=".55"
           >{#each board.hexes as h}<polygon
               points={h.vertices
                 .map((v: number) => point(v).join(','))
@@ -770,53 +858,51 @@
             data-hex={i}
             points={h.vertices.map((v: number) => point(v).join(',')).join(' ')}
             fill={`url(#terrain-${h.resource ?? 5})`}
-            stroke="#e4ce99"
-            stroke-width="3"
+            stroke="#f4da9c"
+            stroke-width="3.5"
           />
           {#if h.number}<circle
-              cx={(2 * h.q + h.r) * 37}
-              cy={3 * h.r * 21.4}
-              r="13"
+              cx={(2 * h.q + h.r) * tileX}
+              cy={3 * h.r * tileY}
+              r="16"
+              class="number-token"
               fill="#fff0cd"
             /><text
-              x={(2 * h.q + h.r) * 37}
-              y={3 * h.r * 21.4 + 5}
+              x={(2 * h.q + h.r) * tileX}
+              y={3 * h.r * tileY + 6}
               text-anchor="middle"
               fill={h.number === 6 || h.number === 8 ? '#b73428' : '#31291e'}
-              font-size="14"
-              font-weight="800">{h.number}</text
+              font-size="18"
+              font-weight="600">{h.number}</text
             >{/if}
           {#if allowed('MOVE_ROBBER')}<text
-              x={(2 * h.q + h.r) * 37}
-              y={3 * h.r * 21.4 + 28}
+              x={(2 * h.q + h.r) * tileX}
+              y={3 * h.r * tileY + 28}
               text-anchor="middle"
               font-size="10"
               fill="#fff">#{i}</text
             >{/if}{#if pub.robber === i}
             <g
               transform={'translate(' +
-                ((2 * h.q + h.r) * 37 + 17) +
+                ((2 * h.q + h.r) * tileX + 17) +
                 ' ' +
-                (3 * h.r * 21.4 - 7) +
+                (3 * h.r * tileY - 7) +
                 ')'}
               ><g data-robber aria-label={m.catan_robber({}, { locale })}>
-                <ellipse cy="7" rx="12" ry="4" fill="#172b2e" opacity=".3" />
+                <ellipse cy="10" rx="10" ry="4" fill="#172017" opacity=".45" />
                 <path
-                  d="M-10 5-7-12Q0-26 7-12L11 5Z"
-                  fill="#3c4550"
-                  stroke="#1a2831"
-                  stroke-width="1.5"
+                  d="M-7 5Q-6-1-4-8H4Q6-1 7 5Q10 12 0 12Q-10 12-7 5Z"
+                  fill="url(#robber-lacquer)"
+                  stroke="#1b1d1a"
+                  stroke-width=".8"
                 />
-                <path d="M-5-10Q0-21 5-10L4-3H-4Z" fill="#18232c" /><path
-                  d="m-4-8 3 1m2 0 3-1"
-                  stroke="#ffc568"
-                  stroke-width="1.8"
-                />
-                <path d="m-7-2 12 5-3 5-11-5Z" fill="#96502e" /><path
-                  d="M7-3q11-5 10 7-5 8-11 2"
-                  fill="#bb8b4b"
-                  stroke="#5b422a"
-                  stroke-width="1.5"
+                <ellipse cy="5" rx="7" ry="3" fill="url(#robber-lacquer)" />
+                <circle
+                  cy="-12"
+                  r="6"
+                  fill="url(#robber-lacquer)"
+                  stroke="#252822"
+                  stroke-width=".7"
                 />
               </g></g
             >{/if}
@@ -848,34 +934,33 @@
                 (cx + (cx / length) * 32) +
                 ' ' +
                 (cy + (cy / length) * 32) +
-                ')'}
+                ') scale(1.2)'}
             >
-              <ellipse
-                rx="19"
-                ry="13"
-                fill="#174e61"
-                stroke="#9edcd1"
-                stroke-width="1"
+              <path
+                d="M0-20 17-10 17 11 0 21-17 11-17-10Z"
+                fill="#083348"
+                stroke="#d8a95c"
+                stroke-width="2"
               />
-              <path d="m-13 1 6 5h14l6-5Z" fill="#d6ac70" /><path
-                d="M0 0v-12L9-2H0"
-                fill="#fff1cd"
-              />
+              {#if port.resource === null}<path
+                  d="m-12 1 5 4h14l5-4Z"
+                  fill="#fff2cd"
+                /><path d="M0 0v-12L9-2H0" fill="#fff1cd" />{/if}
               <text
                 x="0"
-                y="12"
+                y="15"
                 text-anchor="middle"
-                font-size="7"
+                font-size="9"
                 font-weight="800"
                 fill="#fff1cd">{port.resource === null ? '3:1' : '2:1'}</text
               >
-              {#if port.resource !== null}<foreignObject
-                  x="-17"
-                  y="-13"
-                  width="14"
-                  height="14"
-                  ><ResourceArt resource={port.resource} /></foreignObject
-                >{/if}
+              {#if port.resource !== null}<image
+                  x="-11"
+                  y="-17"
+                  width="22"
+                  height="22"
+                  href={resourceArtwork[port.resource]}
+                />{/if}
             </g>
           </g>
         {/each}
@@ -883,36 +968,35 @@
               board.edges[e][0],
             )}{@const b = point(board.edges[e][1])}<g data-piece={'road-' + e}
               ><line
-                x1={a[0]}
-                y1={a[1]}
-                x2={b[0]}
-                y2={b[1]}
-                stroke="#26342f"
+                x1={a[0] * 0.86 + b[0] * 0.14 + 1}
+                y1={a[1] * 0.86 + b[1] * 0.14 + 2}
+                x2={b[0] * 0.86 + a[0] * 0.14 + 1}
+                y2={b[1] * 0.86 + a[1] * 0.14 + 2}
+                stroke={shade(color(owner), 0.55)}
                 stroke-width="9"
-                stroke-linecap="round"
+                class="road-side"
               /><line
-                x1={a[0]}
-                y1={a[1]}
-                x2={b[0]}
-                y2={b[1]}
+                x1={a[0] * 0.86 + b[0] * 0.14}
+                y1={a[1] * 0.86 + b[1] * 0.14}
+                x2={b[0] * 0.86 + a[0] * 0.14}
+                y2={b[1] * 0.86 + a[1] * 0.14}
                 class="built"
                 stroke={color(owner)}
-                stroke-width="6"
-                stroke-linecap="round"
+                stroke-width="8"
               /></g
             >{/if}{/each}
         {#each pub.buildings as building, v}{#if building}{@const p =
               point(v)}<g
               data-piece={'building-' + v}
-              transform={'translate(' + p[0] + ' ' + p[1] + ')'}
+              transform={'translate(' + p[0] + ' ' + p[1] + ') scale(1.25)'}
               ><path
                 class="built"
                 d={building.city
                   ? 'M -10 9 V -8 H -2 V -1 H 8 V 9 Z'
                   : 'M -8 8 V -2 L 0 -10 L 8 -2 V 8 Z'}
                 fill={colors[building.color]}
-                stroke="#39291f"
-                stroke-width="1.5"
+                stroke={colors[building.color]}
+                stroke-width=".5"
                 style="filter:drop-shadow(1px 3px 1px #142b36aa)"
               /><path
                 pointer-events="none"
@@ -924,8 +1008,10 @@
               /><path
                 class="piece-detail"
                 pointer-events="none"
-                d={building.city ? 'M-6 7V2H-3V7M2 3H5V6H2Z' : 'M-2 8V2H2V8'}
-                fill="#3b2f27"
+                d={building.city
+                  ? 'M8-1 13-4V6L8 9ZM-10-8-5-11H3L-2-8ZM-2-1 3-4H13L8-1Z'
+                  : 'M8-2 13-5V5L8 8ZM-8-2 0-10 5-13 13-5 8-2 0-10Z'}
+                fill={shade(colors[building.color], 0.72)}
               /></g
             >{/if}{/each}
         {#each legal.filter((a) => a.type === placement || a.type === 'MOVE_ROBBER') as action}
@@ -944,8 +1030,8 @@
                 : [
                     (2 * board.hexes[action.hex].q +
                       board.hexes[action.hex].r) *
-                      37,
-                    3 * board.hexes[action.hex].r * 21.4,
+                      tileX,
+                    3 * board.hexes[action.hex].r * tileY,
                   ]}
           <circle
             class="target"
@@ -1038,8 +1124,18 @@
               >{/if}</button
           >
         {/if}
-        {#each legal.filter( (a) => ['END_TURN', 'BUY_DEVELOPMENT', 'FINISH_ROADS', 'STEAL'].includes(a.type) ) as action}<button
-            disabled={action.type === 'END_TURN' && diceVisible}
+        {#each ['BUY_DEVELOPMENT', 'END_TURN'] as type}<button
+            class:end-turn={type === 'END_TURN'}
+            class:buy-development={type === 'BUY_DEVELOPMENT'}
+            disabled={!allowed(type) || (type === 'END_TURN' && diceVisible)}
+            onclick={() => {
+              const action = legal.find((a) => a.type === type);
+              if (action) send(action);
+            }}
+            ><span aria-hidden="true">{type === 'END_TURN' ? '▶' : '▱'}</span
+            >{label({ type })}</button
+          >{/each}
+        {#each legal.filter( (a) => ['FINISH_ROADS', 'STEAL'].includes(a.type) ) as action}<button
             onclick={() => send(action)}>{label(action)}</button
           >{/each}
       </div>
@@ -1145,7 +1241,7 @@
           >{priv.development.filter((c) => c.kind === kind).length}</b
         >
         <span class="card-title">{label({ type: kind })}</span>
-        <img class="card-art" src={developmentImage(kind)} alt="" />
+        <img class="card-art" src={developmentBack} alt="" />
         <span class="card-footer">CATAN</span>
       </button>
     {/each}
@@ -1332,12 +1428,776 @@
 </section>
 
 <style>
+  .catan {
+    --wood:
+      linear-gradient(#24110630, #24110670), var(--wood-grain) center / cover;
+    --gold: #b8884b;
+    --card-width: clamp(66px, 6.55vw, 118px);
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    background: #075e88 var(--ocean) center / cover no-repeat;
+    color: #fff2d4;
+    font-family: Georgia, 'Times New Roman', serif;
+    isolation: isolate;
+  }
+  .catan::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    box-shadow: inset 0 0 55px #071b2060;
+    pointer-events: none;
+    z-index: 1;
+  }
+  button,
+  .table-navigation a,
+  .table-language,
+  .table-connection {
+    background: var(--wood);
+    color: #fff1d6;
+    border: 1px solid var(--gold);
+    border-radius: 5px;
+    box-shadow:
+      inset 0 0 0 2px #28150b,
+      inset 0 0 0 3px #d09e5845,
+      inset 0 2px 3px #ffd89c66,
+      1px 3px 0 #25150e,
+      0 5px 7px #0811168a;
+    font:
+      15px/1.15 Georgia,
+      serif;
+    text-shadow: 0 1px 2px #160b04;
+    padding: 10px 13px;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled):not([aria-disabled='true']),
+  .table-navigation a:hover {
+    filter: brightness(1.16);
+  }
+  button:focus-visible,
+  a:focus-visible,
+  select:focus-visible {
+    outline: 3px solid #ffe29b;
+    outline-offset: 3px;
+  }
+  button:disabled,
+  button[aria-disabled='true'] {
+    opacity: 0.53;
+    cursor: default;
+  }
+  button.chosen {
+    border-color: #ffe6a1;
+    box-shadow:
+      inset 0 0 0 2px #634222,
+      0 0 7px #ffe2a277;
+  }
+  .table-navigation {
+    position: absolute;
+    top: 1.1%;
+    left: 1.2%;
+    display: flex;
+    gap: 10px;
+    z-index: 7;
+  }
+  .table-navigation a {
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .table-navigation button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .table-navigation span {
+    font-size: 24px;
+    line-height: 0.7;
+  }
+  .table-utilities {
+    position: absolute;
+    top: 1.1%;
+    right: 1.1%;
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    z-index: 7;
+  }
+  .table-utilities button,
+  .table-language,
+  .table-connection {
+    font-size: clamp(11px, 0.95vw, 16px);
+    padding: 9px 10px;
+  }
+  .table-utilities button > span[aria-hidden] {
+    font-size: 21px;
+    vertical-align: middle;
+    color: #f1d594;
+  }
+  .table-language {
+    display: flex;
+    align-items: center;
+    padding: 0 7px;
+    gap: 4px;
+  }
+  .table-language select {
+    appearance: none;
+    width: auto;
+    border: 0;
+    background: transparent;
+    color: #fff1d6;
+    font: inherit;
+    padding: 5px 0;
+  }
+  .table-language option {
+    color: #302111;
+  }
+  .table-connection {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .table-connection i {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ef6b49;
+    box-shadow: 0 0 5px #ef6b4955;
+  }
+  .table-connection.online i {
+    background: #46d767;
+  }
+  .practice-label {
+    align-self: center;
+    font-size: 11px;
+    padding: 5px 8px;
+    background: #15281bc9;
+    border-radius: 3px;
+    max-width: 120px;
+  }
+  .roster {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+  }
+  .roster > div {
+    position: absolute;
+    width: 24%;
+    min-height: 60px;
+    padding: 8px 8px 8px 64px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 2px solid var(--seat);
+    border-radius: 9px 6px 8px 5px;
+    background: linear-gradient(
+      110deg,
+      color-mix(in srgb, var(--seat) 30%, #180b06),
+      color-mix(in srgb, var(--seat) 12%, #170e0a)
+    );
+    box-shadow:
+      inset 0 0 0 3px #281608,
+      inset 0 0 0 4px #e2ab5755,
+      inset 0 5px 9px #fff4c422,
+      0 5px 0 #1c120dcc,
+      0 9px 15px #031b2799;
+    pointer-events: auto;
+  }
+  .roster > div::before {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 3px;
+    bottom: 3px;
+    width: 7px;
+    border-radius: 4px;
+    background: var(--seat);
+    box-shadow: inset 1px 0 #fff7;
+  }
+  .roster .active {
+    box-shadow:
+      inset 0 0 0 3px #412a0e,
+      inset 0 0 0 4px #ffe097b0,
+      0 5px 0 #241909,
+      0 0 14px #fff3b33b;
+  }
+  .roster [data-position='north'] {
+    top: 0.3%;
+    left: 36%;
+    width: 28%;
+  }
+  .roster [data-position='south'] {
+    bottom: 18.5%;
+    left: 36%;
+    width: 28%;
+  }
+  .roster [data-position='west'] {
+    left: 1%;
+    top: 39.5%;
+  }
+  .roster [data-position='east'] {
+    right: 1%;
+    top: 39.5%;
+  }
+  .roster [data-position='north-west'] {
+    left: 23%;
+    top: 7%;
+    width: 24%;
+  }
+  .roster [data-position='north-east'] {
+    right: 23%;
+    top: 7%;
+    width: 24%;
+  }
+  .extended [data-position='north'] {
+    top: 1%;
+    left: 38%;
+    width: 24%;
+  }
+  .extended ~ .table {
+    top: 15%;
+  }
+  .crest {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 43px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: #120d0880;
+    box-shadow:
+      inset 0 1px 2px #fff3,
+      0 1px 1px #eabe5744;
+    color: var(--seat);
+    font-size: 33px;
+    text-shadow: 0 2px 1px #000;
+  }
+  .seat-identity {
+    min-width: 0;
+    flex: 1;
+  }
+  .civilization-name {
+    font-weight: bold;
+    font-size: clamp(13px, 1.03vw, 19px);
+    line-height: 1.1;
+  }
+  .seat-name {
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 2px 0 0;
+    font:
+      13px Georgia,
+      serif;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    color: #fff0ce;
+  }
+  .seat-stats {
+    max-width: 125px;
+    flex: 0 0 27%;
+    font-size: clamp(9px, 0.8vw, 14px);
+    line-height: 1.25;
+  }
+  .seat-stats > span {
+    display: block;
+  }
+  .seat-stats > span:last-child {
+    font-size: 0.85em;
+  }
+  .points b {
+    font-size: 1.4em;
+    font-weight: normal;
+  }
+  .seat-trade {
+    order: 2;
+    padding: 9px 11px;
+    font-size: 15px;
+    position: relative;
+  }
+  .awards {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 10px;
+    display: flex;
+    gap: 6px;
+  }
+  .awards small {
+    white-space: nowrap;
+    color: #251b0d;
+    padding: 6px 12px;
+    background: linear-gradient(100deg, #e7ca8c, #fff2d0, #e3c487);
+    border: 1px solid #bb9253;
+    border-radius: 2px 5px 3px 2px;
+    box-shadow: 2px 4px 5px #15100a70;
+    font-size: clamp(10px, 1vw, 17px);
+    font-weight: bold;
+  }
+  .awards small span {
+    margin-right: 5px;
+  }
+  .roster [data-position='south'] .awards {
+    left: calc(100% + 10px);
+    top: 8px;
+    flex-direction: column;
+  }
+  .phase {
+    position: absolute;
+    left: 28%;
+    width: 44%;
+    bottom: 0.6%;
+    margin: 0;
+    text-align: center;
+    font-size: clamp(12px, 1.12vw, 19px);
+    line-height: 1.15;
+    text-shadow:
+      0 2px 3px #000,
+      0 0 10px #000;
+    z-index: 4;
+  }
+  .table {
+    position: absolute;
+    inset: max(6%, 62px) 22% 25.5%;
+  }
+  .table > svg {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    user-select: none;
+    touch-action: none;
+    filter: drop-shadow(0 7px 4px #042f46a0);
+  }
+  .table > svg text {
+    font-family: Georgia, serif;
+    text-shadow: none;
+  }
+  .number-token {
+    stroke: #ba9756;
+    stroke-width: 0.55;
+    filter: drop-shadow(1px 2px 1px #2c251999);
+  }
+  .shore {
+    filter: drop-shadow(0 2px 0 #80603d);
+  }
+  .harbor {
+    filter: drop-shadow(1px 2px 1px #042737bb);
+  }
+  .road-side {
+    filter: drop-shadow(1px 2px 1px #18241477);
+  }
+  .target {
+    cursor: pointer;
+  }
+  .target:focus,
+  .target:focus-visible,
+  .table > svg:focus,
+  .table > svg:focus-visible {
+    outline: none;
+  }
+  .table:has(> svg:focus-visible) .zoom-controls {
+    outline: 2px solid #ffe49d;
+    outline-offset: 3px;
+  }
+  .placement-hint {
+    opacity: 0;
+  }
+  .placement-hint.revealed {
+    opacity: 0.45;
+  }
+  .target:hover + .placement-hint,
+  .target:focus-visible + .placement-hint {
+    opacity: 0.65;
+  }
+  .target.chosen + .placement-hint {
+    opacity: 0;
+  }
+  .table > svg.zoomed {
+    cursor: grab;
+  }
+  .table > svg.panning,
+  .table > svg.panning .target {
+    cursor: grabbing;
+  }
+  .zoom-controls {
+    position: fixed;
+    right: 2%;
+    top: 31.5%;
+    display: flex;
+    gap: 4px;
+    z-index: 3;
+  }
+  .zoom-controls button {
+    font-size: 11px;
+    padding: 5px 9px;
+  }
+  .reserve {
+    position: absolute;
+    width: 12%;
+    height: 18%;
+    top: 19%;
+    pointer-events: none;
+  }
+  .reserve[data-reserve-position='west'] {
+    left: 4%;
+    transform: rotate(-13deg);
+  }
+  .reserve[data-reserve-position='east'] {
+    right: 4%;
+    transform: rotate(10deg);
+    top: 23%;
+  }
+  .dice-bowl {
+    position: absolute;
+    right: 1.6%;
+    top: 7.7%;
+    width: 10.5%;
+    aspect-ratio: 1;
+    border: 13px ridge #714423;
+    border-radius: 50%;
+    background: repeating-radial-gradient(
+      ellipse at center,
+      #2c170e 0 4px,
+      #482a19 6px,
+      #311c11 10px
+    );
+    box-shadow:
+      inset 3px 8px 15px #120907,
+      inset -4px -3px 6px #a6723c,
+      5px 10px 9px #06192399;
+    display: grid;
+    place-items: center;
+    transform: rotate(12deg);
+  }
+  .dice-bowl :global(.dice) {
+    gap: 12px;
+    transform: scale(0.9);
+  }
+  .dice-bowl :global(.die) {
+    transform: rotateX(-16deg) rotateY(20deg);
+  }
+  .board-dice {
+    position: absolute;
+    left: 55%;
+    top: 57%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 5;
+  }
+  .controls {
+    position: fixed;
+    left: 1.4%;
+    bottom: 5.6%;
+    width: 26.5%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 4;
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  .controls > .actions:first-child {
+    order: 2;
+  }
+  .controls .actions > button {
+    min-height: clamp(35px, 5.7vh, 58px);
+    font-size: clamp(11px, 1.1vw, 19px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex: 1;
+    padding: 8px;
+  }
+  .controls .game-actions {
+    display: grid;
+    grid-template-columns: 1fr 0.95fr 1.25fr;
+    gap: 9px;
+  }
+  .controls .game-actions > button {
+    font-size: clamp(10px, 0.95vw, 17px);
+    min-height: clamp(34px, 5.1vh, 49px);
+    gap: 6px;
+  }
+  .controls .end-turn {
+    order: 4;
+    background:
+      repeating-linear-gradient(176deg, #ffcf980c 0 1px, transparent 2px 6px),
+      linear-gradient(130deg, #b13724, #76170f);
+    border-color: #d76742;
+  }
+  .controls .buy-development {
+    order: 3;
+    background:
+      repeating-linear-gradient(176deg, #ffcf980c 0 1px, transparent 2px 6px),
+      linear-gradient(130deg, #235b39, #103724);
+    border-color: #9caa69;
+  }
+  .controls .actions > .roll-button {
+    background: linear-gradient(
+      90deg,
+      #a17c32 var(--charge),
+      #694423 var(--charge)
+    );
+    position: relative;
+    touch-action: none;
+    user-select: none;
+    overflow: hidden;
+  }
+  .charge-label {
+    margin-left: 8px;
+  }
+  .build-icon,
   .market-icon {
-    width: 20px;
-    height: 20px;
+    width: 23px;
+    height: 23px;
+    flex-shrink: 0;
     display: inline-block;
     vertical-align: middle;
-    margin-right: 5px;
+  }
+  .confirm {
+    order: -1;
+    background: #302010;
+    border: 1px solid #e2bb79;
+    border-radius: 5px;
+    box-shadow: 0 5px 10px #08192399;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  .confirm b {
+    flex: 1;
+  }
+  .hand {
+    --card-step: min(
+      calc(var(--card-width) + 12px),
+      calc((46vw - var(--card-width)) / max(1, var(--stack-count) - 1))
+    );
+    position: absolute;
+    bottom: 3.1%;
+    left: 30.3%;
+    display: grid;
+    grid-template-columns: repeat(var(--stack-count), var(--card-step));
+    width: max-content;
+    align-items: end;
+    gap: 0;
+    z-index: 4;
+  }
+  .resource-card {
+    width: var(--card-width);
+    height: clamp(105px, 14.5vh, 164px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    border: 5px solid #ebdab7;
+    border-radius: 8px 6px 7px 9px;
+    background: linear-gradient(110deg, #f3e7c8, #fff7df 55%, #dfcca6);
+    color: #302719;
+    box-shadow:
+      inset 0 0 0 1px #ad9a76,
+      0 2px 0 #9d8767,
+      0 4px 0 #eee0c3,
+      0 6px 0 #9d8767,
+      0 8px 0 #dacaad,
+      2px 11px 5px #19100bb3;
+    transform: rotate(var(--tilt, -3deg));
+    overflow: visible;
+    padding: 2px;
+  }
+  .resource-card:nth-child(1) {
+    --tilt: -5deg;
+  }
+  .resource-card:nth-child(2) {
+    --tilt: -4deg;
+  }
+  .resource-card:nth-child(3) {
+    --tilt: -2deg;
+  }
+  .resource-card:nth-child(4) {
+    --tilt: -3deg;
+  }
+  .resource-card:nth-child(5) {
+    --tilt: -5deg;
+  }
+  .card-title {
+    font-size: clamp(11px, 1vw, 17px);
+    font-weight: bold;
+    padding: 2px 0 5px;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+  .card-art {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    background-position: center;
+    background-size: cover;
+    border: 1px solid #a39365;
+    border-radius: 3px;
+    position: relative;
+    isolation: isolate;
+  }
+  .card-art::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(#fff6d340, #f4e4bebb);
+    z-index: -1;
+  }
+  .card-art :global(svg) {
+    width: 100%;
+    height: 100%;
+  }
+  .card-footer {
+    display: none;
+  }
+  .quantity {
+    position: absolute;
+    right: -3px;
+    bottom: 5px;
+    z-index: 2;
+    min-width: 27px;
+    height: 29px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 1px solid #8e7854;
+    background: #fff4d6;
+    box-shadow:
+      inset 0 0 0 2px #f8ebca,
+      inset 0 0 0 3px #beac82,
+      1px 2px 3px #382915aa;
+    font-size: 20px;
+    font-weight: normal;
+    color: #282617;
+  }
+  .empty {
+    filter: saturate(0.65);
+  }
+  .empty .quantity {
+    color: #706953;
+  }
+  .development-card {
+    flex-shrink: 0;
+    background: linear-gradient(125deg, #173c4f, #072c41);
+    border-color: #e2d1aa;
+    cursor: pointer;
+    margin-left: 9px;
+  }
+  .development-card .card-title {
+    color: #fce5a6;
+    font-size: clamp(9px, 0.8vw, 14px);
+    white-space: normal;
+    text-shadow: none;
+  }
+  .development-card .card-art {
+    object-fit: cover;
+    border-color: #c5a04e;
+  }
+  .development-card .quantity {
+    bottom: auto;
+    top: -9px;
+  }
+  .resource-card:hover,
+  .resource-card:focus-visible {
+    z-index: 5;
+  }
+  .development-card:hover {
+    transform: translateY(-12px) rotate(-2deg);
+  }
+  .panels {
+    display: none;
+  }
+  .panels.panel-open {
+    display: block;
+    position: absolute;
+    right: 20px;
+    bottom: 20px;
+    width: min(440px, calc(100vw - 24px));
+    max-height: 65dvh;
+    overflow-y: auto;
+    padding: 20px;
+    background: linear-gradient(120deg, #183e48f9, #082733fa);
+    border: 3px ridge #b99155;
+    border-radius: 7px;
+    box-shadow: 0 15px 45px #001726aa;
+    z-index: 9;
+  }
+  .panels h3 {
+    font:
+      bold 22px Georgia,
+      serif;
+    margin: 0 25px 16px 0;
+    color: #f5d99b;
+  }
+  .panels p,
+  .settings-menu p {
+    font-size: 13px;
+  }
+  .close-panel {
+    float: right;
+    font-size: 20px;
+    padding: 5px 10px;
+  }
+  .quantities {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 5px;
+    margin: 10px 0;
+  }
+  .quantities label,
+  .trade-resource {
+    min-width: 0;
+    text-align: center;
+    padding: 5px 2px 10px;
+    background: #fff1dc09;
+    border-radius: 6px;
+    font-size: 12px;
+  }
+  .quantities span {
+    display: grid;
+    gap: 3px;
+  }
+  .quantities input {
+    width: 100%;
+    max-width: 54px;
+    text-align: center;
+    margin: 3px 0 8px;
+  }
+  input,
+  select {
+    color: #322411;
+    padding: 5px;
+  }
+  form {
+    padding: 8px 0;
+  }
+  .resource-icon {
+    display: block;
+    width: 42px;
+    height: 42px;
+    margin: auto;
+  }
+  .exchange-icon {
+    display: inline-block;
+    width: 22px;
+    height: 22px;
+    vertical-align: middle;
+  }
+  .resource-icon :global(svg),
+  .exchange-icon :global(svg) {
+    width: 100%;
+    height: 100%;
   }
   .player-offer {
     padding: 12px 0;
@@ -1359,817 +2219,37 @@
     width: 24px;
     height: 24px;
   }
-
-  .catan {
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-    color: #fff0d4;
-    background:
-      radial-gradient(ellipse at 50% 45%, #45c4ba33, #063147a8), var(--ocean);
-    background-size: cover, cover;
-    background-repeat: no-repeat;
-  }
-  .catan::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    opacity: 0.3;
-    background: repeating-linear-gradient(
-      174deg,
-      transparent 0 35px,
-      #a1f5e30b 37px,
-      transparent 40px 100px
-    );
-    mix-blend-mode: screen;
-  }
-  button {
-    padding: 8px 12px;
-    font-size: 12px;
-    background: #173c49ed;
-    border: 1px solid #adccb33b;
-    color: #ffeecb;
-  }
-  button.chosen {
-    background: #496e62;
-    border-color: #f4ce80;
-  }
-  .roster {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    z-index: 2;
-  }
-  .roster > div {
-    position: absolute;
-    width: 174px;
-    min-height: 84px;
-    padding: 10px 10px 10px 50px;
-    border-radius: 3px 14px 14px 3px;
-    background: linear-gradient(110deg, #132d37ed, #174350c9);
-    border-left: 3px solid var(--seat);
-    box-shadow: 0 5px 16px #002c3c45;
-    pointer-events: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-  }
-  .roster [data-position='north'] {
-    top: 40px;
-    left: calc(50% - 87px);
-  }
-  .roster [data-position='south'] {
-    bottom: 145px;
-    left: calc(50% - 87px);
-  }
-  .roster [data-position='west'] {
-    left: 20px;
-    top: 42%;
-  }
-  .roster [data-position='east'] {
-    right: 20px;
-    top: 42%;
-  }
-  .roster [data-position='north-west'] {
-    left: 25%;
-    top: 40px;
-  }
-  .roster [data-position='north-east'] {
-    right: 25%;
-    top: 40px;
-  }
-  .roster .active {
-    box-shadow:
-      0 0 0 1px #edd195a0,
-      0 4px 24px #f0c25d24;
-  }
-  .roster .controlled {
-    border-left-width: 5px;
-  }
-  .crest {
-    position: absolute;
-    left: 7px;
-    top: 14px;
-    width: 32px;
-    height: 41px;
-    display: grid;
-    place-items: center;
-    font-size: 26px;
-    color: var(--seat);
-    background: #122a33;
-    clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%);
-    border-top: 2px solid var(--seat);
-  }
-  .civilization-name {
-    font-family: Georgia, serif;
-    font-size: 14px;
-    color: var(--seat);
-    font-weight: bold;
-    line-height: 1.1;
-  }
-  .roster span,
-  .roster small {
-    font-size: 9px;
-    line-height: 1.4;
-    color: #cad9d4;
-  }
-  .seat-name {
-    font-size: 11px;
-  }
-  .seat-name {
-    background: none;
-    border: 0;
-    padding: 0;
-    text-align: left;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-    font-weight: normal;
-  }
-  .phase {
-    position: absolute;
-    top: 64px;
-    left: 20px;
-    width: 210px;
-    font-size: 12px;
-    line-height: 1.5;
-    font-weight: 600;
-    margin: 0;
-    color: #e9e6ce;
-  }
-  .table {
-    position: absolute;
-    inset: 105px 195px 180px;
-  }
-  .board-dice {
-    position: absolute;
-    left: 55%;
-    top: 57%;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    z-index: 2;
-  }
-  .table > svg {
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    user-select: none;
-    touch-action: none;
-    filter: drop-shadow(0 10px 6px #05323d55);
-  }
-  .target {
-    cursor: pointer;
-  }
-  .target:focus,
-  .target:focus-visible,
-  .table > svg:focus,
-  .table > svg:focus-visible {
-    outline: none;
-  }
-  .table:has(> svg:focus-visible) .zoom-controls {
-    border-radius: 8px;
-    box-shadow: 0 0 0 2px #eed09b;
-  }
-  .placement-hint {
-    opacity: 0;
-  }
-  .placement-hint.revealed {
-    opacity: 0.45;
-  }
-  .build-choice {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-  }
-  .build-icon {
-    width: 22px;
-    height: 22px;
-    flex-shrink: 0;
-  }
-  .target:hover + .placement-hint,
-  .target:focus-visible + .placement-hint {
-    opacity: 0.65;
-  }
-  .target.chosen + .placement-hint {
-    opacity: 0;
-  }
-  .zoom-controls {
-    position: fixed;
-    top: 56px;
-    right: 16px;
-    display: flex;
-    gap: 4px;
-    z-index: 3;
-  }
-  .zoom-controls button {
-    padding: 4px 9px;
-    font-size: 11px;
-    background: #123c49df;
-  }
-  .controls {
-    position: fixed;
-    left: 20px;
-    bottom: 20px;
-    width: 230px;
-    max-height: 230px;
-    overflow-y: auto;
-    padding: 12px;
-    display: grid;
-    gap: 9px;
-    background: #103543c9;
-    border: 1px solid #bce4d922;
-    border-radius: 14px;
-    z-index: 3;
-  }
-  .actions {
-    display: flex;
-    gap: 5px;
-    flex-wrap: wrap;
-  }
-  .controls button {
-    font-size: 11px;
-    padding: 7px 9px;
-  }
-  .confirm {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-    background: #365f60;
-    padding: 8px;
-    border-radius: 8px;
-  }
-  .confirm b {
-    font-size: 11px;
-    width: 100%;
-  }
-  .hand {
-    position: absolute;
-    bottom: 7px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 6px;
-    z-index: 3;
-    align-items: end;
-  }
-  .resource-card {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 83px;
-    height: 124px;
-    border: 4px solid #e4d1a3;
-    border-radius: 8px;
-    background: #e8d8ab;
-    box-shadow:
-      0 3px 0 #806d4f,
-      0 6px 15px #001c3580;
-    color: #352e20;
-    transform: rotate(var(--tilt, 0deg));
-    overflow: visible;
-  }
-  .resource-card:nth-child(1) {
-    --tilt: -6deg;
-    bottom: -5px;
-  }
-  .resource-card:nth-child(2) {
-    --tilt: -3deg;
-  }
-  .resource-card:nth-child(4) {
-    --tilt: 3deg;
-  }
-  .resource-card:nth-child(5) {
-    --tilt: 6deg;
-    bottom: -5px;
-  }
-  .card-title {
-    font-family: Georgia, serif;
-    font-size: 12px;
-    font-weight: bold;
-    padding: 3px;
-  }
-  .card-art {
-    width: 100%;
-    height: 78px;
-    background-size: cover;
-    background-position: center;
-    border: 2px solid #9f8450;
-    position: relative;
-    isolation: isolate;
-  }
-  .card-art::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(#fff8dd40, #efe0b5c9);
-    z-index: -1;
-  }
-  .card-art :global(svg) {
-    width: 100%;
-    height: 100%;
-  }
-  .card-footer {
-    font-size: 9px;
-    letter-spacing: 3px;
-    font-weight: bold;
-    color: #8f3026;
-    padding-top: 4px;
-  }
-  .quantity {
-    position: absolute;
-    top: -12px;
-    right: -10px;
-    z-index: 2;
-    min-width: 25px;
-    height: 25px;
-    display: grid;
-    place-items: center;
-    background: #fff1c7;
-    color: #2b443c;
-    border: 2px solid var(--card-color);
-    border-radius: 50%;
-    font-size: 14px;
-  }
-  .empty {
-    filter: saturate(0.6);
+  .stepper-label {
+    display: block;
+    margin: 10px 0 4px;
     opacity: 0.8;
   }
-  .panels {
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-    width: 220px;
-    max-height: 65dvh;
-    overflow-y: auto;
-    padding: 8px 12px;
-    background: #103543e8;
-    border: 1px solid #bce4d922;
-    border-radius: 12px;
-    z-index: 4;
-  }
-  .panels:has(form > h3) {
-    width: min(440px, calc(100vw - 32px));
-  }
-  summary {
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 600;
-    padding: 7px 0;
-  }
-  details {
-    padding: 3px 0;
-  }
-  .panels p {
-    font-size: 12px;
-  }
-  .quantities {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin: 10px 0;
-  }
-  .quantities label {
-    font-size: 11px;
-  }
-  .quantities span {
-    display: grid;
-    gap: 3px;
-  }
-  input {
-    width: 50px;
-    padding: 5px;
-    color: #163d45;
-  }
-  select {
-    color: #163d45;
-    padding: 5px;
-  }
-  form {
-    padding: 8px 0;
-  }
-  .settings-trigger {
-    position: absolute;
-    top: 10px;
-    right: 16px;
-    z-index: 8;
-    font-size: 21px;
-    padding: 4px 10px;
-    background: #10354388;
-    border-radius: 50%;
-    width: 38px;
-    height: 38px;
-  }
-  .settings-menu {
-    position: absolute;
-    right: 16px;
-    top: 56px;
-    width: min(360px, calc(100vw - 32px));
-    max-height: calc(100dvh - 80px);
-    overflow: auto;
-    background: #10313ef7;
-    border: 1px solid #bda77a;
-    border-radius: 14px;
-    padding: 18px;
-    box-shadow: 0 20px 80px #001825aa;
-    z-index: 10;
-  }
-  .settings-menu header {
+  .stepper {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-  }
-  .settings-menu h2 {
-    font-size: 24px;
-    margin: 0;
-  }
-  .settings-menu p {
-    font-size: 12px;
-  }
-  .preferences {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin: 18px 0;
-  }
-  .preferences label {
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .preferences button[aria-pressed='true'] {
-    border-color: #d6c281;
-  }
-  .still :global(*) {
-    animation: none !important;
-    transition: none !important;
-  }
-  @media (max-width: 1000px) and (min-width: 701px) {
-    .table {
-      inset: 120px 130px 180px;
-    }
-    .roster > div {
-      width: 140px;
-      padding-left: 43px;
-    }
-    .roster [data-position='west'] {
-      left: 10px;
-    }
-    .roster [data-position='east'] {
-      right: 10px;
-    }
-    .controls {
-      width: 180px;
-      left: 10px;
-    }
-    .panels {
-      width: 170px;
-      right: 10px;
-    }
-    .resource-card {
-      width: 67px;
-      height: 112px;
-    }
-    .card-art {
-      height: 65px;
-    }
-    .civilization-name {
-      font-size: 12px;
-    }
-  }
-  @media (max-width: 700px) {
-    .zoom-controls {
-      position: absolute;
-      top: 0;
-      right: auto;
-      left: 50%;
-      transform: translateX(-50%);
-    }
-    .table {
-      inset: 180px 20px 235px;
-    }
-    .phase {
-      top: 48px;
-      left: 10px;
-      width: 115px;
-      font-size: 10px;
-    }
-    .roster > div {
-      width: 108px;
-      min-height: 60px;
-      padding: 7px 5px 7px 30px;
-      gap: 2px;
-    }
-    .crest {
-      left: 3px;
-      top: 10px;
-      width: 22px;
-      height: 31px;
-      font-size: 20px;
-    }
-    .civilization-name {
-      font-size: 11px;
-    }
-    .roster span,
-    .roster small {
-      font-size: 8px;
-    }
-    .seat-name {
-      font-size: 9px;
-    }
-    .roster [data-position='north'] {
-      top: 47px;
-      left: calc(50% - 54px);
-    }
-    .roster [data-position='south'] {
-      bottom: 169px;
-      left: calc(50% - 54px);
-    }
-    .roster [data-position='west'] {
-      left: 8px;
-      top: 123px;
-    }
-    .roster [data-position='east'] {
-      right: 8px;
-      top: 123px;
-    }
-    .roster [data-position='north-west'] {
-      left: 8px;
-      top: 52px;
-    }
-    .roster [data-position='north-east'] {
-      right: 8px;
-      top: 52px;
-    }
-    .extended [data-position='north'] {
-      top: 52px;
-    }
-    .extended ~ .phase {
-      top: 34px;
-      width: calc(100% - 70px);
-    }
-    .controls {
-      left: 8px;
-      right: 8px;
-      width: auto;
-      bottom: 98px;
-      max-height: 68px;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      padding: 7px;
-      gap: 5px;
-    }
-    .controls button {
-      font-size: 10px;
-      padding: 5px 7px;
-    }
-    .controls:has(.confirm) {
-      max-height: 180px;
-      z-index: 6;
-      background: #103543f5;
-    }
-    .confirm {
-      width: 100%;
-    }
-    .confirm b {
-      width: auto;
-      align-self: center;
-    }
-    .hand {
-      bottom: 5px;
-      gap: 4px;
-      left: 8px;
-      transform: none;
-    }
-    .resource-card {
-      width: 49px;
-      height: 83px;
-      border-width: 3px;
-    }
-    .card-title {
-      font-size: 9px;
-      padding: 2px;
-    }
-    .card-art {
-      height: 46px;
-    }
-    .card-footer {
-      font-size: 7px;
-      letter-spacing: 1px;
-      padding: 3px;
-    }
-    .quantity {
-      font-size: 11px;
-      min-width: 20px;
-      height: 20px;
-      right: -6px;
-      top: -9px;
-    }
-    .panels {
-      bottom: 8px;
-      right: 8px;
-      width: 105px;
-      padding: 5px 8px;
-    }
-    .panels:has(form > h3) {
-      width: calc(100% - 16px);
-      max-height: 65dvh;
-      background: #103543fa;
-      z-index: 9;
-    }
-    .settings-trigger {
-      top: 7px;
-      right: 9px;
-      width: 32px;
-      height: 32px;
-      padding: 2px;
-      font-size: 20px;
-    }
-    .settings-menu {
-      right: 8px;
-      top: 44px;
-    }
-  }
-  @media (max-height: 650px) and (min-width: 701px) {
-    .table {
-      inset: 90px 180px 125px;
-    }
-    .roster [data-position='south'] {
-      bottom: 120px;
-    }
-    .resource-card {
-      height: 105px;
-      width: 70px;
-    }
-    .card-art {
-      height: 60px;
-    }
-    .controls {
-      max-height: 180px;
-    }
-  }
-  .controls {
-    left: max(24px, calc(50% - 490px));
-    max-height: none;
-    bottom: 32px;
-    width: 235px;
-    background: none;
-    border: 0;
-    overflow: visible;
-    padding: 0;
-  }
-  .controls .actions {
     justify-content: center;
+    gap: 2px;
   }
-  .civilization-name {
-    background: none;
+  .stepper button {
+    padding: 3px;
+    min-width: 24px;
+    height: 30px;
     border: 0;
-    padding: 0;
-    text-align: left;
-    color: inherit;
-    font:
-      bold 15px/1 Georgia,
-      serif;
+    background: transparent;
+    box-shadow: none;
+    color: #ffe0a0;
+    font-size: 24px;
+    font-weight: bold;
   }
-  .panels {
-    display: none;
+  .stepper output {
+    min-width: 17px;
+    font-size: 15px;
+    color: #ffe2a2;
   }
-  .panels.panel-open {
-    display: block;
-    width: min(440px, calc(100vw - 32px));
-    padding: 20px;
-    background: #123e49f5;
-    box-shadow: 0 16px 60px #001a3066;
-    border: 1px solid #d9c58c66;
-  }
-  .panels h3 {
-    font:
-      bold 22px Georgia,
-      serif;
-    margin: 0 30px 16px 0;
-    color: #f5d99b;
-  }
-  .close-panel {
-    float: right;
-    font-size: 20px;
-  }
-  .resource-icon {
-    display: block;
-    width: 42px;
-    height: 42px;
-    margin: auto;
-  }
-  .exchange-icon {
-    display: inline-block;
-    width: 22px;
-    height: 22px;
-    vertical-align: middle;
-  }
-  .resource-icon :global(svg),
-  .exchange-icon :global(svg) {
-    width: 100%;
-    height: 100%;
-  }
-  .quantities {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 5px;
-  }
-  .quantities label {
-    min-width: 0;
-    text-align: center;
-    padding: 5px;
-    background: #ffffff08;
-    border-radius: 8px;
-  }
-  .quantities input {
-    width: 100%;
-    max-width: 54px;
-    text-align: center;
-    margin: 3px 0 8px;
-  }
-  .development-card {
-    padding: 0;
-    flex-shrink: 0;
-    border-color: #c4a85a;
-    cursor: pointer;
-  }
-  .development-card:hover {
-    transform: translateY(-14px);
-  }
-  .development-card .card-art {
-    object-fit: contain;
-  }
-  .hand {
-    max-width: calc(100vw - 32px);
-  }
-  @media (max-width: 1100px) and (min-width: 701px) {
-    .controls {
-      left: 24px;
-      width: 170px;
-    }
-    .hand {
-      left: 57%;
-    }
-  }
-  @media (max-width: 700px) {
-    .controls {
-      left: 8px;
-      right: 8px;
-      bottom: 105px;
-      width: auto;
-      justify-content: center;
-      gap: 4px;
-    }
-    .hand {
-      left: 50%;
-      transform: translateX(-50%);
-      width: max-content;
-      gap: 2px;
-      overflow-x: auto;
-      padding: 12px 5px 5px;
-    }
-    .resource-card {
-      flex-shrink: 0;
-    }
-    .panels.panel-open {
-      bottom: 8px;
-      right: 8px;
-      width: calc(100% - 16px);
-      max-height: 65dvh;
-      z-index: 9;
-    }
-    .civilization-name {
-      font-size: 11px;
-    }
-  }
-  .roll-button {
-    position: relative;
-    touch-action: none;
-    user-select: none;
-    overflow: hidden;
-    background: linear-gradient(
-      90deg,
-      #a17c32 var(--charge),
-      #123c49 var(--charge)
-    );
-    min-width: 110px;
-  }
-  .charge-label {
-    margin-left: 8px;
-    color: #ffe4a4;
-  }
-  button[aria-disabled='true'] {
-    opacity: 0.55;
-  }
-  .seat-trade,
   .open-offer-button {
     position: relative;
   }
-  .trade-tooltip,
-  .roster .trade-tooltip {
+  .trade-tooltip {
     display: none;
     position: absolute;
     bottom: calc(100% + 8px);
@@ -2177,7 +2257,7 @@
     width: 210px;
     padding: 9px 12px;
     border: 1px solid #c7ab70;
-    border-radius: 8px;
+    border-radius: 5px;
     background: #102f3b;
     color: #fff0cb;
     font-size: 12px;
@@ -2201,243 +2281,512 @@
     bottom: auto;
   }
   button:hover > .trade-tooltip,
-  button:focus > .trade-tooltip,
-  .roster button:hover > .trade-tooltip,
-  .roster button:focus > .trade-tooltip {
+  button:focus-visible > .trade-tooltip {
     display: block;
   }
-  .seat-trade {
-    justify-self: start;
-    font-size: 10px;
-    padding: 2px 8px;
-    border-radius: 12px;
+  .settings-menu {
+    position: absolute;
+    right: 16px;
+    top: 62px;
+    width: min(370px, calc(100vw - 32px));
+    max-height: calc(100dvh - 80px);
+    overflow: auto;
+    background: #10313efc;
+    border: 3px ridge #b99155;
+    border-radius: 6px;
+    padding: 18px;
+    box-shadow: 0 20px 80px #001825aa;
+    z-index: 10;
   }
-  .trade-resource {
-    min-width: 0;
-    text-align: center;
-    background: #ffffff09;
-    border-radius: 10px;
-    padding: 5px 2px 10px;
-    font-size: 11px;
-  }
-  .stepper-label {
-    display: block;
-    margin: 10px 0 4px;
-    opacity: 0.8;
-  }
-  .stepper {
+  .settings-menu header {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 2px;
+    justify-content: space-between;
   }
-  .stepper button {
-    padding: 3px;
-    min-width: 21px;
-    height: 29px;
-    border: 0;
-    background: transparent;
-    color: #ffe0a0;
+  .settings-menu h2 {
     font-size: 24px;
-    font-weight: 600;
-    text-shadow: 0 1px 2px #001c2b;
+    margin: 0;
   }
-  .stepper output {
-    min-width: 17px;
-    font-size: 15px;
-    color: #ffe2a2;
+  .preferences {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 18px 0;
+  }
+  .preferences button[aria-pressed='true'] {
+    border-color: #f3d79b;
+  }
+  summary {
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: bold;
+    padding: 7px 0;
+  }
+  details {
+    padding: 3px 0;
+  }
+  .rules-dialog {
+    width: min(1000px, calc(100vw - 32px));
+    max-height: calc(100dvh - 60px);
+    padding: 25px;
+    border: 5px ridge #ac814b;
+    border-radius: 8px;
+    background: #f7edd4;
+    color: #342814;
+  }
+  .rules-dialog::backdrop {
+    background: #081b23bb;
+  }
+  .close-rules {
+    position: sticky;
+    top: 0;
+    float: right;
+    z-index: 2;
+    font-size: 22px;
+  }
+  .still :global(*) {
+    animation: none !important;
+    transition: none !important;
   }
   @media (min-width: 701px) {
     .panels[data-trade-anchor='west'] {
-      left: 200px;
+      left: 4%;
       right: auto;
-      top: 35%;
+      top: 49%;
       bottom: auto;
-      max-height: 60dvh;
+      max-height: 48dvh;
     }
     .panels[data-trade-anchor='east'] {
-      right: 200px;
-      top: 35%;
+      right: 4%;
+      top: 49%;
       bottom: auto;
-      max-height: 60dvh;
+      max-height: 48dvh;
     }
-    .panels[data-trade-anchor='north'],
-    .panels[data-trade-anchor='north-west'],
-    .panels[data-trade-anchor='north-east'] {
-      top: 145px;
+    .panels[data-trade-anchor^='north'] {
+      top: 90px;
       bottom: auto;
       left: 50%;
       right: auto;
       transform: translateX(-50%);
-    }
-    .panels[data-trade-anchor='north-west'] {
-      left: 30%;
-    }
-    .panels[data-trade-anchor='north-east'] {
-      left: 70%;
     }
     .panels[data-trade-anchor='south'] {
       left: 50%;
       right: auto;
       transform: translateX(-50%);
-      bottom: 145px;
+      bottom: 20%;
     }
   }
-  .table > svg.zoomed {
-    cursor: grab;
-  }
-  .table > svg.panning,
-  .table > svg.panning .target {
-    cursor: grabbing;
-  }
-  .catan {
-    --controls-left: max(210px, calc(50% - 380px));
-    --hand-left: calc(var(--controls-left) + 250px);
-    --card-width: 83px;
-  }
-  .controls {
-    left: var(--controls-left);
-  }
-  .hand {
-    left: var(--hand-left);
-    transform: none;
-    display: grid;
-    --card-step: min(
-      calc(var(--card-width) + 6px),
-      calc(
-        (100vw - var(--hand-left) - 24px - var(--card-width)) /
-          (var(--stack-count) - 1)
-      )
-    );
-    grid-template-columns: repeat(var(--stack-count), var(--card-step));
-    gap: 0;
-    width: max-content;
-    max-width: none;
-    overflow: visible;
-    padding: 0;
-  }
-  .resource-card {
-    width: var(--card-width);
-  }
-  .resource-card:hover,
-  .resource-card:focus-visible {
-    z-index: 5;
-  }
-  .roster [data-position='south'] {
-    bottom: 22px;
-    left: calc(var(--controls-left) - 194px);
-  }
-  .stepper button:hover:not(:disabled) {
-    color: #fff5d5;
-    transform: scale(1.12);
-  }
-  .stepper button:disabled {
-    color: #81a29f;
-    opacity: 0.5;
-  }
-  @media (min-width: 701px) and (max-width: 1100px) {
-    .catan {
-      --hand-left: calc(var(--controls-left) + 190px);
-      --card-width: 67px;
+  @media (min-width: 701px) and (max-width: 1400px) {
+    .table-navigation,
+    .table-utilities {
+      gap: 5px;
+    }
+    .table-navigation a,
+    .table-navigation button {
+      font-size: 12px;
+      padding: 9px;
+    }
+    .table-utilities button,
+    .table-connection {
+      padding: 8px 6px;
+      font-size: 11px;
+    }
+    .table-utilities .practice-label {
+      display: none;
+    }
+    .roster > div {
+      padding-left: 46px;
+      gap: 6px;
+      min-height: 53px;
+    }
+    .roster [data-position='north'],
+    .roster [data-position='south'] {
+      width: 30%;
+      left: 35%;
+    }
+    .crest {
+      width: 29px;
+      height: 34px;
+      left: 11px;
+      font-size: 25px;
+    }
+    .civilization-name {
+      font-size: 13px;
+      white-space: normal;
+    }
+    .seat-name {
+      font-size: 11px;
+    }
+    .seat-trade {
+      padding: 8px 7px;
+      font-size: 12px;
+    }
+    .seat-stats {
+      flex-basis: 31%;
+      font-size: 10px;
+    }
+    .table {
+      inset: max(9%, 72px) 20% 27%;
     }
     .controls {
-      width: 170px;
+      width: 27%;
+      gap: 8px;
     }
-    .roster [data-position='south'] {
-      bottom: 20px;
-      width: 174px;
+    .controls .game-actions {
+      gap: 5px;
+    }
+    .build-icon,
+    .market-icon {
+      width: 17px;
+      height: 17px;
+    }
+    .hand {
+      left: 30%;
+    }
+    .dice-bowl {
+      border-width: 9px;
+    }
+    .dice-bowl :global(.dice) {
+      transform: scale(0.6);
     }
   }
   @media (max-width: 700px) {
     .catan {
-      --hand-left: 8px;
-      --card-width: 49px;
+      --card-width: clamp(43px, 12vw, 65px);
+      background-position: center;
     }
-    .controls {
-      left: 124px;
+    .table-navigation {
+      top: 8px;
+      left: 8px;
+      gap: 5px;
+    }
+    .table-navigation a,
+    .table-navigation button {
+      font-size: 10px;
+      padding: 8px;
+      min-height: 33px;
+    }
+    .table-navigation span {
+      font-size: 16px;
+    }
+    .table-utilities {
+      top: 8px;
       right: 8px;
-      bottom: 108px;
-      width: auto;
+      gap: 5px;
+    }
+    .table-utilities button {
+      font-size: 10px;
+      padding: 6px;
+    }
+    .table-utilities > button:first-child > span {
+      display: none;
+    }
+    .table-language {
+      font-size: 11px;
+      padding: 0 4px;
+    }
+    .table-language > span,
+    .settings-label,
+    .table-connection,
+    .practice-label {
+      display: none;
+    }
+    .table-utilities .settings-trigger > span[aria-hidden] {
+      display: inline;
+      font-size: 18px;
+    }
+    .roster > div {
+      width: calc(50% - 16px);
+      min-height: 51px;
+      padding: 6px 6px 6px 34px;
+      gap: 4px;
+      border-width: 1px;
+    }
+    .crest {
+      width: 23px;
+      height: 27px;
+      font-size: 21px;
+      left: 7px;
+    }
+    .civilization-name {
+      font-size: 11px;
+      white-space: normal;
+    }
+    .seat-name {
+      font-size: 10px;
+    }
+    .seat-stats {
+      font-size: 9px;
+      flex-basis: 33%;
+      line-height: 1.2;
+    }
+    .seat-trade {
+      position: absolute;
+      right: 5px;
+      bottom: -24px;
+      padding: 5px 8px;
+      font-size: 10px;
+    }
+    .roster [data-position='north'] {
+      top: 52px;
+      left: 22%;
+      width: 56%;
+    }
+    .roster [data-position='west'] {
+      top: 125px;
+      left: 8px;
+    }
+    .roster [data-position='east'] {
+      top: 125px;
+      right: 8px;
     }
     .roster [data-position='south'] {
       left: 8px;
+      bottom: 26%;
+      width: calc(100% - 16px);
+      transform: none;
+      min-height: 44px;
+    }
+    .roster [data-position='south'] .seat-trade {
+      position: relative;
       right: auto;
-      bottom: 105px;
+      bottom: auto;
     }
-  }
-  .controls .game-actions {
-    display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-    grid-template-rows: repeat(3, auto);
-    grid-auto-flow: column;
-    gap: 6px;
-  }
-  .controls .game-actions > button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    min-width: 0;
-    min-height: 36px;
-    padding: 6px 4px;
-    line-height: 1.2;
-  }
-  .game-actions .market-icon,
-  .game-actions .build-icon {
-    flex-shrink: 0;
-    width: 16px;
-    height: 16px;
-    margin: 0;
-  }
-  .roster > div {
-    width: max-content;
-    max-width: 350px;
-    min-height: 66px;
-    flex-direction: row;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 12px 10px 50px;
-  }
-  .seat-identity {
-    flex-shrink: 0;
-  }
-  .seat-identity .civilization-name {
-    white-space: nowrap;
-  }
-  .roster .seat-stats {
-    max-width: 115px;
-  }
-  .roster .seat-trade {
-    order: 2;
-    flex-shrink: 0;
-  }
-  .roster [data-position='north'] {
-    left: 50%;
-    transform: translateX(-50%);
-  }
-  @media (min-width: 701px) {
-    .catan {
-      --controls-left: max(330px, calc(50% - 300px));
-    }
-    .roster [data-position='south'] {
+    .roster [data-position='south'] .awards {
       left: auto;
-      right: calc(100% - var(--controls-left) + 16px);
-      max-width: 310px;
+      right: 0;
+      top: -23px;
+      flex-direction: row;
+    }
+    .awards {
+      gap: 3px;
+      top: -22px;
+    }
+    .awards small {
+      padding: 3px 5px;
+      font-size: 9px;
+    }
+    .roster [data-position='north-west'] {
+      left: 8px;
+      top: 52px;
+      width: calc(50% - 16px);
+    }
+    .roster [data-position='north-east'] {
+      right: 8px;
+      top: 52px;
+      width: calc(50% - 16px);
+    }
+    .extended [data-position='north'] {
+      top: 123px;
+      left: 30%;
+      width: 40%;
+    }
+    .extended [data-position='west'],
+    .extended [data-position='east'] {
+      top: 197px;
+    }
+    .extended ~ .table {
+      top: 33%;
+    }
+    .table {
+      inset: 25% 0 32%;
+    }
+    .zoom-controls {
+      position: absolute;
+      top: 5px;
+      right: 8px;
+      gap: 3px;
+    }
+    .zoom-controls button {
+      font-size: 9px;
+      padding: 3px 6px;
+    }
+    .reserve,
+    .dice-bowl {
+      display: none;
+    }
+    .controls {
+      left: 8px;
+      right: 8px;
+      width: auto;
+      bottom: 12%;
+      gap: 5px;
+    }
+    .controls .game-actions {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+    }
+    .controls .game-actions > button,
+    .controls .actions > button {
+      min-height: 28px;
+      padding: 5px;
+      font-size: 10px;
+      gap: 4px;
+    }
+    .controls > .actions:first-child {
+      gap: 4px;
+    }
+    .build-icon,
+    .market-icon {
+      width: 14px;
+      height: 14px;
+    }
+    .controls:has(.confirm) {
+      z-index: 7;
+    }
+    .confirm {
+      padding: 6px;
+      font-size: 11px;
+    }
+    .confirm button {
+      font-size: 12px;
+      padding: 6px;
+    }
+    .hand {
+      --card-step: min(
+        calc(var(--card-width) + 9px),
+        calc((95vw - var(--card-width)) / max(1, var(--stack-count) - 1))
+      );
+      left: 4%;
+      bottom: 3.3%;
+    }
+    .resource-card {
+      height: 8vh;
+      min-height: 62px;
+      border-width: 3px;
+      padding: 1px;
+      border-radius: 4px;
+    }
+    .card-title {
+      font-size: 10px;
+      padding-bottom: 2px;
+    }
+    .quantity {
+      min-width: 19px;
+      height: 21px;
+      font-size: 14px;
+      right: -4px;
+      bottom: 0;
+    }
+    .development-card .card-title {
+      font-size: 8px;
+    }
+    .phase {
+      font-size: 11px;
+      left: 4%;
+      width: 92%;
+      bottom: 0.6%;
+    }
+    .panels.panel-open {
+      bottom: 8px;
+      right: 8px;
+      width: calc(100% - 16px);
+      max-height: 70dvh;
+      padding: 14px;
+    }
+    .settings-menu {
+      top: 50px;
+    }
+    .rules-dialog {
+      padding: 15px;
     }
   }
-  @media (max-width: 700px) {
-    .roster > div {
-      max-width: calc(50% - 12px);
-      padding: 7px 6px 7px 30px;
-      gap: 5px;
+  @media (min-width: 701px) and (max-width: 1100px) {
+    .roster [data-position='west'],
+    .roster [data-position='east'] {
+      width: 19%;
       flex-wrap: wrap;
-      min-height: 54px;
+      padding-left: 38px;
+      min-height: 80px;
     }
-    .seat-identity .civilization-name {
-      white-space: normal;
+    .roster [data-position='west'] .seat-identity,
+    .roster [data-position='east'] .seat-identity {
+      flex-basis: 100%;
+    }
+    .roster [data-position='west'] .seat-stats,
+    .roster [data-position='east'] .seat-stats {
+      flex-basis: 60%;
+    }
+    .roster [data-position='west'] .seat-trade,
+    .roster [data-position='east'] .seat-trade {
+      position: absolute;
+      right: 6px;
+      bottom: 7px;
+      padding: 6px;
+    }
+    .roster [data-position='north'],
+    .roster [data-position='south'] {
+      width: 34%;
+      left: 33%;
+    }
+    .seat-stats {
+      font-size: 9px;
+    }
+    .table-navigation a,
+    .table-navigation button {
+      font-size: 10px;
+      padding: 7px;
+    }
+    .table-navigation span {
+      font-size: 18px;
+    }
+    .table-utilities .settings-label {
+      display: none;
+    }
+    .table-utilities > button:first-child {
+      font-size: 10px;
+    }
+    .table-utilities > button:first-child > span {
+      display: none;
+    }
+    .table-connection {
+      font-size: 9px;
+    }
+    .extended [data-position='north'] {
+      top: 2%;
+    }
+    .extended [data-position='north-west'],
+    .extended [data-position='north-east'] {
+      top: 11%;
+    }
+    .extended ~ .table {
+      top: 20%;
+    }
+  }
+  @media (max-height: 620px) and (min-width: 701px) {
+    .roster > div {
+      min-height: 43px;
+      padding-top: 5px;
+      padding-bottom: 5px;
+    }
+    .table {
+      top: 10%;
+      bottom: 25%;
     }
     .roster [data-position='south'] {
-      max-width: 112px;
+      bottom: 21%;
+    }
+    .resource-card {
+      height: 15vh;
+    }
+    .controls {
+      bottom: 6%;
+      gap: 6px;
+    }
+    .controls .game-actions > button,
+    .controls .actions > button {
+      min-height: 30px;
+      padding: 6px;
+      font-size: 11px;
+    }
+    .card-title {
+      font-size: 11px;
+    }
+    .hand {
+      bottom: 4%;
+    }
+    .phase {
+      font-size: 12px;
     }
   }
 </style>

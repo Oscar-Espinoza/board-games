@@ -128,6 +128,8 @@
   "catan_robber": "Ladrón",
   "catan_move_robber": "Mover ladrón",
   "catan_building_costs": "Costos: camino = madera + ladrillo; poblado = madera + ladrillo + lana + trigo; ciudad = 3 mineral + 2 trigo; desarrollo = mineral + lana + trigo.",
+  "catan_costs_title": "Costos de construcción",
+  "catan_development": "Desarrollo",
   "catan_choose_location": "Elige ubicación",
   "catan_hex": "Hexágono",
   "catan_confirm": "Confirmar",

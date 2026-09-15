@@ -260,7 +260,9 @@ test('six-player beginner Catan advances to the paired action opportunity', asyn
   const secondary = (
     await Promise.all(
       pages.map(async (p) =>
-        (await p.getByRole('button', { name: 'End turn', exact: true }).count())
+        (await p
+          .getByRole('button', { name: 'End turn', exact: true })
+          .isEnabled())
           ? p
           : null,
       ),
