@@ -254,8 +254,9 @@ export function playEffects(
           const card = root.querySelectorAll('.hand > .resource-card')[
             event.resource ?? 0
           ];
-          const art = card?.querySelector('svg')?.cloneNode(true) as
-            SVGElement | undefined;
+          const art = card
+            ?.querySelector<HTMLElement>('.resource-art')
+            ?.cloneNode(true) as HTMLElement | undefined;
           const title = card?.querySelector('.card-title')?.textContent ?? '';
           token.textContent = '';
           if (art) {

@@ -640,7 +640,7 @@ test('board dice clear after resource deliveries follow the roll in readable sta
       timing: el.getAnimations()[0]?.effect?.getTiming(),
       recipient: el.dataset.recipient,
       label: el.textContent,
-      icon: !!el.querySelector('svg'),
+      icon: !!el.querySelector('.resource-art'),
     }));
     return { dice, cards };
   });

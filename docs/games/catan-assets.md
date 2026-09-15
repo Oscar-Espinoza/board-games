@@ -1,32 +1,19 @@
 # Catan artwork provenance
 
-The original SVG illustrations, authored for this repository on September 7,
-2026, are preserved in `games/catan/assets/`. No commercial card faces, rulebook
-artwork, stock textures, external models or recorded audio are distributed.
-
-`games/catan/assets/draw.py` is the deterministic authoring source for six
-terrain paintings and five development faces. Its art-only seeds never consume game randomness. Run it from the assets
-directory when regenerating the original artwork.
-
-The original Svelte board imported individual terrain SVGs through Vite. They were
-content-hashed and requested only after Catan is selected. The board's SVG owns
-number tokens, roads, buildings, robber, ports and legal placement targets.
-Unused terrain variants, portraits, resource icons and the old GPU atlas were
-removed along with their generator branches. Historical artwork remains in Git
-history; the maintained generator emits only artwork used by the current board.
+No commercial card faces, rulebook artwork, stock textures, external models or
+recorded audio are distributed. The pre-redesign SVG terrain, development faces,
+procedural ocean and their generator were removed once the physical-table
+migration replaced every runtime use; they remain recoverable from Git history.
 
 The game is an unofficial implementation. Its name identifies the game; the
 original rule references are preserved in the source snapshot recorded in
 [the migration decision](../adr/009-typescript-catalog.md).
 
-The second island UI adds original SVG resource illustrations in
-`games/catan/src/ResourceArt.svelte`, a procedural water texture in
-`games/catan/assets/ocean.svg`, shaded pieces and an illustrated hooded robber.
-Resource-card faces reuse the repository's terrain art behind those illustrations;
-they are not scans of commercially printed cards. Harbor icons use the same resource
-illustrations. Dice faces are CSS pips; landing audio is synthesized locally with
-Web Audio bass oscillators and filtered noise. No external assets or services are
-required during play.
+The board SVG owns number tokens, roads, buildings, robber, ports and legal
+placement targets. Resource-card faces and harbor icons use the generated local
+resource illustrations. Dice faces are CSS pips; landing audio is synthesized
+locally with Web Audio bass oscillators and filtered noise. No external assets or
+services are required during play.
 
 ## Physical tabletop migration — September 15, 2026
 
@@ -36,19 +23,18 @@ tool using the user-supplied `catan-new-ui.png` as the visual reference. They ar
 original generated materials, not commercial card scans. All selected assets
 live in `games/catan/assets/` and are bundled by Vite only with Catan.
 
-| Assets                                            | Purpose                                                                                                  |
-| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `tabletop-ocean.webp`                             | Empty decorative ocean/wood/foliage/map/compass/ship environment; no game state or UI                    |
-| `table-water.webp`, `table-wood.webp`             | Material samples from that environment; water sample retired after visual review, wood used for controls |
-| `painted-{wood,wool,wheat,brick,ore,desert}.webp` | Six individual 512px terrain paintings clipped to actual SVG hexes                                       |
-| `resource-{wood,wool,wheat,brick,ore}.webp`       | Transparent 256px illustrations reused in cards, trade and costs                                         |
-| `development-compass.webp`                        | Transparent compass illustration for development stacks; actual private card names remain HTML           |
+| Assets                                            | Purpose                                                                                              |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `tabletop-ocean.webp`                             | Empty decorative ocean/wood/foliage/map/compass/ship environment; no game state or UI                |
+| `table-wood.webp`                                 | Small repeating wood material used for controls                                                      |
+| `painted-{wood,wool,wheat,brick,ore,desert}.webp` | Six individual 384px terrain paintings clipped to actual SVG hexes                                   |
+| `resource-{wood,wool,wheat,brick,ore}.webp`       | Transparent 192px illustrations reused in cards, trade and costs                                     |
+| `development-compass.webp`                        | Transparent 192px compass illustration for development stacks; actual private card names remain HTML |
 
 The two 3×2 source atlases were mechanically split into equal cells and encoded
-with `cwebp`; resource alpha is preserved. The background is quality 88, terrain
-quality 90, resource illustrations quality 88. Original generated PNGs remain
-outside the repository; runtime assets never depend on those paths. Legacy SVG
-authoring sources remain available for the catalog guide and provenance.
+with `cwebp`; resource alpha is preserved. Runtime WebPs were right-sized and
+re-encoded after visual comparison. Original generated PNGs remain outside the
+repository; runtime assets never depend on those paths.
 
 ### Generation prompts
 

@@ -2054,7 +2054,7 @@
     background: linear-gradient(#fff6d340, #f4e4bebb);
     z-index: -1;
   }
-  .card-art :global(svg) {
+  .card-art :global(.resource-art) {
     width: 100%;
     height: 100%;
   }
@@ -2194,8 +2194,8 @@
     height: 22px;
     vertical-align: middle;
   }
-  .resource-icon :global(svg),
-  .exchange-icon :global(svg) {
+  .resource-icon :global(.resource-art),
+  .exchange-icon :global(.resource-art) {
     width: 100%;
     height: 100%;
   }
@@ -2215,7 +2215,7 @@
     align-items: center;
     gap: 4px;
   }
-  .offer-resources :global(svg) {
+  .offer-resources :global(.resource-art) {
     width: 24px;
     height: 24px;
   }

@@ -13,8 +13,8 @@ private hand, development cards and legal choices; no canonical state or deck is
 serialized to players.
 
 `src/Board.svelte` renders a responsive SVG island and semantic action controls.
-Its illustrations are copied original repository artwork; `assets/draw.py` is
-the original deterministic authoring source. The textured ocean, zoomable island without drag-to-pan, civilization seats, resource cards, placement previews, short SVG/Web Animations
+The generated physical-table materials are local, compressed WebP assets. The
+textured ocean, zoomable and pannable island, civilization seats, resource cards, placement previews, short SVG/Web Animations
 and gesture-unlocked audio live in this game package. Typed accepted-action events
 carry revisions and explicitly projected public/recipient details. Resynchronization
 settles immediately rather than replaying effects.

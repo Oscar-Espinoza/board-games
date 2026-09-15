@@ -101,7 +101,7 @@
     display: flex;
     align-items: center;
   }
-  .cost-resource :global(svg) {
+  .cost-resource :global(.resource-art) {
     width: clamp(20px, 2vw, 35px);
     height: clamp(20px, 2vw, 35px);
   }
