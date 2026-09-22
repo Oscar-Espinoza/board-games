@@ -102,6 +102,15 @@ server-only; accepted presentation events carry no future information. The local
 and expansion fixtures. See [ADR 012](adr/012-carcassonne-table.md) and the
 [rules and app conventions](games/carcassonne.md).
 
+The painted table combines local WebP scenery/materials with SVG region geometry,
+symbols and wooden figures. A single affine ground transform and its inverse own
+camera rendering, pointer hit testing, zoom and focus. The desktop player column
+and bottom tray become a horizontal seat strip and compact supply on small screens.
+`/practice/carcassonne?scenario=table` supplies a deterministic six-seat landscape;
+`/practice/carcassonne/artwork` renders every design in four rotations using the
+production renderer. Both are separate from multiplayer initialization. See
+[ADR 024](adr/024-carcassonne-painted-table.md).
+
 ## Azul, Codenames and Sushi Go Party
 
 The three games retain the same authoritative contract and game-owned rules,

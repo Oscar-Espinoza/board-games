@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { tableSpace } from '../../games/carcassonne/src/table/camera.js';
 async function ready(page: Page) {
   await page
     .getByRole('button', { name: 'Start practice', exact: true })
@@ -76,8 +77,12 @@ test('360px touch layout, keyboard placement, zoom, mute and help', async ({
   await expect(
     page.getByRole('button', { name: 'Sound · Off', exact: true }),
   ).toHaveAttribute('aria-pressed', 'false');
-  await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
   await page
+    .locator('.settings-dialog')
+    .getByRole('button', { name: 'Zoom in', exact: true })
+    .click();
+  await page
+    .locator('.settings-dialog')
     .getByRole('button', { name: 'Fit landscape', exact: true })
     .click();
   await page.locator('.map').focus();
@@ -270,10 +275,33 @@ test('multiplayer setup is shared, placements survive reconnect and future order
       .getByRole('button', { name: 'Place no meeple', exact: true })
       .click();
     await expect(b.locator('.own-tile')).toBeVisible();
-    const before = await b.locator('.own-tile').innerHTML();
+    const before = await b
+      .locator('.own-tile [data-tile-art]')
+      .getAttribute('data-tile-art');
+    const boardBefore = await b
+      .locator('.tile-surface [data-tile-art]')
+      .evaluateAll((es) =>
+        es.map((e) => [
+          e.getAttribute('data-tile-art'),
+          e.getAttribute('transform'),
+        ]),
+      );
     await b.reload();
-    await expect(b.locator('.own-tile')).toBeVisible();
-    expect(await b.locator('.own-tile').innerHTML()).toBe(before);
+    await expect(b.locator('.own-tile')).toBeEnabled();
+    await expect(b.locator('.own-tile [data-tile-art]')).toHaveAttribute(
+      'data-tile-art',
+      before!,
+    );
+    expect(
+      await b
+        .locator('.tile-surface [data-tile-art]')
+        .evaluateAll((es) =>
+          es.map((e) => [
+            e.getAttribute('data-tile-art'),
+            e.getAttribute('transform'),
+          ]),
+        ),
+    ).toEqual(boardBefore);
   } finally {
     await Promise.all(contexts.map((c) => c.close()));
   }
@@ -431,16 +459,25 @@ test('physical tile and meeple drag, legal hints, rotate in place and invalid re
   await page.goto('/practice/carcassonne');
   await ready(page);
   await expect(page.locator('[data-location]')).toHaveCount(0);
+  // Measure the actual tile face; its painted shadow extends beyond the cell.
   const start = await page
-    .locator('.tile-surface > g > rect')
+    .locator('.tile-surface [data-tile-art] > rect')
     .first()
     .boundingBox();
   const viewport = page.viewportSize()!;
   expect(
-    Math.abs(start!.x + start!.width / 2 - viewport.width / 2),
+    Math.abs(
+      start!.x +
+        start!.width / 2 -
+        tableSpace(viewport.width, viewport.height).anchor.x,
+    ),
   ).toBeLessThan(2);
   expect(
-    Math.abs(start!.y + start!.height / 2 - viewport.height / 2),
+    Math.abs(
+      start!.y +
+        start!.height / 2 -
+        tableSpace(viewport.width, viewport.height).anchor.y,
+    ),
   ).toBeLessThan(2);
   const tile = page.locator('.own-tile');
   await tile.click();
@@ -489,16 +526,10 @@ test('physical tile and meeple drag, legal hints, rotate in place and invalid re
   await expect(page.locator('.figure')).toHaveCount(1);
   await expect(page.locator('[data-location]')).toHaveCount(0);
   await expect(page.locator('.settings-dialog')).not.toBeVisible();
-  await expect
-    .poll(async () =>
-      Math.abs(
-        (await page
-          .locator('.player.self')
-          .evaluate((el) => parseFloat(getComputedStyle(el).top))) -
-          viewport.height * 0.96,
-      ),
-    )
-    .toBeLessThan(1);
+  await expect(page.locator('.player.self')).toHaveCount(1);
+  const plaque = (await page.locator('.player.self').boundingBox())!;
+  expect(plaque.x).toBeLessThan(40);
+  expect(plaque.y).toBeGreaterThan(62);
   await page.screenshot({ path: info.outputPath('carcassonne-drag-play.png') });
 });
 
@@ -548,4 +579,157 @@ test('touch can pick up pieces and place them on legal targets', async ({
   } finally {
     await context.close();
   }
+});
+
+test('painted six-seat table keeps controls reachable across desktop, tablet and phones', async ({
+  page,
+}, info) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  for (const [width, height] of [
+    [1672, 941],
+    [1024, 768],
+    [768, 1024],
+    [390, 844],
+    [360, 640],
+    [844, 390],
+  ]) {
+    await page.setViewportSize({ width, height });
+    await page.goto('/practice/carcassonne?scenario=table');
+    await expect(page.locator('.player')).toHaveCount(6);
+    await expect(page.locator('.tile-surface')).toHaveCount(29);
+    await expect(page.locator('.own-tile')).toBeEnabled();
+    const hand = (await page.locator('.hand').boundingBox())!;
+    const camera = (await page.locator('.camera-controls').boundingBox())!;
+    for (const rect of [hand, camera]) {
+      expect(rect.x).toBeGreaterThanOrEqual(0);
+      expect(rect.y).toBeGreaterThanOrEqual(0);
+      expect(rect.x + rect.width).toBeLessThanOrEqual(width);
+      expect(rect.y + rect.height).toBeLessThanOrEqual(height);
+    }
+    expect(
+      hand.x + hand.width <= camera.x ||
+        camera.x + camera.width <= hand.x ||
+        hand.y + hand.height <= camera.y ||
+        camera.y + camera.height <= hand.y,
+    ).toBe(true);
+    await page
+      .locator('.camera-controls')
+      .getByRole('button', { name: 'Fit landscape', exact: true })
+      .click();
+    const bounds = await page.locator('.board-plane').evaluate((el) => {
+      return Array.from(el.querySelectorAll('.tile-surface')).flatMap(
+        (tile) => {
+          const m = (tile as SVGGraphicsElement).getScreenCTM()!;
+          return [
+            [0, 0],
+            [100, 0],
+            [0, 100],
+            [100, 100],
+          ].map(([x, y]) => {
+            const p = new DOMPoint(x, y).matrixTransform(m);
+            return { x: p.x, y: p.y };
+          });
+        },
+      );
+    });
+    for (const point of bounds) {
+      expect(point.x).toBeGreaterThan(0);
+      expect(point.x).toBeLessThan(width);
+      expect(point.y).toBeGreaterThan(52);
+      expect(point.y).toBeLessThan(height);
+    }
+    await page.evaluate(() => document.fonts.ready);
+    await page.screenshot({
+      path: info.outputPath(`painted-${width}x${height}.png`),
+    });
+    await preview(page);
+    await page.getByRole('button', { name: 'Place tile', exact: true }).click();
+    await page
+      .getByRole('button', { name: 'Place no meeple', exact: true })
+      .click();
+    await expect(page.locator('.tile-surface')).toHaveCount(30);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width);
+  }
+  expect(errors).toEqual([]);
+});
+
+test('angled camera preserves the wheel anchor and pans without selecting a placement', async ({
+  page,
+}) => {
+  await page.goto('/practice/carcassonne');
+  await ready(page);
+  const map = page.locator('.map');
+  const plane = page.locator('.board-plane');
+  const pointer = { x: 750, y: 260 };
+  const world = await plane.evaluate((el, point) => {
+    const p = new DOMPoint(point.x, point.y).matrixTransform(
+      (el as SVGGraphicsElement).getScreenCTM()!.inverse(),
+    );
+    return { x: p.x, y: p.y };
+  }, pointer);
+  const before = await plane.getAttribute('transform');
+  await page.mouse.move(pointer.x, pointer.y);
+  await page.mouse.wheel(0, -180);
+  await expect(plane).not.toHaveAttribute('transform', before!);
+  const anchored = await plane.evaluate((el, point) => {
+    const p = new DOMPoint(point.x, point.y).matrixTransform(
+      (el as SVGGraphicsElement).getScreenCTM()!,
+    );
+    return { x: p.x, y: p.y };
+  }, world);
+  expect(anchored.x).toBeCloseTo(pointer.x, 1);
+  expect(anchored.y).toBeCloseTo(pointer.y, 1);
+  await map.focus();
+  await page.keyboard.press('Shift+ArrowRight');
+  const shifted = await plane.getAttribute('transform');
+  await page.mouse.down();
+  await page.mouse.move(830, 290, { steps: 8 });
+  await page.mouse.up();
+  await expect(plane).not.toHaveAttribute('transform', shifted!);
+  await expect(page.locator('.ghost')).toHaveCount(0);
+  await expect(page.locator('.tile-surface')).toHaveCount(1);
+});
+
+test('artwork inventory renders every design in all rotations with unique SVG references', async ({
+  page,
+}, info) => {
+  const failures: string[] = [];
+  page.on('pageerror', (error) => failures.push(error.message));
+  page.on('response', (response) => {
+    if (response.status() >= 400) failures.push(response.url());
+  });
+  await page.goto('/practice/carcassonne/artwork');
+  await expect(page.locator('[data-design]')).toHaveCount(138);
+  await expect(page.locator('[data-tile-art]')).toHaveCount(552);
+  expect(
+    await page.locator('[id]').evaluateAll((elements) => {
+      const ids = elements.map((e) => e.id);
+      return new Set(ids).size === ids.length;
+    }),
+  ).toBe(true);
+  const assets = await page
+    .locator('image')
+    .evaluateAll((elements) => [
+      ...new Set(elements.map((e) => e.getAttribute('href')!)),
+    ]);
+  for (const asset of assets) {
+    expect(
+      await page.evaluate(async (src) => {
+        const img = new Image();
+        img.src = src;
+        await img.decode();
+        return img.naturalWidth > 0;
+      }, asset),
+    ).toBe(true);
+  }
+  await page
+    .locator('[data-module="river"]')
+    .screenshot({ path: info.outputPath('painted-river-inventory.png') });
+  await page
+    .locator('[data-module="ferries"]')
+    .screenshot({ path: info.outputPath('painted-ferries-inventory.png') });
+  expect(failures).toEqual([]);
 });

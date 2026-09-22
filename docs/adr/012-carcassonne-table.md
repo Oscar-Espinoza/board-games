@@ -2,6 +2,9 @@
 
 Status: accepted. September 11, 2026.
 
+Presentation updated by [ADR 024](024-carcassonne-painted-table.md); the engine,
+authority and resumable-decision contracts below remain in force.
+
 Carcassonne Big Box 3.1 joins UNO and Catan as a game-owned Bun/TypeScript package.
 It uses the existing room and recipient-projection contract. Its integer-grid
 landscape has explicit road/city regions and field half-edges. Connected features

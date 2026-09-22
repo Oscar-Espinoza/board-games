@@ -25,6 +25,11 @@ and crop-circle fixtures. One **Start practice** action confirms the local setup
 all three simulated seats. Reset starts a fresh local table. None of these fixtures
 or shortened decks is used by the server or imported by catalog metadata.
 
+**Painted landscape · 6 seats** opens a deterministic, playable 29-tile table for
+reviewing the redesign. Link directly with `/practice/carcassonne?scenario=table`.
+The separate `/practice/carcassonne/artwork` inventory shows all 138 tile designs
+at four rotations using the production artwork renderer.
+
 ## Play and controls
 
 Select a highlighted frontier square, rotate the tile, and confirm its placement.
@@ -34,13 +39,17 @@ but legal draw cannot be rejected. The server tries every frontier cell and all
 four rotations before discarding an unplaceable tile.
 
 Drag empty space to pan, use the wheel or a two-finger pinch to zoom, or use the
-zoom buttons, Fit landscape and Last move controls inside Settings. The landscape
-fills the screen and begins in the center, with seats around it. Your tile and
-individual meeples sit by your seat. Picking up the tile reveals legal spaces;
+zoom buttons, Fit landscape and Last move controls at the bottom right (also
+available in Settings). The angled landscape fills the screen, with player plaques
+in a left column and your tile and individual meeples in a bottom tray. Compact
+screens use a horizontally scrollable player strip and an expandable piece supply.
+Picking up the tile reveals legal spaces;
 drop it to preview, rotate it in place and confirm. Invalid drops return to the
 hand. Settings also contains practice scenarios/reset, language, help and history. Zoom remains
 anchored to the pointer or pinch midpoint. On the focused map, arrows cycle legal
-locations, R/Shift+R rotate, Enter confirms, and +/- zoom. A movement threshold
+locations, R/Shift+R rotate, Enter confirms, and +/- zoom. Space-drag and
+Shift+arrows pan without selecting a tile; directional buttons offer the same
+camera movements. A movement threshold
 prevents a pan from becoming a tile selection. Consequential choices also have
 ordinary keyboard-focusable buttons.
 
@@ -51,18 +60,20 @@ their specified exceptions. Farmers remain until final scoring unless an expansi
 explicitly returns them. The journal links accepted actions and scores to the map.
 Scoring updates the seats around the screen and briefly shows a point receipt.
 
-Original SVG tiles use green meadows, limestone walls, roof details, pale roads,
-blue water and module symbols. Numbered meeples supplement player colors; farmers
+Local painted WebP materials supply the wooden table, meadows, town roofs, earth,
+abbeys and keeps. SVG still defines every tile's roads, walls, rivers, regions and
+module symbols; decoration cannot change topology. Numbered wooden meeples
+supplement player colors; farmers
 lie down and large meeples have a larger silhouette. Attached figures remain
 linked to their meeple. English and Spanish text use Paraglide.
 
-Bare guide and settings controls sit at the upper corners without enclosing discs.
+Brass guide, overview and settings controls sit in the upper-right header.
 Hovering or focusing a physical figure explains its purpose. The field guide covers
 the three-step turn, ordinary and final scoring, every player figure, and all eleven
 modules; enabled rules appear first and are marked for the current game. Setup uses
 the same guide language on illustrated module cards instead of native checkboxes.
 
-A bare chart control beside the guide opens the live board overview during play.
+A chart control beside the guide opens the live board overview during play.
 It compares public scores, leader gaps, placed tiles, figure supplies and active
 expansion resources for every seat. Its Mine, Rivals and Unclaimed watchlists rank
 unfinished features by their provisional final value, then by open ends. Selecting

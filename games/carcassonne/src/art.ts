@@ -11,6 +11,10 @@ export function roadPath(r: Region) {
     return `M${r.anchor[0] - 4},${r.anchor[1] - 3}L${r.anchor[0] + 4},${r.anchor[1] + 3}`;
   const a = endpoints[r.ports[0]];
   if (r.ports.length === 1) return `M${a} Q50,50 50,50`;
+  if (r.ports.length === 2 && Math.abs(r.ports[0] - r.ports[1]) === 2)
+    return r.ports.includes(0)
+      ? 'M50 0C50 20 60 30 54 50S44 80 50 100'
+      : 'M0 50C20 50 30 60 50 54S80 44 100 50';
   if (r.ports.length === 2) return `M${a} Q50,50 ${endpoints[r.ports[1]]}`;
   return r.ports.map((p) => `M${endpoints[p]} L50,50`).join(' ');
 }
@@ -48,10 +52,10 @@ export function cityPath(r: Region) {
 export const meeplePath =
   'M-4,-6A5,5 0 1 1 4,-6L11,1Q12,4 8,5L5,3L7,13H1L0,7L-1,13H-7L-5,3L-8,5Q-12,4 -11,1Z';
 export const colors = [
-  '#bd5140',
-  '#3c7cab',
-  '#dfa943',
-  '#7959a0',
+  '#a93625',
+  '#22559b',
+  '#487934',
+  '#d5a725',
   '#e9e0c9',
   '#353d42',
 ];

@@ -1,5 +1,16 @@
 <script lang="ts">
-  import { onMount, type Snippet } from 'svelte';
+  import { onMount, untrack, type Snippet } from 'svelte';
+  import WoodenPiece from './table/WoodenPiece.svelte';
+  import {
+    groundMatrix,
+    uprightMatrix,
+    screen,
+    world as boardWorld,
+    unproject,
+    zoomAt,
+    tableSpace,
+    fitCamera,
+  } from './table/camera.js';
   import type { Locale } from '@board-games/shared/runtime';
   import {
     tiles,
@@ -72,10 +83,22 @@
     sound = $state(true);
   let cx = $state(50),
     cy = $state(50),
-    scale = $state(0.9),
+    scale = $state(1.5),
     width = $state(800),
     height = $state(600);
   let map: SVGSVGElement;
+  let spacePan = $state(false),
+    supplyOpen = $state(false);
+  const camera = $derived({ x: cx, y: cy, scale });
+  const space = $derived(tableSpace(width, height));
+  const cameraTransform = $derived(
+    `translate(${space.anchor.x} ${space.anchor.y}) scale(${scale}) ${groundMatrix} translate(${-cx} ${-cy})`,
+  );
+  function pan(dx: number, dy: number) {
+    const delta = unproject({ x: dx / scale, y: dy / scale });
+    cx -= delta.x;
+    cy -= delta.y;
+  }
   let settingsDialog: HTMLDialogElement;
   let guideDialog: HTMLDialogElement;
   let overviewDialog: HTMLDialogElement;
@@ -170,52 +193,44 @@
     cx = v.x * 100 + 50;
     cy = v.y * 100 + 50;
   }
-  function zoom(factor: number, x = width / 2, y = height / 2) {
-    const old = scale;
-    scale = Math.max(0.22, Math.min(2.5, scale * factor));
-    cx += (x - width / 2) * (1 / old - 1 / scale);
-    cy += (y - height / 2) * (1 / old - 1 / scale);
+  function zoom(factor: number, x = space.anchor.x, y = space.anchor.y) {
+    const next = zoomAt(camera, space.anchor, { x, y }, factor);
+    cx = next.x;
+    cy = next.y;
+    scale = next.scale;
   }
   function focus(k: string | null) {
     if (!k) return;
     const [x, y] = k.split(',').map(Number);
     cx = x * 100 + 50;
     cy = y * 100 + 50;
-    scale = Math.max(scale, 0.7);
+    scale = Math.max(scale, 1.1);
   }
   function fit() {
-    const list = Object.values(p.board);
-    if (!list.length) return;
-    const minX = Math.min(...list.map((v) => v.x)) * 100,
-      minY = Math.min(...list.map((v) => v.y)) * 100,
-      maxX = (Math.max(...list.map((v) => v.x)) + 1) * 100,
-      maxY = (Math.max(...list.map((v) => v.y)) + 1) * 100;
-    cx = (minX + maxX) / 2;
-    cy = (minY + maxY) / 2;
-    scale = Math.max(
-      0.22,
-      Math.min(
-        1.2,
-        (width - 120) / (maxX - minX),
-        (height - 120) / (maxY - minY),
-      ),
-    );
+    const next = fitCamera(Object.values(p.board), width, height);
+    cx = next.x;
+    cy = next.y;
+    scale = next.scale;
+  }
+  function resetCamera() {
+    fit();
+    // Start close enough to read the painted tiles. Fit remains an explicit
+    // overview; a developed landscape can extend beneath the floating UI.
+    scale = Math.max(scale, width <= 900 || height <= 540 ? 0.85 : 1.4);
   }
   const pointers = new Map<number, { x: number; y: number }>();
   let start = { x: 0, y: 0 },
-    dragged = false,
-    previousDistance = 0;
+    dragged = false;
   function down(e: PointerEvent) {
-    if ((e.target as Element).closest('[data-preview]') && mine) {
+    if (!spacePan && (e.target as Element).closest('[data-preview]') && mine) {
       beginDrag('tile', e);
       return;
     }
-    if (drag) return;
+    if (drag || e.button !== 0) return;
     unlock();
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     start = { x: e.clientX, y: e.clientY };
-    dragged = false;
-    previousDistance = 0;
+    dragged = spacePan || pointers.size > 1;
     map.setPointerCapture(e.pointerId);
   }
   function move(e: PointerEvent) {
@@ -224,6 +239,7 @@
     if (!old) return;
     const dx = e.clientX - old.x,
       dy = e.clientY - old.y;
+    const previous = [...pointers.values()];
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > 6)
       dragged = true;
@@ -231,23 +247,26 @@
     if (list.length === 2) {
       dragged = true;
       const distance = Math.hypot(list[0].x - list[1].x, list[0].y - list[1].y);
+      const previousDistance = Math.hypot(
+        previous[0].x - previous[1].x,
+        previous[0].y - previous[1].y,
+      );
       const r = map.getBoundingClientRect();
+      pan(dx / 2, dy / 2);
       if (previousDistance)
         zoom(
           distance / previousDistance,
           (list[0].x + list[1].x) / 2 - r.left,
           (list[0].y + list[1].y) / 2 - r.top,
         );
-      previousDistance = distance;
-    } else {
-      cx -= dx / scale;
-      cy -= dy / scale;
+    } else if (dragged) {
+      pan(dx, dy);
     }
   }
   function up(e: PointerEvent) {
+    if (!pointers.has(e.pointerId)) return;
     pointers.delete(e.pointerId);
-    previousDistance = 0;
-    if (dragged || drag) return;
+    if (dragged || drag || spacePan) return;
     const el = document
       .elementFromPoint(e.clientX, e.clientY)
       ?.closest('[data-location],[data-region]');
@@ -264,6 +283,19 @@
   }
   function keyboard(e: KeyboardEvent) {
     if ((e.target as Element)?.matches('input,select,button')) return;
+    if (e.key === ' ') {
+      e.preventDefault();
+      spacePan = true;
+      return;
+    }
+    if (e.shiftKey && e.key.startsWith('Arrow')) {
+      e.preventDefault();
+      pan(
+        e.key === 'ArrowLeft' ? 80 : e.key === 'ArrowRight' ? -80 : 0,
+        e.key === 'ArrowUp' ? 80 : e.key === 'ArrowDown' ? -80 : 0,
+      );
+      return;
+    }
     if (
       e.key.toLowerCase() === 'r' &&
       mine &&
@@ -435,17 +467,22 @@
     round;
     overview = false;
     overviewScope = 'mine';
-    cx = 50;
-    cy = 50;
-    scale = 0.9;
+    spacePan = false;
+    supplyOpen = false;
+    untrack(resetCamera);
   });
   onMount(() => {
     try {
       sound = localStorage.getItem('carcassonne:sound') !== 'off';
     } catch {}
+    let firstSize = true;
     const observer = new ResizeObserver((entries) => {
       width = entries[0].contentRect.width;
       height = entries[0].contentRect.height;
+      if (firstSize) {
+        firstSize = false;
+        resetCamera();
+      }
     });
     observer.observe(map);
     return () => {
@@ -506,14 +543,6 @@
     ...(p.config.modules.includes('inns') ? ['large'] : []),
     ...(p.config.modules.includes('abbot') ? ['abbot'] : []),
   ] as Piece[]);
-  const previewPosition = $derived(
-    preview
-      ? {
-          x: (preview.x * 100 + 50 - cx) * scale + width / 2,
-          y: (preview.y * 100 + 100 - cy) * scale + height / 2,
-        }
-      : null,
-  );
   function available(type: Piece) {
     return (
       (type === 'meeple' ? 7 : 1) -
@@ -526,44 +555,6 @@
       normalChoice &&
       !!p.pending?.options.some((o) => o.kind === 'deploy' && o.figure === type)
     );
-  }
-  function seatPosition(i: number) {
-    const n = players.length,
-      relative = (i - ownIndex + n) % n;
-    const positions: Record<number, number[][]> = {
-      2: [
-        [50, 96],
-        [50, 8],
-      ],
-      3: [
-        [50, 96],
-        [19, 14],
-        [81, 14],
-      ],
-      4: [
-        [50, 96],
-        [9, 50],
-        [50, 8],
-        [91, 50],
-      ],
-      5: [
-        [50, 96],
-        [9, 63],
-        [25, 11],
-        [75, 11],
-        [91, 63],
-      ],
-      6: [
-        [50, 96],
-        [9, 65],
-        [13, 25],
-        [50, 8],
-        [87, 25],
-        [91, 65],
-      ],
-    };
-    const [x, y] = positions[n][relative];
-    return `left:${x}%;top:${y}%;--seat:${colors[i]}`;
   }
   function pick(kind: 'tile' | Piece) {
     if (suppressClick) {
@@ -620,21 +611,27 @@
   }
   function world(clientX: number, clientY: number) {
     const r = map.getBoundingClientRect();
-    return {
-      x: cx + (clientX - r.left - width / 2) / scale,
-      y: cy + (clientY - r.top - height / 2) / scale,
-    };
+    return boardWorld(
+      { x: clientX - r.left, y: clientY - r.top },
+      camera,
+      space.anchor,
+    );
   }
   function dropRef(x: number, y: number) {
     let closest: string | undefined;
-    let distance = Math.max(25, 26 * scale);
+    let distance = Math.max(18, 20 * scale);
+    const pointer = screen({ x, y }, camera, space.anchor);
     for (const o of pieceOptions) {
       const { tile, region } = split(o.target!);
       const cell = p.board[tile];
       const r = tiles[cell.id].regions.find((v) => v.id === region)!;
       const a = rotatePoint(r.anchor, cell.rotation);
-      const d =
-        Math.hypot(cell.x * 100 + a[0] - x, cell.y * 100 + a[1] - y) * scale;
+      const target = screen(
+        { x: cell.x * 100 + a[0], y: cell.y * 100 + a[1] },
+        camera,
+        space.anchor,
+      );
+      const d = Math.hypot(target.x - pointer.x, target.y - pointer.y);
       if (d < distance) {
         closest = o.id;
         distance = d;
@@ -663,13 +660,8 @@
     }
     suppressClick = true;
     setTimeout(() => (suppressClick = false), 0);
-    const r = map.getBoundingClientRect();
-    const onMap =
-      e.clientX >= r.left &&
-      e.clientX <= r.right &&
-      e.clientY >= r.top &&
-      e.clientY <= r.bottom &&
-      e.clientY < r.bottom - 95;
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    const onMap = !!hit && (hit === map || map.contains(hit));
     const pos = world(e.clientX, e.clientY);
     if (onMap && current.kind === 'tile') {
       const x = Math.floor(pos.x / 100),
@@ -708,10 +700,14 @@
 </script>
 
 <svelte:window
+  onkeyup={(e) => {
+    if (e.key === ' ') spacePan = false;
+  }}
   onpointermove={dragMove}
   onpointerup={dragEnd}
   onpointercancel={cancelDrag}
   onblur={() => {
+    spacePan = false;
     cancelDrag();
     pointers.clear();
   }}
@@ -722,13 +718,23 @@
     }
   }}
 />
-<div class="carc-table" class:carrying={!!drag?.moved}>
+<div
+  class="carc-table"
+  class:carrying={!!drag?.moved}
+  class:supply-open={supplyOpen}
+>
+  <header class="table-header">
+    <span class="fleur" aria-hidden="true">⚜</span><span class="table-title"
+      >Carcassonne</span
+    >
+    <span class="edition-tag">{t('edition')}</span>
+  </header>
   <div class="landscape">
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions (The map is a keyboard-operated application; native controls provide equivalent actions.) -->
     <svg
       bind:this={map}
       class="map"
-      viewBox={`${cx - width / scale / 2} ${cy - height / scale / 2} ${width / scale} ${height / scale}`}
+      viewBox={`0 0 ${width} ${height}`}
       role="application"
       aria-label={t('controls')}
       tabindex="0"
@@ -738,6 +744,7 @@
       onpointerup={up}
       onpointercancel={(e) => {
         pointers.delete(e.pointerId);
+        dragged = true;
         cancelDrag(e);
       }}
       onwheel={(e) => {
@@ -750,229 +757,197 @@
         );
       }}
     >
-      <defs
-        ><pattern
-          id="carc-grid"
-          width="100"
-          height="100"
-          patternUnits="userSpaceOnUse"
-          ><path
-            d="M100 0H0V100"
-            fill="none"
-            stroke="#efdfb7"
-            stroke-opacity=".035"
-          /></pattern
-        ></defs
-      >
-      <rect
-        x={cx - width / scale}
-        y={cy - height / scale}
-        width={(width * 2) / scale}
-        height={(height * 2) / scale}
-        fill="url(#carc-grid)"
-      />
-      {#each Object.entries(p.board) as [k, tile] (k)}<g
-          transform={`translate(${tile.x * 100} ${tile.y * 100})`}
-          class:landed={recent.includes(k)}
-        >
-          <rect
-            x="2"
-            y="5"
-            width="97"
-            height="98"
-            rx="2"
-            fill="#080d08"
-            opacity=".35"
-          />
-          <g class="tile-surface"
-            ><TileArt id={tile.id} rotation={tile.rotation} /></g
+      <g class="board-plane" transform={cameraTransform}>
+        {#each Object.entries(p.board).sort((a, b) => a[1].y - b[1].y || a[1].x - b[1].x) as [k, tile] (k)}<g
+            transform={`translate(${tile.x * 100} ${tile.y * 100})`}
+            class:landed={recent.includes(k)}
           >
-          {#if feature?.tiles.includes(k)}<g
-              transform={`rotate(${tile.rotation * 90} 50 50)`}
-              pointer-events="none"
-              >{#each tiles[tile.id].regions.filter( (r) => feature!.nodes.includes(node(k, r.id)) ) as r}{#if r.kind === 'city'}<path
-                    d={cityPath(r)}
-                    fill="#ffebaa"
-                    fill-opacity=".35"
-                    stroke="#ffe8a0"
-                    stroke-width="3"
-                  />{:else if r.kind === 'road'}<path
-                    d={roadPath(r)}
-                    fill="none"
-                    stroke="#ffe8a0"
-                    stroke-width="12"
-                    stroke-opacity=".6"
-                  />{:else if r.kind === 'field'}<path
-                    d={fieldPath(r)}
-                    fill="#ecf8a2"
-                    fill-opacity=".2"
-                    stroke="#e5efa3"
-                    stroke-width="1"
-                  />{:else}<circle
-                    cx={r.anchor[0]}
-                    cy={r.anchor[1]}
-                    r="21"
-                    fill="#ffe8a0"
-                    fill-opacity=".3"
-                    stroke="#ffe8a0"
-                  />{/if}{/each}</g
-            >{/if}
-          {#if p.goldMap[k]}<g transform="translate(81 82)"
-              ><path
-                d="M-9 0L0-5L9 0L0 5Z"
-                fill="#ffe27b"
-                stroke="#8c692b"
-              /><text
-                text-anchor="middle"
-                y="3"
-                font-size="9"
-                font-weight="bold">{p.goldMap[k]}</text
-              ></g
-            >{/if}
-          {#if tiles[tile.id].ferry}{@const pair =
-              ferryPreview?.tile === k ? ferryPreview.pair : tile.ferry}<g
-              transform={`rotate(${tile.rotation * 90} 50 50)`}
-              pointer-events="none"
-            >
-              {#if pair}<path
-                  class="ferry-connection"
-                  d={ferryPath(tile.id, pair)}
-                  fill="none"
-                  stroke="#f1d5a0"
-                  stroke-width="8"
-                /><path
-                  d={ferryPath(tile.id, pair)}
-                  fill="none"
-                  stroke="#93663e"
-                  stroke-width="5"
-                  stroke-dasharray="2 2"
-                />{/if}
-              {#each tiles[tile.id].regions.filter((r) => r.kind === 'road') as r, i}<text
-                  x={r.anchor[0]}
-                  y={r.anchor[1] + 3}
-                  text-anchor="middle"
-                  font-size="9"
-                  fill="#26382b"
-                  stroke="#f5e0b0"
-                  stroke-width="2"
-                  paint-order="stroke">{i + 1}</text
-                >{/each}
-            </g>{/if}
-          {#each tiles[tile.id].regions.filter((r) => r.kind !== 'river') as r}
-            {@const a = rotatePoint(r.anchor, tile.rotation)}{@const ref = node(
-              k,
-              r.id,
-            )}
-            <circle
-              data-region={ref}
-              data-legal={legalRefs.has(ref) ? 'true' : undefined}
-              role={legalRefs.has(ref) ? 'button' : undefined}
-              tabindex={legalRefs.has(ref) ? 0 : undefined}
-              aria-label={legalRefs.has(ref)
-                ? `${t('meeple')} · ${t(r.kind)} (${tile.x}, ${tile.y})`
-                : undefined}
-              onkeydown={(e) => {
-                if (
-                  legalRefs.has(ref) &&
-                  (e.key === 'Enter' || e.key === ' ')
-                ) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const o = pieceOptions.find((o) => o.target === ref);
-                  if (o) choose(o);
-                }
-              }}
-              cx={a[0]}
-              cy={a[1]}
-              r="13"
-              fill={selected === ref ? '#ffeab3' : 'transparent'}
-              fill-opacity=".65"
-              stroke={legalRefs.has(ref) ? '#ffebaf' : 'transparent'}
-              stroke-width="1.7"
-              stroke-dasharray="2 2"
-              class="region"
-              ><title>{t(r.kind)} ({tile.x}, {tile.y})</title></circle
-            >
-          {/each}
-          {#each p.figures.filter((f) => f.tile === k) as f, i}
-            {@const r = tiles[tile.id].regions.find(
-              (r) => r.id === f.region,
-            )!}{@const a = rotatePoint(r.anchor, tile.rotation)}{@const index =
-              p.players.indexOf(f.owner)}
-            <g
-              transform={`translate(${a[0] + (i % 2) * 4} ${a[1]}) rotate(${r.kind === 'field' ? 90 : 0}) scale(${f.type === 'large' ? 1.3 : 0.85})`}
-              class="figure"
-              data-region={node(k, f.region)}
-              ><path
-                d={meeplePath}
-                fill={colors[index]}
-                stroke="#f9e5b5"
-                stroke-width="1.4"
-              /><text
-                y="5"
-                text-anchor="middle"
-                font-size="8"
-                fill={index === 4 ? '#29382f' : 'white'}
-                >{f.type === 'abbot' ? '✝' : index + 1}</text
-              >{#if f.attachment}<path d="M8 5L17 9" stroke="#e7d5a4" /><circle
-                  cx="20"
-                  cy="10"
-                  r="7"
-                  fill={colors[index]}
-                  stroke="#f9e5b5"
-                /><text
-                  x="20"
-                  y="13"
-                  text-anchor="middle"
-                  font-size="8"
-                  fill="white">{f.attachment === 'pig' ? 'P' : 'B'}</text
-                >{/if}</g
-            >
-          {/each}
-          {#each ['mage', 'witch'] as magic}{#if p.magic[magic as 'mage' | 'witch']?.startsWith(k + '/')}<path
-                d="M69 33L77 11L85 33Z"
-                fill={magic === 'mage' ? '#bd965a' : '#80629d'}
-                stroke="#f3dfaa"
-              />{/if}{/each}
-        </g>{/each}
-      {#if p.phase === 'place' && mine && tool === 'tile'}{#each locations as loc}<g
-            transform={`translate(${loc.x * 100} ${loc.y * 100})`}
-            data-location={`${loc.x},${loc.y}`}
-            ><rect
-              x="5"
+            <rect
+              x="2"
               y="5"
-              width="90"
-              height="90"
-              rx="4"
-              fill="#b2c68e"
-              fill-opacity=".07"
-              stroke="#d7d6a5"
-              stroke-opacity=".6"
-              stroke-dasharray="3 7"
-            /><path
-              d="M44 50H56M50 44V56"
-              stroke="#d7d6a5"
-              stroke-width="2"
+              width="97"
+              height="98"
+              rx="2"
+              fill="#080d08"
+              opacity=".35"
+            />
+            <g class="tile-surface"
+              ><TileArt id={tile.id} rotation={tile.rotation} /></g
+            >
+            {#if feature?.tiles.includes(k)}<g
+                transform={`rotate(${tile.rotation * 90} 50 50)`}
+                pointer-events="none"
+                >{#each tiles[tile.id].regions.filter( (r) => feature!.nodes.includes(node(k, r.id)) ) as r}{#if r.kind === 'city'}<path
+                      d={cityPath(r)}
+                      fill="#ffebaa"
+                      fill-opacity=".35"
+                      stroke="#ffe8a0"
+                      stroke-width="3"
+                    />{:else if r.kind === 'road'}<path
+                      d={roadPath(r)}
+                      fill="none"
+                      stroke="#ffe8a0"
+                      stroke-width="12"
+                      stroke-opacity=".6"
+                    />{:else if r.kind === 'field'}<path
+                      d={fieldPath(r)}
+                      fill="#ecf8a2"
+                      fill-opacity=".2"
+                      stroke="#e5efa3"
+                      stroke-width="1"
+                    />{:else}<circle
+                      cx={r.anchor[0]}
+                      cy={r.anchor[1]}
+                      r="21"
+                      fill="#ffe8a0"
+                      fill-opacity=".3"
+                      stroke="#ffe8a0"
+                    />{/if}{/each}</g
+              >{/if}
+            {#if p.goldMap[k]}<g transform="translate(81 82)"
+                ><path
+                  d="M-9 0L0-5L9 0L0 5Z"
+                  fill="#ffe27b"
+                  stroke="#8c692b"
+                /><text
+                  text-anchor="middle"
+                  y="3"
+                  font-size="9"
+                  font-weight="bold">{p.goldMap[k]}</text
+                ></g
+              >{/if}
+            {#if tiles[tile.id].ferry}{@const pair =
+                ferryPreview?.tile === k ? ferryPreview.pair : tile.ferry}<g
+                transform={`rotate(${tile.rotation * 90} 50 50)`}
+                pointer-events="none"
+              >
+                {#if pair}<path
+                    class="ferry-connection"
+                    d={ferryPath(tile.id, pair)}
+                    fill="none"
+                    stroke="#f1d5a0"
+                    stroke-width="8"
+                  /><path
+                    d={ferryPath(tile.id, pair)}
+                    fill="none"
+                    stroke="#93663e"
+                    stroke-width="5"
+                    stroke-dasharray="2 2"
+                  />{/if}
+                {#each tiles[tile.id].regions.filter((r) => r.kind === 'road') as r, i}<text
+                    x={r.anchor[0]}
+                    y={r.anchor[1] + 3}
+                    text-anchor="middle"
+                    font-size="9"
+                    fill="#26382b"
+                    stroke="#f5e0b0"
+                    stroke-width="2"
+                    paint-order="stroke">{i + 1}</text
+                  >{/each}
+              </g>{/if}
+            {#each tiles[tile.id].regions.filter((r) => r.kind !== 'river') as r}
+              {@const a = rotatePoint(r.anchor, tile.rotation)}{@const ref =
+                node(k, r.id)}
+              <circle
+                data-region={ref}
+                data-legal={legalRefs.has(ref) ? 'true' : undefined}
+                role={legalRefs.has(ref) ? 'button' : undefined}
+                tabindex={legalRefs.has(ref) ? 0 : undefined}
+                aria-label={legalRefs.has(ref)
+                  ? `${t('meeple')} · ${t(r.kind)} (${tile.x}, ${tile.y})`
+                  : undefined}
+                onkeydown={(e) => {
+                  if (
+                    legalRefs.has(ref) &&
+                    (e.key === 'Enter' || e.key === ' ')
+                  ) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const o = pieceOptions.find((o) => o.target === ref);
+                    if (o) choose(o);
+                  }
+                }}
+                cx={a[0]}
+                cy={a[1]}
+                r="13"
+                fill={selected === ref ? '#ffeab3' : 'transparent'}
+                fill-opacity=".65"
+                stroke={legalRefs.has(ref) ? '#ffebaf' : 'transparent'}
+                stroke-width="1.7"
+                stroke-dasharray="2 2"
+                class="region"
+                ><title>{t(r.kind)} ({tile.x}, {tile.y})</title></circle
+              >
+            {/each}
+            {#each p.figures.filter((f) => f.tile === k) as f, i}
+              {@const r = tiles[tile.id].regions.find(
+                (r) => r.id === f.region,
+              )!}{@const a = rotatePoint(
+                r.anchor,
+                tile.rotation,
+              )}{@const index = p.players.indexOf(f.owner)}
+              <g
+                transform={`translate(${a[0] + (i % 2) * 4} ${a[1]}) ${uprightMatrix} rotate(${r.kind === 'field' ? 75 : 0}) scale(${f.type === 'large' ? 1.45 : 1.05})`}
+                class="figure"
+                data-region={node(k, f.region)}
+                ><WoodenPiece
+                  color={colors[index]}
+                  type={f.type}
+                  mark={index + 1}
+                />
+                {#if f.attachment}<g transform="translate(17 6) scale(.65)"
+                    ><WoodenPiece
+                      color={colors[index]}
+                      type={f.attachment}
+                    /></g
+                  >{/if}</g
+              >
+            {/each}
+            {#each ['mage', 'witch'] as magic}{#if p.magic[magic as 'mage' | 'witch']?.startsWith(k + '/')}<path
+                  d="M69 33L77 11L85 33Z"
+                  fill={magic === 'mage' ? '#bd965a' : '#80629d'}
+                  stroke="#f3dfaa"
+                />{/if}{/each}
+          </g>{/each}
+        {#if p.phase === 'place' && mine && tool === 'tile'}{#each locations as loc}<g
+              transform={`translate(${loc.x * 100} ${loc.y * 100})`}
+              data-location={`${loc.x},${loc.y}`}
+              ><rect
+                x="5"
+                y="5"
+                width="90"
+                height="90"
+                rx="4"
+                fill="#b2c68e"
+                fill-opacity=".07"
+                stroke="#e1edb1"
+                stroke-opacity=".85"
+                stroke-dasharray="3 7"
+              /><path
+                d="M44 50H56M50 44V56"
+                stroke="#d7d6a5"
+                stroke-width="2"
+              /></g
+            >{/each}{/if}
+        {#if preview && p.current}<g
+            class="ghost"
+            transform={`translate(${preview.x * 100} ${preview.y * 100})`}
+            data-preview="true"
+            ><g
+              class="rotating"
+              style={`transform:rotate(${visualRotation * 90}deg);transform-origin:50px 50px`}
+              ><TileArt id={p.current} /></g
+            ><rect
+              x="2"
+              y="2"
+              width="96"
+              height="96"
+              fill="none"
+              stroke={valid ? '#eaffb7' : '#ee795e'}
+              stroke-width="4"
             /></g
-          >{/each}{/if}
-      {#if preview && p.current}<g
-          class="ghost"
-          transform={`translate(${preview.x * 100} ${preview.y * 100})`}
-          data-preview="true"
-          ><g
-            class="rotating"
-            style={`transform:rotate(${visualRotation * 90}deg);transform-origin:50px 50px`}
-            ><TileArt id={p.current} /></g
-          ><rect
-            x="2"
-            y="2"
-            width="96"
-            height="96"
-            fill="none"
-            stroke={valid ? '#ffe6a0' : '#ee795e'}
-            stroke-width="4"
-          /></g
-        >{/if}
+          >{/if}
+      </g>
     </svg>
 
     <div class="receipts" aria-live="polite">
@@ -1011,31 +986,78 @@
         >
       </aside>{/if}
   </div>
-  <div class="players" aria-label="Carcassonne">
-    {#each players as player, i}<div
+  <div class="players" aria-label={t('players')}>
+    {#each players as player, i}
+      {@const remaining =
+        7 -
+        p.figures.filter((f) => f.owner === player.id && f.type === 'meeple')
+          .length}
+      <div
         class="player"
         class:active={who === player.id}
         class:self={player.id === playerId}
-        style={seatPosition(i)}
+        class:offline={player.connected === false}
+        style={`--seat:${colors[i]}`}
       >
-        <svg viewBox="-16 -16 32 34" aria-hidden="true"
-          ><path
-            d={meeplePath}
-            fill={colors[i]}
-            stroke="#e7d9b3"
-            stroke-width=".8"
-          /><text
-            y="5"
-            text-anchor="middle"
-            font-size="9"
-            fill={i === 4 ? '#293a32' : 'white'}>{i + 1}</text
-          ></svg
-        ><strong>{player.name}</strong><span
+        <svg class="portrait-piece" viewBox="-17 -17 36 38" aria-hidden="true"
+          ><WoodenPiece color={colors[i]} mark={i + 1} /></svg
+        >
+        <strong title={player.name}>{player.name}</strong>
+        <span class="player-score"
           >{p.scores[player.id][0] + p.scores[player.id][1]}</span
-        >{#if p.phase === 'setup' && p.ready.includes(player.id)}<small>✓</small
+        >
+        <span
+          class="player-supply"
+          aria-label={`${t('meeple')} · ${remaining}`}
+        >
+          {#each Array(remaining) as _}<svg
+              viewBox="-16 -16 32 34"
+              aria-hidden="true"><path d={meeplePath} fill={colors[i]} /></svg
+            >{/each}
+        </span>
+        {#if player.connected === false}<small class="connection-status"
+            >{t('disconnected')}</small
           >{/if}
-      </div>{/each}
+        {#if p.phase === 'setup' && p.ready.includes(player.id)}<small
+            class="ready-mark">✓</small
+          >{/if}
+      </div>
+    {/each}
   </div>
+  <nav class="camera-controls" aria-label={t('camera')}>
+    <button
+      onclick={() => zoom(1.2)}
+      aria-label={t('zoom_in')}
+      title={t('zoom_in')}>+</button
+    >
+    <button
+      onclick={() => zoom(1 / 1.2)}
+      aria-label={t('zoom_out')}
+      title={t('zoom_out')}>−</button
+    >
+    <button onclick={fit} aria-label={t('fit')} title={t('fit')}>⛶</button>
+    <button
+      onclick={() => focus(p.last)}
+      aria-label={t('last')}
+      title={t('last')}
+      disabled={!p.last}>⌖</button
+    >
+    <details class="pan-menu">
+      <summary aria-label={t('pan')} title={t('pan')}>✥</summary>
+      <div class="pan-buttons">
+        <button onclick={() => pan(0, 100)} aria-label={t('pan_up')}>↑</button>
+        <button onclick={() => pan(100, 0)} aria-label={t('pan_left')}>←</button
+        >
+        <button onclick={() => pan(-100, 0)} aria-label={t('pan_right')}
+          >→</button
+        >
+        <button onclick={() => pan(0, -100)} aria-label={t('pan_down')}
+          >↓</button
+        >
+      </div>
+    </details>
+  </nav>
+  <p class="camera-hint">{t('camera_hint')}</p>
   <button
     class="guide-toggle corner-control"
     onclick={() => (guide = true)}
@@ -1227,28 +1249,14 @@
           >{t('disconnected')}</small
         >{/if}
     </div>
-    {#if previewPosition && p.current && p.phase === 'place'}<div
-        class="placement-controls"
-        style={`left:${Math.max(95, Math.min(width - 95, previewPosition.x))}px;top:${Math.max(90, Math.min(height - 205, previewPosition.y + 12))}px`}
-      >
-        <button onclick={() => rotate(-1)} aria-label={t('rotate_left')}
-          >↶</button
-        ><button
-          class="confirm"
-          onclick={place}
-          disabled={!valid || !mine}
-          aria-label={t('confirm')}>✓</button
-        ><button onclick={() => rotate(1)} aria-label={t('rotate_right')}
-          >↷</button
-        ><button
-          class="cancel"
-          onclick={dismissPreview}
-          aria-label={t('cancel')}>×</button
-        >{#if !valid}<small>{t('mismatch')}</small>{/if}
-      </div>{/if}
     <div class="hand" aria-label={t('your_pieces')}>
+      <div class="tray-heading">
+        <span>{p.phase === 'place' ? t('current') : t('your_pieces')}</span
+        ><small>{name(playerId)}</small>
+      </div>
       {#if p.current}<div class="tile-stack">
-          <span class="deck-count">{p.remaining}</span><button
+          <span class="deck-count" title={t('remaining')}>{p.remaining}</span
+          ><button
             class="own-tile"
             class:picked={tool === 'tile'}
             class:in-map={!!preview}
@@ -1268,6 +1276,41 @@
             ></button
           >
         </div>{/if}
+      {#if p.phase === 'place'}<div class="placement-controls">
+          <button
+            class="rotate-main"
+            onclick={() => rotate(1)}
+            disabled={!mine}
+            aria-label={t('rotate_right')}
+            title={t('rotate_right')}>⟳</button
+          >
+          <span class="rotate-caption">{t('rotate')}</span>
+          {#if preview}<div class="confirm-row">
+              <button
+                onclick={() => rotate(-1)}
+                aria-label={t('rotate_left')}
+                title={t('rotate_left')}>↶</button
+              >
+              <button
+                class="confirm"
+                onclick={place}
+                disabled={!valid || !mine}
+                aria-label={t('confirm')}>✓</button
+              >
+              <button
+                class="cancel"
+                onclick={dismissPreview}
+                aria-label={t('cancel')}>×</button
+              >
+            </div>
+            {#if !valid}<small>{t('mismatch')}</small>{/if}{/if}
+        </div>{/if}
+      <button
+        class="supply-toggle"
+        aria-expanded={supplyOpen}
+        onclick={() => (supplyOpen = !supplyOpen)}
+        >{t('your_pieces')} {supplyOpen ? '⌄' : '⌃'}</button
+      >
       <div class="meeple-supply">
         {#each figureTypes as type}<div class="piece-group">
             {#each Array(type === 'meeple' ? 7 : 1) as _, i}
@@ -1293,21 +1336,7 @@
                     if (!unavailable) pick(type);
                   }}
                   ><svg viewBox="-16 -18 32 36" aria-hidden="true"
-                    ><path
-                      d={meeplePath}
-                      fill={ownColor}
-                      stroke="#f3dfb4"
-                      stroke-width=".8"
-                    /><path
-                      d="M-3-11Q0-14 3-11M-8 1-5-1"
-                      fill="none"
-                      stroke="#fff6ce"
-                      stroke-opacity=".5"
-                    />{#if type === 'abbot'}<path
-                        d="M0-5V5M-4-1H4"
-                        stroke="#f9edcc"
-                        stroke-width="2"
-                      />{/if}</svg
+                    ><WoodenPiece color={ownColor} {type} /></svg
                   ></button
                 ><span
                   class="piece-tooltip"
@@ -1337,16 +1366,8 @@
                 onclick={() => {
                   if (!unavailable) attachmentPick(kind as 'builder' | 'pig');
                 }}
-                ><svg viewBox="0 0 40 40" aria-hidden="true"
-                  >{#if kind === 'pig'}<path
-                      d="M7 16Q3 14 3 20M9 13Q20 7 29 14L35 13V22L29 25V32H24V27H15V32H10V25Q5 20 9 13Z"
-                      fill={ownColor}
-                      stroke="#f3dfb4"
-                    />{:else}<path
-                      d="M10 32V19L6 16L12 11V5H27V11L33 16L27 19V32Z"
-                      fill={ownColor}
-                      stroke="#f3dfb4"
-                    />{/if}</svg
+                ><svg viewBox="-17 -17 36 36" aria-hidden="true"
+                  ><WoodenPiece color={ownColor} type={kind} /></svg
                 ></button
               ><span
                 class="piece-tooltip"
@@ -1412,12 +1433,7 @@
       {#if drag.kind === 'tile' && p.current}<svg viewBox="0 0 100 100"
           ><TileArt id={p.current} {rotation} /></svg
         >{:else}<svg viewBox="-16 -18 32 36"
-          ><path
-            d={meeplePath}
-            fill={ownColor}
-            stroke="#f3dfb4"
-            stroke-width="1"
-          /></svg
+          ><WoodenPiece color={ownColor} type={drag.kind} /></svg
         >{/if}
     </div>{/if}
 
@@ -1745,6 +1761,11 @@
 </div>
 
 <style>
+  @font-face {
+    font-family: 'Carcassonne Display';
+    src: url('/fonts/carcassonne/marcellus.woff2') format('woff2');
+    font-display: swap;
+  }
   :global(body:has(.carc-table) .site-header),
   :global(body:has(.carc-table) .room-toolbar) {
     display: none;
@@ -1753,14 +1774,13 @@
     position: fixed;
     inset: 0;
     overflow: hidden;
-    background:
-      radial-gradient(ellipse at 18% 18%, #d3c97a20 0 12%, transparent 36%),
-      radial-gradient(ellipse at 82% 76%, #b48a4f20 0 10%, transparent 32%),
-      repeating-linear-gradient(17deg, transparent 0 34px, #f1d88708 35px 36px),
-      radial-gradient(ellipse at 50% 45%, #71875b, #435f49 62%, #304a3a 100%);
-    color: #fff0c9;
-    font-family: inherit;
     isolation: isolate;
+    color: #f3e8d2;
+    font-family: Georgia, 'Times New Roman', serif;
+    background: #302014 url('/games/carcassonne/table.webp') center / cover;
+    --brass: #b59a65;
+    --ink: #211b15;
+    --paper: #e8d6af;
   }
   .landscape {
     position: absolute;
@@ -1770,34 +1790,76 @@
     width: 100%;
     height: 100%;
     touch-action: none;
-    outline: none;
     display: block;
     cursor: grab;
+    outline: none;
   }
   .map:active {
     cursor: grabbing;
   }
-  button {
-    font: inherit;
+  .map:focus-visible {
+    box-shadow: inset 0 0 0 2px #d9bd78aa;
+  }
+  .table-header {
+    position: absolute;
+    z-index: 3;
+    inset: 0 0 auto;
+    height: 62px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 26px;
+    background: linear-gradient(100deg, #14120ff5, #292219ed 70%, #191612f5);
+    border: 1px solid #b19360;
+    border-top: 0;
+    border-radius: 0 0 18px 18px;
+    box-shadow:
+      0 5px 16px #0007,
+      inset 0 -3px 0 #09070566;
+    pointer-events: none;
+  }
+  .fleur {
+    color: #c0a06b;
+    font-size: 36px;
+    text-shadow: 0 2px 2px #000;
+  }
+  .table-title {
+    font-family: 'Carcassonne Display', Georgia, serif;
+    font-size: 28px;
+    letter-spacing: 0.02em;
+    color: #f2dfb7;
+  }
+  .edition-tag {
+    display: none;
+  }
+  button,
+  summary {
     color: inherit;
+    font: inherit;
     cursor: pointer;
-    border: 1px solid #e8d6af30;
-    background: #344a3e;
-    border-radius: 8px;
+  }
+  button {
     padding: 10px 14px;
+    border: 1px solid #b59a6566;
+    border-radius: 4px;
+    background: linear-gradient(145deg, #342c21, #1e1b17);
+    box-shadow: inset 0 1px #ead6ab17;
   }
-  button:disabled {
-    cursor: default;
+  button:hover:not(:disabled):not([aria-disabled='true']) {
+    background: #4a3b28;
+    border-color: #d5ba82;
   }
+  button:disabled,
   button[aria-disabled='true'] {
     cursor: default;
   }
-  button:focus-visible {
-    outline: 2px solid #f2d18a;
-    outline-offset: 4px;
+  button:disabled {
+    opacity: 0.5;
   }
-  button:hover:not(:disabled) {
-    background: #47604e;
+  button:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid #f8df98;
+    outline-offset: 3px;
   }
   svg {
     display: block;
@@ -1807,125 +1869,252 @@
   p {
     margin: 0;
   }
+  h1,
+  h2,
+  h3 {
+    font-family: 'Carcassonne Display', Georgia, serif;
+    font-weight: 400;
+  }
   h1 {
-    font-size: 27px;
+    font-size: 28px;
   }
   h2 {
-    font-size: 19px;
+    font-size: 21px;
   }
   .eyebrow {
     font-size: 10px;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.15em;
     text-transform: uppercase;
-    opacity: 0.6;
+    opacity: 0.7;
     margin-bottom: 12px;
   }
   .players {
+    position: absolute;
+    top: 84px;
+    left: 18px;
+    width: 198px;
+    display: grid;
+    gap: 12px;
     pointer-events: none;
   }
   .player {
-    position: absolute;
-    transform: translate(-50%, -50%);
-    display: flex;
-    gap: 8px;
+    position: relative;
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    grid-template-rows: 22px 28px;
     align-items: center;
-    font-size: 12px;
-    white-space: nowrap;
-    opacity: 0.65;
-    transition:
-      left 0.5s,
-      top 0.5s,
-      opacity 0.3s;
-  }
-  .player svg {
-    width: 26px;
-    height: 30px;
-    filter: drop-shadow(0 3px 2px #0005);
-  }
-  .player span {
-    font-size: 17px;
-    font-variant-numeric: tabular-nums;
-    color: #e5c98d;
+    column-gap: 10px;
+    min-width: 0;
+    padding: 12px;
+    background: linear-gradient(130deg, #242018f2, #131311ed);
+    border: 1px solid #8e7854;
+    border-radius: 7px 13px 7px 7px;
+    box-shadow:
+      0 4px 10px #0005,
+      inset 0 0 0 3px #ead1a007;
   }
   .player.active {
-    opacity: 1;
+    border-color: #d7b26d;
+    box-shadow:
+      0 4px 10px #0006,
+      inset 3px 0 var(--seat);
   }
-  .player.active strong {
-    text-decoration: underline;
-    text-decoration-color: #e5c98d;
-    text-underline-offset: 6px;
+  .player.self strong::after {
+    content: ' ·';
+    color: #d9b66f;
   }
-  .player.self {
-    font-size: 11px;
+  .player .portrait-piece {
+    width: 44px;
+    height: 52px;
+    grid-row: 1 / 3;
   }
-  .player.self svg {
-    width: 20px;
+  .player strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    font-weight: 400;
+  }
+  .player-score {
+    font-size: 25px;
+    font-variant-numeric: tabular-nums;
+  }
+  .player-supply {
+    position: absolute;
+    bottom: 18px;
+    right: 10px;
+    display: flex;
+    gap: 1px;
+    max-width: 96px;
+  }
+  .player-supply svg {
+    width: 12px;
+    height: 16px;
+    filter: drop-shadow(0 1px 1px #000);
+  }
+  .connection-status {
+    position: absolute;
+    top: 2px;
+    right: 5px;
+    font-size: 8px;
+    color: #e5b98d;
+  }
+  .ready-mark {
+    position: absolute;
+    right: 9px;
+    top: 8px;
+    color: #daca96;
   }
   .corner-control {
     position: absolute;
-    top: 20px;
+    top: 10px;
     z-index: 4;
-    width: 46px;
-    height: 46px;
-    border: 0;
-    border-radius: 4px;
-    padding: 8px;
-    background: transparent;
-    color: #ffe6ad;
-    filter: drop-shadow(0 2px 2px #1c3324aa);
-    transition:
-      color 0.18s ease,
-      transform 0.18s ease,
-      filter 0.18s ease;
-  }
-  .corner-control:hover:not(:disabled) {
-    color: #fff5d7;
-    background: transparent;
-    transform: translateY(-2px);
-    filter: drop-shadow(0 5px 3px #1c332477);
+    width: 41px;
+    height: 41px;
+    padding: 9px;
+    border: 1px solid #ac926970;
+    border-radius: 50%;
+    color: #d9c7a6;
+    background: linear-gradient(140deg, #342c21, #171613);
+    box-shadow: 0 2px 3px #0005;
   }
   .corner-control svg {
-    width: 28px;
-    height: 28px;
-  }
-  .settings-toggle {
-    right: 22px;
+    width: 22px;
+    height: 22px;
   }
   .guide-toggle {
-    left: 22px;
+    right: 120px;
   }
   .overview-toggle {
-    left: 70px;
+    right: 70px;
+  }
+  .settings-toggle {
+    right: 20px;
   }
   .turn-hint {
     position: absolute;
-    top: 28px;
-    left: 50%;
-    transform: translateX(-50%);
-    text-align: center;
+    z-index: 3;
+    top: 0;
+    left: 310px;
+    right: 190px;
+    height: 62px;
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    color: #eadfca;
     pointer-events: none;
-    max-width: 50%;
-    font-size: 12px;
-    color: #e4d8bc;
   }
   .turn-line {
-    font-size: 10px;
-    letter-spacing: 0.08em;
-    opacity: 0.6;
+    flex-shrink: 0;
+    font-size: 15px;
+    padding-left: 22px;
+    border-left: 1px solid #c9b48430;
   }
   .turn-hint p {
-    margin-top: 7px;
+    font-size: 15px;
+    line-height: 1.3;
+    border-left: 1px solid #c9b48430;
+    padding-left: 22px;
+  }
+  .turn-hint small {
+    font-size: 10px;
+    color: #e4ac82;
+  }
+  .camera-controls {
+    position: absolute;
+    right: 22px;
+    bottom: 25px;
+    display: flex;
+    align-items: center;
+    padding: 5px;
+    border: 1px solid #b49a685e;
+    border-radius: 7px;
+    background: #1b1915ee;
+    box-shadow: 0 4px 15px #0006;
+  }
+  .camera-controls button,
+  .pan-menu summary {
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    width: 35px;
+    height: 35px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-size: 22px;
+  }
+  .camera-controls button + button {
+    border-left: 1px solid #b49a682b;
+    border-radius: 0;
+  }
+  .pan-menu summary {
+    list-style: none;
+  }
+  .pan-menu summary::-webkit-details-marker {
+    display: none;
+  }
+  .pan-buttons {
+    position: absolute;
+    bottom: 55px;
+    right: 0;
+    display: grid;
+    grid-template-columns: repeat(2, 44px);
+    padding: 6px;
+    background: #1b1915f5;
+    border: 1px solid #b49a68;
+    border-radius: 5px;
+  }
+  .pan-buttons button {
+    width: 44px;
+    height: 44px;
+  }
+  .camera-hint {
+    position: absolute;
+    bottom: 18px;
+    left: 24px;
+    color: #d2bd91;
+    font:
+      11px Georgia,
+      serif;
+    pointer-events: none;
+    text-shadow: 0 1px 2px #000;
   }
   .hand {
     position: absolute;
-    bottom: 58px;
+    bottom: 26px;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 25px;
-    max-width: calc(100% - 32px);
+    padding: 42px 25px 20px;
+    max-width: calc(100% - 460px);
+    min-width: 310px;
+    box-sizing: border-box;
     user-select: none;
+    background: linear-gradient(135deg, #29271def, #181813f5 50%, #252016f5);
+    border: 1px solid #b4965f;
+    border-radius: 15px 5px 15px 5px;
+    box-shadow:
+      0 12px 26px #0007,
+      inset 0 0 0 4px #c4a46a0b;
+  }
+  .tray-heading {
+    position: absolute;
+    top: 12px;
+    left: 24px;
+    right: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    font-size: 17px;
+  }
+  .tray-heading small {
+    font-size: 11px;
+    color: #b8a481;
   }
   .tile-stack {
     position: relative;
@@ -1933,43 +2122,45 @@
   }
   .deck-count {
     position: absolute;
-    left: -19px;
-    bottom: 4px;
-    font-size: 10px;
-    opacity: 0.5;
+    left: -10px;
+    bottom: -7px;
+    z-index: 1;
+    background: #2c251c;
+    color: #e6d3ab;
+    border: 1px solid #b59a65;
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
   }
   .own-tile {
-    width: 88px;
-    height: 88px;
+    width: 106px;
+    height: 106px;
     padding: 0;
     border: 0;
-    border-radius: 3px;
+    border-radius: 2px;
     background: none;
     box-shadow:
-      0 4px #ac936a,
-      0 7px #746347,
-      0 12px 13px #0005;
-    transform: rotate(-5deg);
+      0 3px #8b7852,
+      0 6px #4c3c24,
+      0 9px 14px #0008;
+    touch-action: none;
     transition:
       transform 0.2s,
-      opacity 0.2s,
-      box-shadow 0.2s;
-    touch-action: none;
+      opacity 0.2s;
   }
   .own-tile:hover:not(:disabled),
   .own-tile.picked {
     background: none;
-    transform: translateY(-8px) rotate(0);
-    box-shadow:
-      0 4px #ac936a,
-      0 15px 20px #0006;
+    transform: translateY(-3px);
+    outline: 1px solid #e5cf8b;
+    outline-offset: 3px;
   }
   .own-tile.in-map,
   .own-tile.lifted {
-    opacity: 0.25;
-  }
-  .own-tile:disabled {
-    opacity: 0.65;
+    opacity: 0.4;
   }
   .own-tile svg {
     width: 100%;
@@ -1978,161 +2169,138 @@
   .rotating {
     transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
   }
-  .meeple-supply,
+  .placement-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 80px;
+  }
+  .placement-controls .rotate-main {
+    width: 62px;
+    height: 62px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 49px;
+    line-height: 1;
+    border-color: #b8a078;
+    color: #e4d8bd;
+  }
+  .rotate-caption {
+    font-size: 13px;
+  }
+  .confirm-row {
+    display: flex;
+    gap: 3px;
+    margin-top: 2px;
+  }
+  .confirm-row button {
+    width: 30px;
+    height: 29px;
+    padding: 0;
+    font-size: 20px;
+  }
+  .confirm-row .confirm {
+    background: #d4c08b;
+    color: #263221;
+  }
+  .placement-controls small {
+    width: 110px;
+    font-size: 10px;
+    text-align: center;
+    color: #e6b48a;
+  }
+  .meeple-supply {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    max-width: 280px;
+    padding-left: 16px;
+    border-left: 1px solid #b59a653b;
+  }
   .piece-group {
     display: flex;
     align-items: center;
-    gap: 2px;
-  }
-  .meeple-supply {
-    gap: 8px;
+    gap: 1px;
   }
   .piece-wrap {
     position: relative;
     display: inline-grid;
     place-items: center;
-    border-radius: 5px;
-  }
-  .piece-wrap:focus-visible {
-    outline: 2px solid #ffe09a;
-    outline-offset: 4px;
-  }
-  .piece-tooltip {
-    position: absolute;
-    bottom: calc(100% + 12px);
-    left: 50%;
-    z-index: 30;
-    width: 190px;
-    padding: 10px 12px;
-    border: 1px solid #d9b96c;
-    border-radius: 8px;
-    background: #f8e8bd;
-    color: #3f3828;
-    box-shadow: 0 10px 26px #1e30245c;
-    font-size: 11px;
-    line-height: 1.4;
-    text-align: left;
-    pointer-events: none;
-    opacity: 0;
-    transform: translate(-50%, 7px);
-    transition:
-      opacity 0.16s ease,
-      transform 0.16s ease;
-  }
-  .piece-tooltip::after {
-    content: '';
-    position: absolute;
-    left: calc(50% - 6px);
-    bottom: -7px;
-    width: 11px;
-    height: 11px;
-    background: #f8e8bd;
-    border-right: 1px solid #d9b96c;
-    border-bottom: 1px solid #d9b96c;
-    transform: rotate(45deg);
-  }
-  .piece-tooltip strong,
-  .piece-tooltip span {
-    display: block;
-  }
-  .piece-tooltip strong {
-    margin-bottom: 3px;
-    color: #765124;
-  }
-  .piece-wrap:hover .piece-tooltip,
-  .piece-wrap:focus .piece-tooltip,
-  .piece-wrap:focus-within .piece-tooltip {
-    opacity: 1;
-    transform: translate(-50%, 0);
   }
   .loose-meeple,
   .attachment {
+    width: 29px;
+    height: 41px;
     border: 0;
+    box-shadow: none;
     background: none;
     padding: 0;
-    width: 30px;
-    height: 43px;
     flex-shrink: 0;
     touch-action: none;
     transform: rotate(var(--lean, 0deg));
     transition:
       transform 0.2s,
       opacity 0.2s;
-    filter: drop-shadow(1px 4px 1px #0007);
+  }
+  .loose-meeple.large {
+    width: 34px;
+    height: 47px;
   }
   .loose-meeple svg,
   .attachment svg {
     width: 100%;
     height: 100%;
-  }
-  .loose-meeple.large {
-    width: 37px;
-    height: 49px;
+    overflow: visible;
   }
   .loose-meeple:hover:not([aria-disabled='true']),
   .loose-meeple.picked,
   .attachment.picked,
   .attachment:hover:not([aria-disabled='true']) {
     background: none;
-    transform: translateY(-10px) rotate(0);
-    filter: drop-shadow(1px 10px 3px #0005);
-  }
-  .loose-meeple[aria-disabled='true']:not(.used),
-  .attachment[aria-disabled='true'] {
-    opacity: 1;
+    transform: translateY(-7px);
   }
   .loose-meeple.used {
-    opacity: 0.13;
-    filter: none;
+    opacity: 0.15;
+  }
+  .piece-tooltip {
+    position: absolute;
+    bottom: calc(100% + 12px);
+    left: 50%;
+    z-index: 30;
+    width: 180px;
+    padding: 12px;
+    background: #e7d5ae;
+    border: 1px solid #a7874e;
+    color: #40321f;
+    box-shadow: 0 6px 20px #0005;
+    font-size: 11px;
+    line-height: 1.5;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateX(-50%);
+  }
+  .piece-tooltip strong,
+  .piece-tooltip span {
+    display: block;
+  }
+  .piece-wrap:hover .piece-tooltip,
+  .piece-wrap:focus-within .piece-tooltip {
+    opacity: 1;
+  }
+  .supply-toggle {
+    display: none;
   }
   .hand-actions {
-    position: absolute;
-    bottom: calc(100% + 20px);
-    left: 50%;
-    transform: translateX(-50%);
     display: flex;
-    gap: 8px;
-    white-space: nowrap;
+    flex-direction: column;
+    gap: 7px;
   }
   .hand-actions button {
-    font-size: 11px;
-    background: #21382dde;
-  }
-  .placement-controls {
-    position: absolute;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 4px;
-    animation: appear 0.18s ease-out;
-  }
-  .placement-controls button {
-    width: 37px;
-    height: 36px;
-    padding: 0;
-    font-size: 22px;
-    background: #243a30ed;
-    box-shadow: 0 3px 7px #0004;
-  }
-  .placement-controls .confirm {
-    background: #e1c38a;
-    color: #24392c;
-  }
-  .placement-controls .confirm:disabled {
-    opacity: 0.35;
-  }
-  .placement-controls .cancel {
-    width: 27px;
-    font-size: 19px;
-  }
-  .placement-controls small {
-    position: absolute;
-    top: 42px;
-    width: 200px;
-    left: 50%;
-    transform: translateX(-50%);
-    text-align: center;
-    color: #efc5a3;
-    font-size: 10px;
+    font-size: 12px;
+    min-width: 110px;
   }
   .drag-piece {
     position: fixed;
@@ -2144,8 +2312,8 @@
     filter: drop-shadow(4px 18px 8px #0006);
   }
   .drag-piece.drag-tile {
-    width: 90px;
-    height: 90px;
+    width: 106px;
+    height: 106px;
   }
   .drag-piece svg {
     width: 100%;
@@ -2154,81 +2322,76 @@
   .drag-piece.returning {
     transition:
       left 0.2s cubic-bezier(0.3, 0.8, 0.3, 1),
-      top 0.2s cubic-bezier(0.3, 0.8, 0.3, 1),
-      transform 0.2s;
+      top 0.2s cubic-bezier(0.3, 0.8, 0.3, 1);
     transform: translate(-50%, -50%);
   }
   .carrying {
     cursor: grabbing;
   }
   .ghost {
-    filter: drop-shadow(0 5px 3px #0005);
+    filter: drop-shadow(0 3px 2px #0006);
   }
   .landed .tile-surface {
     animation: land 0.3s ease-out;
     transform-origin: 50px 50px;
   }
-  .figure {
-    animation: land 0.3s ease-out;
-    transform-box: fill-box;
-    transform-origin: center;
-  }
   .region {
     cursor: pointer;
-    transition: stroke 0.2s;
-  }
-  .ferry-connection {
-    transition: opacity 0.2s;
   }
   .decision {
     position: absolute;
-    bottom: 185px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: max-content;
+    right: 24px;
+    bottom: 105px;
+    width: 250px;
     max-width: calc(100% - 40px);
-    text-align: center;
-    padding: 16px;
-    border-radius: 12px;
-    background: #21362feb;
-    box-shadow: 0 10px 35px #0002;
+    max-height: calc(100% - 190px);
+    overflow: auto;
+    padding: 20px;
+    box-sizing: border-box;
+    background: linear-gradient(120deg, #efdfb9, #d4ba88);
+    color: #3c301f;
+    border: 1px solid #b19762;
+    border-radius: 3px 10px 4px 8px;
+    box-shadow: 0 8px 30px #0006;
   }
   .decision h2 {
-    font-size: 15px;
+    font-size: 17px;
+    margin-bottom: 10px;
+  }
+  .decision p {
+    font-size: 12px;
+    line-height: 1.5;
     margin-bottom: 10px;
   }
   .choices {
     display: flex;
-    gap: 7px;
+    gap: 6px;
     flex-wrap: wrap;
-    justify-content: center;
-    max-width: 600px;
-    max-height: 180px;
-    overflow: auto;
   }
   .choices button {
     font-size: 11px;
+    background: #efe2c2;
+    color: #49361d;
+  }
+  .choices button:hover:not(:disabled) {
+    background: #fff1cd;
   }
   .inspection {
     position: absolute;
-    left: 22px;
-    bottom: 180px;
-    width: 220px;
-    background: #23382fee;
-    padding: 18px;
-    border: 1px solid #f1d5a329;
-    border-radius: 12px;
+    right: 24px;
+    top: 94px;
+    width: 236px;
+    box-sizing: border-box;
+    max-height: calc(100% - 320px);
+    overflow: auto;
+    background: linear-gradient(135deg, #eee0be, #d7bf91);
+    color: #443522;
+    padding: 22px;
+    border: 1px solid #ac8d55;
+    border-radius: 3px 9px 3px 8px;
+    box-shadow: 0 7px 25px #0005;
     font-size: 12px;
     line-height: 1.7;
-  }
-  .close {
-    position: absolute;
-    right: 12px;
-    top: 10px;
-    border: 0;
-    background: none;
-    padding: 4px 9px;
-    font-size: 23px;
   }
   .inspection h3 {
     margin: 0;
@@ -2236,9 +2399,19 @@
   .inspection p {
     margin: 5px 0;
   }
+  .close {
+    position: absolute;
+    right: 9px;
+    top: 7px;
+    border: 0;
+    background: none;
+    padding: 4px 9px;
+    font-size: 23px;
+    color: inherit;
+  }
   .receipts {
     position: absolute;
-    top: 24%;
+    top: 18%;
     left: 50%;
     transform: translateX(-50%);
     pointer-events: none;
@@ -2246,9 +2419,12 @@
   }
   .receipts > div {
     animation: receipt 2s both;
-    color: #f3d995;
-    font-size: 14px;
-    padding: 5px;
+    background: #252017e8;
+    border: 1px solid #b7985e;
+    color: #f0dca8;
+    padding: 10px 18px;
+    font-size: 16px;
+    margin: 5px;
   }
   .setup-panel,
   .finished {
@@ -2264,11 +2440,11 @@
       repeating-linear-gradient(0deg, transparent 0 5px, #78501d08 6px);
     color: #433923;
     border: 1px solid #f8e7bc;
-    border-radius: 18px;
+    border-radius: 5px 14px 5px 10px;
     padding: 30px;
     box-sizing: border-box;
     box-shadow:
-      0 22px 70px #172d205c,
+      0 22px 70px #20130780,
       inset 0 0 0 3px #9d743321;
   }
   .setup-panel {
@@ -2500,10 +2676,10 @@
       repeating-linear-gradient(0deg, transparent 0 5px, #78501d0a 6px);
     color: #433923;
     border: 1px solid #fff1c9;
-    border-radius: 18px;
+    border-radius: 5px 14px 5px 10px;
     padding: 28px;
     box-shadow:
-      0 25px 90px #15291e99,
+      0 25px 90px #100b0799,
       inset 0 0 0 3px #9d743321;
   }
   .guide-dialog,
@@ -2530,7 +2706,7 @@
   .settings-dialog::backdrop,
   .guide-dialog::backdrop,
   .overview-dialog::backdrop {
-    background: #183326b3;
+    background: #100d09b3;
     backdrop-filter: blur(5px);
   }
   .settings-grid {
@@ -3025,74 +3201,243 @@
       transform: scale(1.25) rotate(12deg);
     }
   }
-  @media (max-width: 600px) {
+  @media (max-width: 1100px) {
     .hand {
-      gap: 17px;
-    }
-    .hand {
-      bottom: 64px;
-    }
-    .own-tile {
-      width: 65px;
-      height: 65px;
-    }
-    .loose-meeple {
-      width: 23px;
-      height: 34px;
-    }
-    .loose-meeple.large {
-      width: 27px;
-      height: 39px;
+      max-width: calc(100% - 280px);
+      gap: 15px;
+      padding-inline: 18px;
     }
     .meeple-supply {
-      gap: 3px;
-      flex-wrap: wrap;
-      min-width: 0;
-      justify-content: center;
-    }
-    .piece-group {
-      gap: 0;
-    }
-    .attachment {
-      width: 23px;
-    }
-    .player {
-      font-size: 10px;
-      gap: 4px;
-    }
-    .player svg {
-      width: 20px;
-    }
-    .player span {
-      font-size: 14px;
+      max-width: 205px;
+      padding-left: 10px;
     }
     .turn-hint {
-      top: 145px;
-      max-width: 80%;
-      width: 80%;
-      font-size: 11px;
+      left: 270px;
+      gap: 10px;
+    }
+    .turn-line,
+    .turn-hint p {
+      padding-left: 12px;
+      font-size: 12px;
+    }
+    .table-title {
+      font-size: 25px;
+    }
+    .camera-hint {
+      max-width: 180px;
+      line-height: 1.5;
+    }
+  }
+  @media (max-width: 900px), (max-height: 540px) {
+    .table-header {
+      height: 52px;
+      padding: 0 12px;
+      gap: 8px;
+      border-radius: 0 0 9px 9px;
+    }
+    .table-title {
+      font-size: 21px;
+    }
+    .fleur {
+      font-size: 27px;
     }
     .corner-control {
-      top: 14px;
+      top: 9px;
+      width: 34px;
+      height: 34px;
+      padding: 7px;
     }
-    .settings-toggle {
-      right: 12px;
+    .corner-control svg {
+      width: 18px;
+      height: 18px;
     }
     .guide-toggle {
-      left: 12px;
+      right: 92px;
     }
     .overview-toggle {
-      left: 58px;
+      right: 51px;
+    }
+    .settings-toggle {
+      right: 10px;
+    }
+    .players {
+      top: 64px;
+      left: 10px;
+      width: calc(100% - 20px);
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      scrollbar-width: thin;
+      pointer-events: auto;
+    }
+    .player {
+      flex: 1 0 88px;
+      grid-template-columns: 23px 1fr;
+      grid-template-rows: 16px 20px;
+      column-gap: 6px;
+      padding: 6px 8px;
+      box-sizing: border-box;
+    }
+    .player .portrait-piece {
+      width: 25px;
+      height: 33px;
+    }
+    .player strong {
+      font-size: 11px;
+      max-width: 75px;
+    }
+    .player-score {
+      font-size: 18px;
+    }
+    .player-supply {
+      display: none;
+    }
+    .turn-hint {
+      top: 119px;
+      left: 15px;
+      right: 15px;
+      height: auto;
+      justify-content: center;
+      gap: 8px;
+    }
+    .turn-line,
+    .turn-hint p {
+      border: 0;
+      padding: 0;
+      font-size: 11px;
+    }
+    .turn-line {
+      max-width: 40%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .camera-hint {
+      display: none;
+    }
+    .camera-controls {
+      right: 10px;
+      bottom: 10px;
+      padding: 2px;
+    }
+    .camera-controls button,
+    .pan-menu summary {
+      width: 32px;
+      height: 32px;
+      font-size: 20px;
+    }
+    .hand {
+      bottom: 54px;
+      min-width: 270px;
+      max-width: calc(100% - 20px);
+      padding: 34px 15px 13px;
+      gap: 15px;
+    }
+    .tray-heading {
+      top: 9px;
+      left: 15px;
+      right: 15px;
+      font-size: 14px;
+    }
+    .tray-heading small {
+      font-size: 10px;
+    }
+    .own-tile {
+      width: 71px;
+      height: 71px;
+    }
+    .deck-count {
+      width: 21px;
+      height: 21px;
+      font-size: 10px;
+    }
+    .placement-controls {
+      min-width: 65px;
+    }
+    .placement-controls .rotate-main {
+      width: 43px;
+      height: 43px;
+      font-size: 34px;
+    }
+    .rotate-caption {
+      font-size: 11px;
+    }
+    .confirm-row button {
+      min-height: 34px;
+      width: 34px;
+    }
+    .supply-toggle {
+      display: block;
+      align-self: center;
+      font-size: 11px;
+      max-width: 90px;
+      padding: 10px 6px;
+    }
+    .meeple-supply {
+      display: none;
+    }
+    .supply-open .meeple-supply {
+      display: flex;
+      position: absolute;
+      bottom: calc(100% + 9px);
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 15px;
+      width: 265px;
+      max-width: calc(100vw - 55px);
+      background: #222019f5;
+      border: 1px solid #b4965f;
+      box-shadow: 0 7px 20px #0006;
+    }
+    .hand:has(.hand-actions) .meeple-supply {
+      display: flex;
+      padding: 0;
+      border: 0;
+      max-width: 195px;
+    }
+    .hand:has(.hand-actions) .tile-stack,
+    .hand:has(.hand-actions) .supply-toggle {
+      display: none;
+    }
+    .hand:has(.hand-actions) .meeple-supply {
+      position: static;
+      transform: none;
+      background: none;
+      box-shadow: none;
+      width: auto;
+    }
+    .loose-meeple {
+      width: 24px;
+      height: 35px;
+    }
+    .loose-meeple.large {
+      width: 29px;
+      height: 40px;
+    }
+    .hand-actions button {
+      font-size: 11px;
+      min-width: 85px;
+      padding: 10px 8px;
+    }
+    .decision {
+      bottom: 188px;
+      right: 10px;
+      width: min(310px, calc(100% - 20px));
+      max-height: calc(100% - 345px);
+      padding: 14px;
     }
     .inspection {
-      left: 12px;
-      bottom: 180px;
-      width: 180px;
+      top: 151px;
+      right: 10px;
+      width: 220px;
+      max-height: calc(100% - 340px);
+      padding: 17px;
     }
-    .setup-panel {
-      top: 54%;
+    .setup-panel,
+    .finished {
+      top: 55%;
       padding: 20px;
-      max-height: calc(100% - 126px);
+      max-height: calc(100% - 155px);
     }
     .modules,
     .guide-cards,
@@ -3104,9 +3449,6 @@
     }
     .player-chips button {
       flex: 1 1 42%;
-    }
-    .decision {
-      bottom: 170px;
     }
     .drag-piece.drag-tile {
       width: 72px;
@@ -3134,13 +3476,27 @@
       grid-template-columns: repeat(3, 1fr);
     }
     .piece-tooltip {
-      position: fixed;
-      left: 50%;
-      bottom: 142px;
-      width: min(250px, calc(100vw - 40px));
+      bottom: calc(100% + 8px);
+      width: 150px;
     }
-    .piece-tooltip::after {
-      display: none;
+  }
+  @media (max-height: 540px) and (min-width: 600px) {
+    .players {
+      width: 300px;
+    }
+    .turn-hint {
+      top: 70px;
+      left: 340px;
+    }
+    .hand {
+      left: 12px;
+      bottom: 12px;
+      transform: none;
+    }
+    .decision {
+      right: 12px;
+      bottom: 64px;
+      max-height: calc(100% - 155px);
     }
   }
   @media (prefers-reduced-motion: reduce) {

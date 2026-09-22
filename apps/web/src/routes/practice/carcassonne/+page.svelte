@@ -4,6 +4,7 @@
   import {
     practice,
     seats,
+    tableSeats,
     scenarios,
     type Scenario,
   } from '@board-games/carcassonne/practice';
@@ -18,9 +19,15 @@
     scenario = $state<Scenario>('short'),
     round = $state(0);
   let game = practice();
+  const visibleSeats = $derived(scenario === 'table' ? tableSeats : seats);
   let seat = $state(game.actor),
     view = $state(game.view(game.actor));
   onMount(() => {
+    const requested = new URLSearchParams(location.search).get('scenario');
+    if (scenarios.includes(requested as Scenario)) {
+      scenario = requested as Scenario;
+      reset();
+    }
     gameClients
       .carcassonne()
       .then((v) => (Board = v.default))
@@ -30,6 +37,7 @@
     ({
       short: m.carc_short,
       match: m.carc_match,
+      table: m.carc_table_scenario,
       builder: m.carc_builder,
       pig: m.carc_pig,
       flight: m.carc_flight,
@@ -56,7 +64,7 @@
         action.type === 'ready'
       ) {
         const version = view.public.setupVersion;
-        for (const player of seats)
+        for (const player of visibleSeats)
           game.send(player.id, { type: 'ready', version });
       } else game.send(seat, action);
       seat = game.actor;
@@ -73,7 +81,7 @@
   {#if error}<p role="alert">{error}</p>{/if}{#if Board}<Board
       {view}
       playerId={seat}
-      players={seats}
+      players={visibleSeats}
       {send}
       {round}
       locale={getLocale()}
@@ -107,7 +115,7 @@
   .practice {
     position: fixed;
     inset: 0;
-    background: #283a30;
+    background: #302014;
     color: #f1e5c9;
   }
   nav {
@@ -126,7 +134,7 @@
   select,
   button {
     font: inherit;
-    background: #33493a;
+    background: #34291e;
     color: #f1e5c9;
     border: 1px solid #e9dcb330;
     padding: 7px;

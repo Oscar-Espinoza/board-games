@@ -45,6 +45,15 @@ unfinished-feature behavior. Keep `/practice/carcassonne` fixtures out of room
 initialization and catalog metadata. See [ADR 012](docs/adr/012-carcassonne-table.md)
 and [Carcassonne rules](docs/games/carcassonne.md).
 
+Carcassonne's painted wooden table uses local WebP materials beneath real SVG
+tile regions, symbols and numbered wooden pieces. One affine camera controls
+drawing and inverse hit testing; never apply an independent CSS perspective.
+Keep the fixed desktop player column and tile tray separate from camera controls;
+compact layouts use a scrollable seat strip and expandable piece supply. Tile
+drops remain previews requiring confirmation. The six-seat painted practice
+fixture and artwork inventory stay isolated from multiplayer and eager metadata.
+See [ADR 024](docs/adr/024-carcassonne-painted-table.md).
+
 Azul, Codenames and Sushi Go Party own viewport tables with rules/settings corner
 controls. Preserve role-private Codenames keys and Sushi hands, picks and Menu
 offers in actual recipient payloads. Their practice fixtures stay separate from

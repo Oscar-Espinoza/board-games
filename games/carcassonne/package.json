@@ -6,6 +6,8 @@
   "exports": {
     "./server": "./src/index.ts",
     "./Board.svelte": "./src/Board.svelte",
+    "./TileArt.svelte": "./src/TileArt.svelte",
+    "./TileGallery.svelte": "./src/table/TileGallery.svelte",
     "./practice": "./src/practice.ts"
   },
   "dependencies": {

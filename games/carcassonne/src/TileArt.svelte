@@ -2,203 +2,327 @@
   import { tiles } from './tiles.js';
   import { cityPath, roadPath } from './art.js';
   let { id, rotation = 0 }: { id: string; rotation?: number } = $props();
+  const uid = $props.id();
   const tile = $derived(tiles[id]);
   const cities = $derived(tile.regions.filter((r) => r.kind === 'city'));
+  const roads = $derived(tile.regions.filter((r) => r.kind === 'road'));
+  const variation = $derived([...id].reduce((n, c) => n + c.charCodeAt(0), 0));
+  const art = '/games/carcassonne/';
 </script>
 
-<g transform={`rotate(${rotation * 90} 50 50)`}>
-  <rect
-    x="1"
-    y="1"
-    width="98"
-    height="98"
-    rx="2"
-    fill="#7f9c54"
-    stroke="#4d653b"
-    stroke-width="2"
-  />
-  <path
-    d="M4 22Q22 13 34 20M65 80Q77 73 94 82M8 65L16 61M80 15L91 11M30 88L37 84"
-    fill="none"
-    stroke="#a9b876"
-    stroke-width="1.5"
-    opacity=".65"
-  />
-  {#each tile.regions.filter((r) => r.kind === 'river') as r}
-    <path
-      d={roadPath(r)}
-      stroke="#e2cc93"
-      stroke-width="23"
-      fill="none"
-      stroke-linecap="round"
+<g transform={`rotate(${rotation * 90} 50 50)`} data-tile-art={id}>
+  <defs>
+    <clipPath id={`${uid}-edge`}
+      ><rect x=".6" y=".6" width="98.8" height="98.8" rx=".7" /></clipPath
+    >
+    <clipPath id={`${uid}-inside`}
+      ><rect x="2.5" y="2.5" width="95" height="95" /></clipPath
+    >
+    <pattern
+      id={`${uid}-town`}
+      width="100"
+      height="100"
+      patternUnits="userSpaceOnUse"
+    >
+      <image href={`${art}town.webp`} width="100" height="100" />
+    </pattern>
+    <pattern
+      id={`${uid}-earth`}
+      width="32"
+      height="32"
+      patternUnits="userSpaceOnUse"
+      ><image href={`${art}earth.webp`} width="32" height="32" /></pattern
+    >
+    <linearGradient id={`${uid}-water`} x2="1" y2="1">
+      <stop stop-color="#508985" /><stop
+        offset=".5"
+        stop-color="#78b7c9"
+      /><stop offset="1" stop-color="#487c8d" />
+    </linearGradient>
+    <linearGradient id={`${uid}-edge-light`} x2=".4" y2="1">
+      <stop stop-color="#fff4bc" stop-opacity=".5" /><stop
+        offset=".6"
+        stop-color="#302213"
+        stop-opacity="0"
+      /><stop offset="1" stop-color="#21170c" stop-opacity=".6" />
+    </linearGradient>
+  </defs>
+  <rect x=".5" y="1.5" width="99" height="100" rx="1" fill="#413321" />
+  <g clip-path={`url(#${uid}-edge)`}>
+    <image
+      href={`${art}meadow.webp`}
+      width="100"
+      height="100"
+      transform={`rotate(${(variation % 4) * 90} 50 50)`}
     />
-    <path
-      d={roadPath(r)}
-      stroke="#559fac"
-      stroke-width="17"
-      fill="none"
-      stroke-linecap="round"
-    />
-    <path d={roadPath(r)} stroke="#98c9ce" stroke-width="2" fill="none" />
-  {/each}
-  {#each cities as r}
-    <path d={cityPath(r)} fill="#b78861" stroke="#695647" stroke-width="5" />
-    <path
-      d={cityPath(r)}
-      fill="none"
-      stroke="#ead4a0"
-      stroke-width="3"
-      stroke-dasharray="5 3"
-    />
-    {#each r.ports as side}
-      <g transform={`rotate(${side * 90} 50 50)`}>
+    {#each tile.regions.filter((r) => r.kind === 'river') as r}
+      <path
+        d={roadPath(r)}
+        stroke="#405e35"
+        stroke-width="23"
+        fill="none"
+        stroke-linecap="round"
+      />
+      <path
+        d={roadPath(r)}
+        stroke="#c7b47b"
+        stroke-width="20"
+        fill="none"
+        stroke-linecap="round"
+      />
+      <path
+        d={roadPath(r)}
+        stroke={`url(#${uid}-water)`}
+        stroke-width="16"
+        fill="none"
+        stroke-linecap="round"
+      />
+      <path
+        d={roadPath(r)}
+        stroke="#d8ede0"
+        stroke-width=".6"
+        stroke-dasharray="5 3 2 9"
+        fill="none"
+        opacity=".75"
+      />
+      {#if tile.source || tile.lake}<ellipse
+          cx="50"
+          cy="50"
+          rx={tile.lake ? 23 : 12}
+          ry={tile.lake ? 18 : 11}
+          fill={`url(#${uid}-water)`}
+          stroke="#c7b47b"
+          stroke-width="2"
+        />{/if}
+    {/each}
+    {#each cities as r}
+      <path d={cityPath(r)} fill={`url(#${uid}-town)`} />
+      <g clip-path={`url(#${uid}-inside)`}>
         <path
-          d="M18 3v11h11V3M40 3v15h13V3M67 3v12h12V3"
-          fill="#dfc696"
-          stroke="#75644e"
-          stroke-width="1"
+          d={cityPath(r)}
+          fill="none"
+          stroke="#302b1d"
+          stroke-width="5.2"
+          opacity=".65"
+          transform="translate(.5 1.4)"
+        />
+        <path d={cityPath(r)} fill="none" stroke="#9d9277" stroke-width="4.2" />
+        <path d={cityPath(r)} fill="none" stroke="#ddd5b6" stroke-width="2.8" />
+        <path
+          d={cityPath(r)}
+          fill="none"
+          stroke="#796f57"
+          stroke-width="2.8"
+          stroke-dasharray=".5 2"
         />
         <path
-          d="M16 7l8 9 7-9M38 10l9 10 9-10M65 7l8 10 8-10"
-          fill="#aa5140"
-          stroke="#7d4334"
-          stroke-width="1"
+          d={cityPath(r)}
+          fill="none"
+          stroke="#f1e4ba"
+          stroke-width="1.2"
+          stroke-dasharray="1.5 1"
         />
       </g>
     {/each}
-    {#if r.shields}<path
-        d={`M${r.anchor[0] - 5},${r.anchor[1] - 7}h10v8l-5,5-5,-5Z`}
-        fill="#4274a1"
-        stroke="#fff0ba"
-        stroke-width="2"
-      />{/if}
-    {#if r.goods.some(Boolean)}<g transform={`translate(${r.anchor})`}
-        ><circle r="8" fill="#f3dfb2" stroke="#7d5539" /><text
-          y="4"
-          text-anchor="middle"
-          font-size="11"
-          fill="#453b2c">{r.goods[0] ? '♧' : r.goods[1] ? '♨' : '▧'}</text
-        ></g
-      >{/if}
-  {/each}
-  {#each tile.regions.filter((r) => r.kind === 'road') as r, i}
-    {#if i > 0 && tile.regions
-        .filter((r) => r.kind === 'road')
-        .some((v) => v.ports.length === 2) && r.ports.length === 2}<path
+    {#each roads as r, i}
+      {#if i > 0 && r.ports.length === 2 && roads.some((v) => v !== r && v.ports.length === 2)}
+        <path d={roadPath(r)} stroke="#342d20" stroke-width="11" fill="none" />
+      {/if}
+      <path
         d={roadPath(r)}
-        stroke="#67563d"
-        stroke-width="12"
+        stroke="#6e6c3b"
+        stroke-width="8"
+        stroke-opacity=".55"
         fill="none"
+      />
+      <path d={roadPath(r)} stroke="#b59f72" stroke-width="7" fill="none" />
+      <path
+        d={roadPath(r)}
+        stroke={`url(#${uid}-earth)`}
+        stroke-width="6"
+        fill="none"
+      />
+      <path
+        d={roadPath(r)}
+        stroke="#fff1c7"
+        stroke-width=".5"
+        stroke-dasharray="2 3 7 4"
+        fill="none"
+        opacity=".7"
+      />
+      {#if r.inn}<g
+          transform={`translate(${r.anchor[0] + 11} ${r.anchor[1] - 7})`}
+        >
+          <ellipse
+            rx="8"
+            ry="5"
+            fill="#6098a3"
+            stroke="#d1be8c"
+            stroke-width="1"
+          />
+          <image
+            href={`${art}abbey.webp`}
+            x="-9"
+            y="-15"
+            width="17"
+            height="17"
+          />
+        </g>{/if}
+    {/each}
+    {#if roads.some((r) => r.ports.length === 1) && !tile.ferry}
+      <circle
+        cx="50"
+        cy="50"
+        r="5.5"
+        fill={`url(#${uid}-earth)`}
+        stroke="#9b8b60"
+        stroke-width=".6"
+      />
+      <path
+        d="M47 51v-6h6v6z"
+        fill="#d1b88a"
+        stroke="#65533d"
+        stroke-width=".6"
+      />
+      <path d="M46 45l4-4 4 4z" fill="#aa5934" />
+    {/if}
+    {#if tile.regions.some((r) => r.kind === 'monastery')}
+      <image href={`${art}abbey.webp`} x="22" y="14" width="59" height="65" />
+    {/if}
+    {#if tile.regions.some((r) => r.cathedral)}
+      <image href={`${art}abbey.webp`} x="17" y="11" width="69" height="76" />
+      <path d="M42 68h16v10H42z" fill="#d7cbaa" stroke="#5f5443" /><path
+        d="M47 68v-8h6v8"
+        fill="#e7dcc2"
+      />
+    {/if}
+    {#if tile.regions.some((r) => r.kind === 'garden')}<g
+        transform="translate(62 66)"
+      >
+        <path
+          d="M-13-9h26v19h-26z"
+          fill="#b99762"
+          stroke="#efe1ac"
+          stroke-width="1.1"
+        />
+        {#each [-8, -3, 2, 7] as x}<path
+            d={`M${x} -6v13`}
+            stroke="#325936"
+            stroke-width="2.5"
+          />
+          {#each [-4, 1, 5] as y}<circle
+              cx={x}
+              cy={y}
+              r=".9"
+              fill={x % 2 ? '#dfa887' : '#c8bf74'}
+            />{/each}
+        {/each}
+      </g>{/if}
+    {#if tile.ferry}<path
+        d="M30 35Q48 24 66 37Q80 51 65 64Q48 74 31 62Q23 48 30 35Z"
+        fill={`url(#${uid}-water)`}
+        stroke="#d2bf8e"
+        stroke-width="2"
       />{/if}
-    <path d={roadPath(r)} stroke="#b2a179" stroke-width="8" fill="none" />
-    <path d={roadPath(r)} stroke="#eee0b9" stroke-width="5" fill="none" />
-    {#if r.inn}<g transform={`translate(${r.anchor[0] + 9} ${r.anchor[1] - 8})`}
-        ><ellipse rx="10" ry="6" fill="#78abb1" /><path
-          d="M-4,0V-7H4V0Z"
-          fill="#e4ce9d"
-        /><path d="M-6,-7L0,-12L6,-7Z" fill="#ac4f37" /></g
-      >{/if}
-  {/each}
-  {#if tile.regions.some((r) => r.kind === 'road' && r.ports.length === 1) && !tile.ferry}<circle
-      cx="50"
-      cy="50"
-      r="4"
-      fill="#b89970"
-      stroke="#826e4d"
-    />{/if}
-  {#if tile.regions.some((r) => r.kind === 'monastery')}
-    <g transform="translate(50 49)"
-      ><ellipse cy="12" rx="19" ry="5" fill="#385038" opacity=".25" /><path
-        d="M-15,10V-8H10V10Z"
-        fill="#efdfb0"
-        stroke="#806449"
-        stroke-width="1.5"
-      /><path d="M-19,-8L-3,-20L15,-8Z" fill="#9e4939" /><path
-        d="M7,10V-18H16V10Z"
-        fill="#e5d6a9"
-        stroke="#806449"
-      /><path d="M5,-18L12,-29L19,-18Z" fill="#ad5440" /><path
-        d="M-5,10V1Q0,-6 4,1V10"
-        fill="#63584c"
-      /></g
-    >
-  {/if}
-  {#if tile.regions.some((r) => r.cathedral)}<g transform="translate(50 53)"
-      ><path
-        d="M-22,19V-10H22V19ZM-24,-8V-28H-14V-8M14,-8V-28H24V-8"
-        fill="#ead9b6"
-        stroke="#675f53"
-        stroke-width="2"
-      /><path
-        d="M-25,-27L-19,-38L-13,-27M13,-27L19,-38L25,-27M-26,-10L0,-26L26,-10"
-        fill="#a24f3d"
-      /><circle cy="0" r="6" fill="#6a8b9b" /></g
-    >{/if}
-  {#if tile.regions.some((r) => r.kind === 'garden')}<g
-      transform="translate(64 67)"
-      ><path
-        d="M-10 0L0-6L10 0L0 6Z"
-        fill="#bc9474"
-        stroke="#e8d49a"
-      />{#each [-5, 0, 5] as x}<circle
-          cx={x}
-          cy="0"
-          r="2"
-          fill="#c99ba4"
-        />{/each}</g
-    >{/if}
-  {#if tile.ferry}<path
-      d="M30 35Q48 24 66 37Q80 51 65 64Q48 74 31 62Q23 48 30 35Z"
-      fill="#649faa"
-      stroke="#dccf9b"
-      stroke-width="3"
-    />{/if}
-  {#if tile.flight}<g transform="translate(38 35)"
-      ><path d="M-10 0H10M0-9V8" stroke="#dab57c" stroke-width="6" /><path
-        d={`M0 0L${tile.flight[0] * 15} ${tile.flight[1] * 15}`}
-        stroke="#623f2b"
-        stroke-width="2"
-      /><circle r="3" fill="#754d32" /></g
-    >{/if}
-  {#if tile.gold}<path
-      d="M12 79L22 74L33 79L23 85Z"
-      fill="#f8d261"
-      stroke="#b08935"
-      stroke-width="2"
-    />{/if}
-  {#if tile.magic}<path
-      d="M13 85L20 64L28 85Z"
-      fill="#795c96"
-      stroke="#e8d2a0"
-      stroke-width="2"
-    />{/if}
-  {#if tile.robber}<path
-      d="M14 72L26 72L23 77Q34 90 20 89Q7 90 17 77Z"
-      fill="#b27342"
-      stroke="#ecd4a0"
-      stroke-width="2"
-    />{/if}
-  {#if tile.crop}<g transform="translate(50 56)"
-      ><rect
-        x="-12"
-        y="-18"
-        width="24"
-        height="31"
-        rx="3"
-        fill="#d7b965"
-        stroke="#a28745"
-      /><text text-anchor="middle" y="4" font-size="20" fill="#8b763f"
-        >{tile.crop === 'field' ? '♧' : tile.crop === 'city' ? '♜' : '⌁'}</text
-      ></g
-    >{/if}
+    {#each cities.filter((r) => r.ports.length >= 3 || (r.ports.length === 2 && Math.abs(r.ports[0] - r.ports[1]) === 2)) as r}
+      {#if !r.cathedral}<image
+          href={`${art}keep.webp`}
+          x={r.anchor[0] - 19}
+          y={r.anchor[1] - 30}
+          width="38"
+          height="41"
+        />{/if}
+    {/each}
+    {#each cities as r}
+      {#each Array(r.shields) as _, i}<g
+          transform={`translate(${r.anchor[0] + i * 10 - (r.shields - 1) * 5} ${r.anchor[1]})`}
+        >
+          <path
+            d="M-4-7h8v10L0 7-4 3Z"
+            fill="#2c5983"
+            stroke="#e8cd84"
+            stroke-width="1"
+          />
+          <path d="M0-5v8M-2-1h4" stroke="#e5c56c" stroke-width="1" />
+        </g>{/each}
+      {#if r.goods.some(Boolean)}<g
+          transform={`translate(${r.anchor[0]} ${r.anchor[1] + 9})`}
+        >
+          <circle r="6" fill="#ead4a0" stroke="#79603e" stroke-width=".7" />
+          <text y="3" text-anchor="middle" font-size="8" fill="#574025"
+            >{r.goods[0] ? '♧' : r.goods[1] ? '♨' : '▧'}</text
+          >
+        </g>{/if}
+    {/each}
+    {#if tile.flight}<g transform="translate(38 35)">
+        <path d="M-9-7L9 7M-9 7L9-7" stroke="#765128" stroke-width="3" />
+        <path
+          d="M-8-6L-2-2M3 2L8 6M-8 6L-2 2M3-2L8-6"
+          stroke="#e2c996"
+          stroke-width="2"
+        />
+        <path
+          d={`M0 0L${tile.flight[0] * 16} ${tile.flight[1] * 16}`}
+          stroke="#392719"
+          stroke-width="1.8"
+        />
+        <circle r="2.5" fill="#d7b876" />
+      </g>{/if}
+    {#if tile.gold}<path
+        d="M12 79L22 74L33 79L23 85Z"
+        fill="#e8bd48"
+        stroke="#825b24"
+      /><path d="M12 79l11 3 10-3" fill="none" stroke="#ffe49a" />{/if}
+    {#if tile.magic}<path
+        d="M13 85L20 64L28 85Z"
+        fill="#6b4e81"
+        stroke="#e8d2a0"
+        stroke-width="1.2"
+      />{/if}
+    {#if tile.robber}<path
+        d="M14 72L26 72L23 77Q34 90 20 89Q7 90 17 77Z"
+        fill="#8b5833"
+        stroke="#e1c28e"
+        stroke-width="1.1"
+      />{/if}
+    {#if tile.crop}<g transform="translate(50 56)">
+        <rect
+          x="-12"
+          y="-18"
+          width="24"
+          height="31"
+          rx="2"
+          fill="#c6a454"
+          stroke="#e1c77c"
+        />
+        {#each [-9, -5, -1, 3, 7] as x}<path
+            d={`M${x} -15v25`}
+            stroke="#826c32"
+            stroke-width=".5"
+          />{/each}
+        <text
+          text-anchor="middle"
+          y="4"
+          font-size="20"
+          fill="#4e522a"
+          stroke="#e6cf88"
+          stroke-width=".4"
+          >{tile.crop === 'field'
+            ? '♧'
+            : tile.crop === 'city'
+              ? '♜'
+              : '⌁'}</text
+        >
+      </g>{/if}
+  </g>
   <rect
-    x="1.5"
-    y="1.5"
-    width="97"
-    height="97"
-    rx="2"
+    x=".7"
+    y=".7"
+    width="98.6"
+    height="98.6"
+    rx="1"
     fill="none"
-    stroke="#fff6c1"
-    stroke-opacity=".2"
+    stroke={`url(#${uid}-edge-light)`}
+    stroke-width="1.4"
   />
 </g>

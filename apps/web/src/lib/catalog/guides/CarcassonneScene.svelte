@@ -1,4 +1,5 @@
 <script lang="ts">
+  import TileArt from '@board-games/carcassonne/TileArt.svelte';
   import { m } from '@board-games/shared/messages';
   import type { Lesson } from '../types';
   let { lesson, step }: { lesson: Lesson; step: number } = $props();
@@ -13,7 +14,7 @@
   role="img"
   aria-label={`${lesson.title()}: ${lesson.frames[step]()}`}
 >
-  <rect width="520" height="270" rx="12" fill="#e8e2c5" />
+  <rect width="520" height="270" rx="12" fill="#2e2419" />
   {#if lesson.scene === 'markers' || lesson.scene === 'message'}
     {#each [0, 5, 10, 15, 20, 25] as n, i}<rect
         x={35 + i * 77}
@@ -24,7 +25,7 @@
         fill="#fff4d5"
         stroke="#bca679"
       /><text x={68 + i * 77} y="88">{n}</text>{/each}
-    <circle cx={step === 0 ? 145 : 222} cy="124" r="16" fill="#ac4833" /><text
+    <circle cx={step === 0 ? 145 : 222} cy="124" r="16" fill="#a93625" /><text
       x={step === 0 ? 145 : 222}
       y="131"
       class="piece-letter">A</text
@@ -47,47 +48,30 @@
     {#each ['road', 'city', 'ownership', 'builder', 'goods', 'magic', 'gold'].includes(lesson.scene) ? [3, 4, 5] : [0, 1, 2, 3, 4, 5, 6, 7, 8] as i}
       {@const x = 46 + (i % 3) * 70}{@const y = 22 + Math.floor(i / 3) * 70}
       <g opacity={i === 5 && step === 0 ? 0.3 : 1}>
-        <rect
-          {x}
-          {y}
-          width="68"
-          height="68"
-          rx="2"
-          fill={field ? '#9dab6e' : '#9eae79'}
-          stroke="#fff1d2"
-          stroke-width="2"
-        />
-        {#if city && [3, 4, 5].includes(i)}<path
-            d="M{x + 2} {y + 18}h64v39h-64Z"
-            fill="#bda477"
-            stroke="#765e49"
-            stroke-width="2"
-          /><path
-            d="M{x + 4} {y + 19}h10v-6h10v6h10v-6h10v6h10v-6h10"
-            fill="none"
-            stroke="#765e49"
-            stroke-width="3"
-          />{:else if lesson.scene === 'river'}<path
-            d="M{x + 34} {y}v68"
-            stroke="#659bb0"
-            stroke-width="16"
-          />{:else if !field}<path
-            d="M{x} {y + 34}h68"
-            stroke="#ead5a6"
-            stroke-width="12"
-          />{/if}
-        {#if city && i === 4}<path
-            d="M{x + 25} {y + 23}h18v17l-9 8-9-8Z"
-            fill="#f1d591"
-            stroke="#765e49"
-            stroke-width="2"
-          />{/if}
-        {#if (lesson.scene === 'monastery' && i === 4) || (field && [1, 6].includes(i))}<path
-            d="M{x + 19} {y + 49}V30l15-17 15 17v19Z"
-            fill="#e5cca0"
-            stroke="#87674f"
-            stroke-width="2"
-          /><path d="M{x + 15} {y + 31}l19-22 19 22" fill="#a0563c" />{/if}
+        <g transform={`translate(${x} ${y}) scale(.68)`}>
+          <TileArt
+            id={city && [3, 4, 5].includes(i)
+              ? i === 4
+                ? 'F'
+                : 'E'
+              : lesson.scene === 'river'
+                ? 'F2'
+                : lesson.scene === 'monastery' && i === 4
+                  ? 'B'
+                  : field
+                    ? 'B'
+                    : 'U'}
+            rotation={city
+              ? i === 3
+                ? 1
+                : i === 5
+                  ? 3
+                  : 0
+              : lesson.scene === 'river'
+                ? 0
+                : 1}
+          />
+        </g>
       </g>
     {/each}
     {#if lesson.scene === 'gold'}{#each [0, 1] as i}<path
@@ -119,8 +103,8 @@
       >
         <path
           d="M-8-8a11 11 0 1 1 16 0l17 12-7 10-11-6 5 26h-24l5-26-11 6-7-10Z"
-          fill="#ac4833"
-          stroke="#fff2d3"
+          fill="#a93625"
+          stroke="#79472b"
           stroke-width="2"
         /><text x="0" y="17" class="piece-letter">A</text>
       </g>
@@ -137,7 +121,9 @@
       font-size="14"
       >{[m.library_before, m.library_action, m.library_result][step]()}</text
     ><text x="397" y="104" class="value">{lesson.values[step]}</text>
-    <text x="394" y="230" font-size="14">Ada · {m.library_supply()}</text>
+    <text class="supply-label" x="394" y="230" font-size="14"
+      >Ada · {m.library_supply()}</text
+    >
   {/if}
 </svg>
 
@@ -156,6 +142,9 @@
   .value {
     font-size: 29px;
     font-weight: 750;
+  }
+  .supply-label {
+    fill: #ead9b7;
   }
   .piece-letter {
     fill: #fff3d5;

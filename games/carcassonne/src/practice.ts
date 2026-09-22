@@ -1,4 +1,5 @@
 /** Local practice only; never imported by multiplayer initialization. No bots. */
+import { placements } from './features.js';
 import { modules } from './tiles.js';
 import { createGame, applyAction, playerView, type State } from './index.js';
 export const seats = ['Rose', 'Azure', 'Amber'].map((name, i) => ({
@@ -15,6 +16,7 @@ export function seeded(seed: number) {
 export const scenarios = [
   'short',
   'match',
+  'table',
   'builder',
   'pig',
   'flight',
@@ -95,12 +97,73 @@ function scenarioState(scenario: Scenario): State {
   }
   return s;
 }
+// A reproducible developed landscape built exclusively through accepted actions.
+// This is a local review fixture, never a multiplayer initializer or bot policy.
+export const tableSeats = [
+  'Eleanor',
+  'Magnus',
+  'Clara',
+  'Rurik',
+  'Isolde',
+  'Hugo',
+].map((name, i) => ({ id: 'practice-' + i, name, connected: true }));
+function paintedTable(): State {
+  let s = createGame(tableSeats.map((p) => p.id));
+  s.config = { farmers: true, modules: ['abbot', 'inns', 'traders'], first: 0 };
+  const random = seeded(9222026);
+  for (const player of s.players)
+    s = applyAction(s, player, { type: 'ready', version: 0 }, random);
+  for (
+    let steps = 0;
+    steps < 400 && (Object.keys(s.board).length < 29 || s.phase !== 'place');
+    steps++
+  ) {
+    if (s.phase === 'place') {
+      const legal = placements(s.board, s.current!);
+      const cells = Object.values(s.board);
+      const cx = cells.reduce((sum, t) => sum + t.x, 0) / cells.length;
+      const cy = cells.reduce((sum, t) => sum + t.y, 0) / cells.length;
+      legal.sort(
+        (a, b) =>
+          (a.x - cx) ** 2 +
+          (a.y - cy) ** 2 * 3 -
+          ((b.x - cx) ** 2 + (b.y - cy) ** 2 * 3),
+      );
+      s = applyAction(
+        s,
+        s.players[s.active],
+        { type: 'place', turn: s.turn, ...legal[0] },
+        random,
+      );
+    } else if (s.pending) {
+      const prompt = s.pending;
+      const option =
+        prompt.options.find(
+          (o) =>
+            o.kind === 'deploy' &&
+            o.figure === 'meeple' &&
+            !o.target?.includes('/f'),
+        ) ??
+        prompt.options.find((o) => o.kind === 'skip') ??
+        prompt.options[0];
+      s = applyAction(
+        s,
+        prompt.actor,
+        { type: 'choose', prompt: prompt.id, choice: option.id },
+        random,
+      );
+    } else break;
+  }
+  return s;
+}
 export function practice(scenario: Scenario = 'short') {
   const short = scenario === 'short';
   let state =
-    scenario === 'short' || scenario === 'match'
-      ? createGame(seats.map((p) => p.id))
-      : scenarioState(scenario);
+    scenario === 'table'
+      ? paintedTable()
+      : scenario === 'short' || scenario === 'match'
+        ? createGame(seats.map((p) => p.id))
+        : scenarioState(scenario);
   if (short) state.config = { farmers: false, modules: [], first: 0 };
   const random = seeded(3109);
   return {

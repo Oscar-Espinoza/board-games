@@ -759,3 +759,55 @@ The passing workaround is explicitly an automation-environment limitation, not
 proof of normal Safari/JIT behavior. Native Safari, physical touch/audio and a
 human group playtest remain unverified. All agent-started development/test
 servers were stopped. Existing unrelated Azul changes were preserved.
+
+## Carcassonne painted table completion — September 22, 2026
+
+Completed the existing painted wooden table redesign. See
+[ADR 024](adr/024-carcassonne-painted-table.md). Desktop player plaques, the tile
+tray, brass controls, numbered wooden pieces, local artwork and typography now
+share the production renderer and affine camera. The 768px tablet uses the compact
+layout so its hand cannot cover the camera controls. Two-finger movement pans and
+zooms around its moving midpoint; cancelled gestures cannot select a placement.
+
+Verified:
+
+- `bun run check`: zero Svelte errors/warnings and a clean root TypeScript check.
+- `bun run test`: **330 tests across 27 files passed**. After the final camera
+  breakpoint change, all four focused camera/fixture tests passed again. These
+  cover inverse coordinates, anchored zoom and bounds, Fit framing, and the
+  deterministic six-seat fixture's legal neighboring edges.
+- `bun run build` passed after the presentation changes.
+- **All 28 Carcassonne browser checks passed**: fourteen cases in both Chromium
+  and WebKit. Coverage includes a complete short game, setup/reset, multiplayer
+  reconnect and stable tile identity, expansion choices, English/Spanish,
+  keyboard/touch/drag placement, invalid and cancelled drops, sound/mute/failure,
+  overview/feature inspection, camera anchoring, and six-seat responsive play.
+- All **18 catalog/library checks** also passed across both engines, including
+  every Carcassonne lesson and lazy imports. The first combined run passed 40
+  checks before its server exited; six remaining WebKit catalog checks reported
+  connection refused. A focused rerun of those six passed, for **46 successful
+  browser checks** across the two runs.
+- Responsive checks cover 1672×941, 1024×768, 768×1024, 390×844, 360×640 and
+  844×390, with disjoint hand/camera controls, Fit bounds and accepted placement
+  at every size. The inventory renders all **138 designs × four rotations** with
+  unique SVG references and successfully decoded local materials in both engines.
+- Changed source/docs pass Prettier and `git diff --check`. Repository-wide
+  `bun run format:check` reports three unrelated files:
+  `.impeccable/hook.cache.json`, `games/codenames/src/tokens.css`, and
+  `tests/e2e/sushi-prototype.spec.ts`. Those files were not reformatted.
+
+Durable screenshots and review notes are under
+[`artifacts/carcassonne-redesign/`](../artifacts/carcassonne-redesign/README.md).
+Desktop, tablet, phone placement and river/ferry inventory captures were visually
+reviewed. Reconnect tests compare actual tile IDs/rotations, since per-instance
+SVG gradient/clip IDs legitimately change after reloading. Browser validation
+used the existing `/tmp/little-secret-webkit` wrapper; no browser dependency or
+project configuration changed.
+
+All preview/test servers started for this work were stopped, and ports 3100,
+3101 and 3102 were checked for remaining listeners.
+
+Physical Safari/iOS, native two-finger device interaction, independent printed-tile
+geometry review and human group playtesting remain unverified. Existing Big Box
+rules limitations remain documented in the rules page. This is targeted
+Carcassonne/catalog browser validation, not a full-catalog gameplay sweep.
