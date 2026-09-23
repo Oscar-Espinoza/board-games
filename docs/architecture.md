@@ -14,7 +14,7 @@ The catalog runs on Bun workspaces, TypeScript, SvelteKit, Bun and Socket.IO. Bu
 | `games/azul`           | Standard-wall tile drafting, conservation, scoring and ceramic table                                        |
 | `games/codenames`      | Team/role consent, authoritative clues/turns, public history and private key table                          |
 | `games/sushi-go-party` | Simultaneous drafting, full standard menu, resumable effects and private hands                              |
-| `games/domino`         | Venezuelan pairs dominoes, cosmetic strike scatter and a CSS 3D patio table                                 |
+| `games/domino`         | Venezuelan pairs dominoes, cosmetic strike scatter and a three.js patio table                               |
 
 ## Authority and state delivery
 
@@ -178,8 +178,10 @@ results. See [ADR 023](adr/023-little-secret-table.md).
 ## Dominó
 
 Exactly four seats in fixed pairs. Rules, projection and the slam scatter live in
-`games/domino/src/index.ts`; the scatter is public, cosmetic, seeded by the server's
-random source and cleared by any player. Pure chain geometry (`layout.ts`) is kept
-apart from the realistic board so an 8-bit board can reuse it later. The local
+`games/domino/src/index.ts`. Each tile's resting pose is public, cosmetic state: a new
+tile plugs onto its neighbour wherever that neighbour lies, a slam jitters poses with
+the server's random source, and any player can tidy them. Pure chain geometry
+(`layout.ts`) is kept apart from the board so an 8-bit board can reuse it later. The
+board is the only game rendered with three.js, loaded lazily with the game client. The local
 practice route is pass-and-play and follows whoever is to move. See
 [Dominó](games/domino.md).

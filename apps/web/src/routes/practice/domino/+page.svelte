@@ -1,5 +1,6 @@
 <script lang="ts">
   import Rulebook from '$lib/catalog/Rulebook.svelte';
+  import Loading from '@board-games/domino/Loading.svelte';
   import { onMount, type Component } from 'svelte';
   import { gameClients } from '$lib/games';
   import { practice, seats } from '@board-games/domino/practice';
@@ -73,9 +74,10 @@
               ></label
             >
           </nav>{/snippet}
-      </Board>{/key}{:else if !error}<p class="loading">
-      {m.domino_loading()}
-    </p>{/if}
+      </Board>{/key}{:else if !error}<Loading
+      progress={0.05}
+      label={m.domino_loading()}
+    />{/if}
 </main>
 
 <style>
@@ -119,9 +121,5 @@
     padding: 10px 14px;
     color: #fff;
     background: #743f30;
-  }
-  .domino-practice > .loading {
-    background: none;
-    color: #f3e6cc;
   }
 </style>

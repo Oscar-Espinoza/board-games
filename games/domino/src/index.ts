@@ -1,5 +1,6 @@
 import { shuffle } from '@board-games/game-core';
 import type { GameDefinition } from '@board-games/game-core';
+import { idealPoses, plug, separate, type Pose } from './layout.js';
 
 /** Venezuelan pairs domino: double-six, four seats, partners opposite. */
 export const TARGET = 100;
@@ -16,7 +17,6 @@ export const pips = (id: number) => TILES[id].a + TILES[id].b;
 export type End = 'left' | 'right';
 /** A placed tile with its pips oriented left→right along the chain. */
 export type Link = { id: number; left: number; right: number; seq: number };
-export type Offset = { dx: number; dy: number; r: number };
 export type Team = 0 | 1;
 export const teamOf = (seat: number): Team => (seat % 2) as Team;
 export type Action =
@@ -51,7 +51,8 @@ export type State = {
   handNumber: number;
   teams: [string, string];
   scores: [number, number];
-  offsets: Record<number, Offset>;
+  /** Where each tile on the table actually rests; cosmetic only. */
+  poses: Record<number, Pose>;
   last: Last;
   result: Result | null;
   phase: 'playing' | 'scored' | 'finished';
@@ -71,7 +72,7 @@ function deal(s: State, random: () => number) {
     ids.slice(i * 7, i * 7 + 7).sort((x, y) => x - y),
   );
   s.chain = [];
-  s.offsets = {};
+  s.poses = {};
   s.passes = 0;
   s.last = null;
   s.result = null;
@@ -91,7 +92,7 @@ export function create(players: string[], random: () => number): State {
     handNumber: 1,
     teams: ['Nosotros', 'Ellos'],
     scores: [0, 0],
-    offsets: {},
+    poses: {},
     last: null,
     result: null,
     phase: 'playing',
@@ -196,7 +197,7 @@ export function validate(s: State, actor: string, input: unknown): Action {
   }
   return action;
 }
-/** A hard strike nudges nearby tiles; purely cosmetic and seeded by the server. */
+/** A hard strike shoves nearby tiles; cosmetic and seeded by the server. */
 function scatter(
   s: State,
   placed: number,
@@ -206,18 +207,35 @@ function scatter(
   if (force <= 0.55) return;
   const k = (force - 0.55) / 0.45;
   const at = s.chain.findIndex((l) => l.id === placed);
+  const home = idealPoses(s.chain);
+  const clamp = (v: number, c: number, m: number) =>
+    Math.max(c - m, Math.min(c + m, v));
   s.chain.forEach((link, i) => {
     const d = Math.abs(i - at);
     const reach = k * Math.exp(-d / 4) * (0.35 + random() * 0.65);
     const angle = random() * Math.PI * 2;
-    const prev = s.offsets[link.id] ?? { dx: 0, dy: 0, r: 0 };
-    const clamp = (v: number, m: number) => Math.max(-m, Math.min(m, v));
-    s.offsets[link.id] = {
-      dx: clamp(prev.dx + Math.cos(angle) * reach * 0.7, 1.4),
-      dy: clamp(prev.dy + Math.sin(angle) * reach * 0.7, 1.4),
-      r: clamp(prev.r + (random() - 0.5) * reach * 50, 35),
+    const p = s.poses[link.id];
+    const h = home[link.id];
+    s.poses[link.id] = {
+      x: clamp(p.x + Math.cos(angle) * reach * 0.7, h.x, 1.4),
+      y: clamp(p.y + Math.sin(angle) * reach * 0.7, h.y, 1.4),
+      angle: clamp(p.angle + (random() - 0.5) * reach * 50, h.angle, 35),
     };
   });
+  separate(s.poses);
+}
+/** The chain once `tileId` is attached at `end`; pips oriented along it. */
+export function attach(chain: Link[], tileId: number, end: End): Link[] {
+  const { a, b } = TILES[tileId];
+  const seq = chain.length;
+  const e = ends(chain);
+  if (!e) return [{ id: tileId, left: a, right: b, seq }];
+  if (end === 'left') {
+    const right = e.left;
+    return [{ id: tileId, left: a === right ? b : a, right, seq }, ...chain];
+  }
+  const left = e.right;
+  return [...chain, { id: tileId, left, right: a === left ? b : a, seq }];
 }
 function score(s: State, kind: Result['kind'], seat: number | null) {
   const counts = s.hands.map((h) => h.reduce((sum, id) => sum + pips(id), 0));
@@ -255,7 +273,7 @@ export function apply(
   const s = structuredClone(state);
   const seat = s.players.indexOf(actor);
   s.revision++;
-  if (action.type === 'ARRANGE') s.offsets = {};
+  if (action.type === 'ARRANGE') s.poses = idealPoses(s.chain);
   else if (action.type === 'RENAME_TEAM')
     s.teams[action.team] = action.name.trim();
   else if (action.type === 'NEXT_HAND') {
@@ -267,25 +285,9 @@ export function apply(
     s.last = { type: 'pass', seat };
     s.turn = (s.turn + 1) % 4;
   } else {
-    const { a, b } = TILES[action.tileId];
-    const seq = s.chain.length;
-    const e = ends(s.chain);
-    let end = action.end;
-    if (!e) {
-      end = 'right';
-      s.chain.push({ id: action.tileId, left: a, right: b, seq });
-    } else if (end === 'left') {
-      const right = e.left;
-      s.chain.unshift({
-        id: action.tileId,
-        left: a === right ? b : a,
-        right,
-        seq,
-      });
-    } else {
-      const left = e.right;
-      s.chain.push({ id: action.tileId, left, right: a === left ? b : a, seq });
-    }
+    const end = s.chain.length ? action.end : 'right';
+    s.chain = attach(s.chain, action.tileId, end);
+    s.poses[action.tileId] = plug(s.chain, s.poses, action.tileId);
     s.hands[seat] = s.hands[seat].filter((id) => id !== action.tileId);
     s.passes = 0;
     s.last = {

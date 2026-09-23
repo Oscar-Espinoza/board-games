@@ -7,13 +7,19 @@
     "./server": "./src/index.ts",
     "./Board.svelte": "./src/Board.svelte",
     "./practice": "./src/practice.ts",
-    "./layout": "./src/layout.ts"
+    "./layout": "./src/layout.ts",
+    "./preload": "./src/preload.ts",
+    "./Loading.svelte": "./src/Loading.svelte"
   },
   "dependencies": {
     "@board-games/game-core": "workspace:*",
-    "@board-games/shared": "workspace:*"
+    "@board-games/shared": "workspace:*",
+    "three": "^0.186.0"
   },
   "peerDependencies": {
     "svelte": "^5.29.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0"
   }
 }

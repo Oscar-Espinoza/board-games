@@ -7,5 +7,9 @@ export const gameClients = {
   uno: () => import('@board-games/uno/Board.svelte'),
   carcassonne: () => import('@board-games/carcassonne/Board.svelte'),
   catan: () => import('@board-games/catan/Board.svelte'),
-  domino: () => import('@board-games/domino/Board.svelte'),
+  domino: () => {
+    // The 3D table's code and art download alongside the board.
+    void import('@board-games/domino/preload').then((m) => m.preload());
+    return import('@board-games/domino/Board.svelte');
+  },
 };
