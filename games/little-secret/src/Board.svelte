@@ -2,9 +2,15 @@
   import { onMount, untrack, type Snippet } from 'svelte';
   import { m } from '@board-games/shared/messages';
   import type { View, Role, Power, Symbol, Event } from './types.js';
-  import Rulebook from './Rulebook.svelte';
   import Badge from './Badge.svelte';
-  import { eventGate } from './presentation.js';
+  import Paper from './table/Paper.svelte';
+  import PlayerToken from './table/PlayerToken.svelte';
+  import SideSheet from './table/SideSheet.svelte';
+  import Outcome from './table/Outcome.svelte';
+  import BallotReview from './table/BallotReview.svelte';
+  import { seatPosition } from './table/layout.js';
+  import { eventGate, readJson, write } from '@board-games/shared/ui';
+  import { prefersReducedMotion } from 'svelte/motion';
   import { soundEffects } from './effects.js';
   let {
     view,
@@ -18,6 +24,7 @@
     practice = false,
     canConfigure = false,
     settingsContent,
+    rulesContent,
     canRematch = false,
     rematch = async () => {},
     errorCode = null,
@@ -33,6 +40,7 @@
     practice?: boolean;
     canConfigure?: boolean;
     settingsContent?: Snippet;
+    rulesContent?: Snippet;
     canRematch?: boolean;
     rematch?: () => Promise<void>;
     errorCode?: string | null;
@@ -45,6 +53,8 @@
   const role = (id: Role) => m[`ls_${id}`]();
   const power = (id: Power) => m[`ls_${id}`]();
   const phaseLabel = $derived(m[`ls_${s.phase}`]());
+  let ballotReview = $state<Extract<Event, { type: 'ballots' }> | null>(null);
+  let clueText = $state('');
   let secret = $state(false),
     target = $state(''),
     symbol = $state<Symbol | ' '>(' '),
@@ -59,8 +69,8 @@
     opener: HTMLElement | null = null;
   let sound = $state(true),
     reduced = $state(false),
-    systemReduced = $state(false),
     mounted = $state(false);
+  const systemReduced = $derived(prefersReducedMotion.current);
   const audio = soundEffects(),
     animations = new Set<Animation>();
   function cancel() {
@@ -68,11 +78,29 @@
     animations.clear();
     audio.cancel();
   }
-  const gate = eventGate(cancel);
+  const gate = eventGate<Event>(cancel);
+  $effect(() => {
+    s.mission;
+    s.cycle;
+    s.speaker;
+    playerId;
+    clueText = '';
+  });
   const entitled = $derived(s.prompt?.actor === playerId);
   const choices = $derived(
     s.phase === 'tie' ? s.candidates : living.filter((p) => p !== playerId),
   );
+  const choosing = $derived(
+    !ballotReview &&
+      !disabled &&
+      !busy &&
+      ((s.phase === 'vote' &&
+        living.includes(playerId) &&
+        !s.committed.includes(playerId)) ||
+        (entitled &&
+          (s.prompt?.kind === 'sage' || s.prompt?.kind === 'revenant'))),
+  );
+  const bannerLabel = $derived(ballotReview ? m.ls_ballots() : phaseLabel);
   function gesture() {
     if (sound) void audio.unlock();
   }
@@ -100,12 +128,6 @@
     dialog.close();
     opener?.focus();
   }
-  function eventLabel(e: Event) {
-    if (e.type === 'elimination') return `${name(e.player)} · ${role(e.role)}`;
-    if (e.type === 'guess')
-      return `${name(e.player)} · ${e.correct ? m.ls_correct() : m.ls_incorrect()}`;
-    return e.type === 'score' ? m.ls_score_event() : m[`ls_${e.type}`]();
-  }
   $effect(() => {
     const version = s.setupVersion;
     untrack(() => {
@@ -117,6 +139,7 @@
     const identity = `${round}:${playerId}:${s.mission}`;
     untrack(() => {
       secret = false;
+      ballotReview = null;
       answer = '';
     });
   });
@@ -135,6 +158,7 @@
     untrack(() => {
       if (!online || code) {
         secret = false;
+        ballotReview = null;
         gate.reset();
       }
     });
@@ -147,6 +171,8 @@
     untrack(() => {
       const accepted = gate.consume(identity, sequence, events, online, s);
       if (!mounted || document.hidden) return;
+      const reveal = accepted.find((e) => e.type === 'ballots');
+      if (reveal?.type === 'ballots') ballotReview = reveal;
       if (accepted.length && !reduced && !systemReduced && root?.animate) {
         const a = root.animate([{ opacity: 0.82 }, { opacity: 1 }], {
           duration: 240,
@@ -167,39 +193,24 @@
   });
   $effect(() => {
     if (mounted) {
-      try {
-        localStorage.setItem(
-          'little-secret:preferences',
-          JSON.stringify({ sound, reduced }),
-        );
-      } catch {}
+      write('little-secret:preferences', { sound, reduced });
       if (!sound) audio.cancel();
     }
   });
   onMount(() => {
-    try {
-      const p = JSON.parse(
-        localStorage.getItem('little-secret:preferences') ?? '{}',
-      );
-      sound = p.sound !== false;
-      reduced = p.reduced === true;
-    } catch {}
-    const media = matchMedia('(prefers-reduced-motion: reduce)');
-    systemReduced = media.matches;
-    const change = () => {
-      systemReduced = media.matches;
-    };
+    const p = readJson('little-secret:preferences');
+    sound = p.sound !== false;
+    reduced = p.reduced === true;
     const hide = () => {
       secret = false;
+      ballotReview = null;
       gate.reset();
     };
-    media.addEventListener('change', change);
     document.addEventListener('visibilitychange', hide);
     mounted = true;
     return () => {
       cancel();
       audio.dispose();
-      media.removeEventListener('change', change);
       document.removeEventListener('visibilitychange', hide);
     };
   });
@@ -207,29 +218,46 @@
 
 <section
   class="ls-table"
+  class:result-stage={!!s.result && !ballotReview}
+  class:dense={players.length > 6}
   data-testid="little-secret-board"
   data-phase={s.phase}
   bind:this={root}
 >
-  <div class="corners">
-    <button onclick={(e) => open('rules', e.currentTarget)}
-      >{m.ls_rules()}</button
-    ><button
+  <nav class="corners" aria-label={m.ls_settings()}>
+    <button
+      onclick={(e) => open('rules', e.currentTarget)}
+      aria-label={m.ls_rules()}
+      >?<span class="sr-only">{m.ls_rules()}</span></button
+    >
+    <button
       aria-label={m.ls_settings()}
       onclick={(e) => open('settings', e.currentTarget)}>⚙</button
     >
-  </div>
-  <header>
+  </nav>
+  <header class="brand-note">
+    <h1 aria-label="Little Secret">
+      {#each ['LITTLE', 'SECRET'] as word}<span class="brand-line"
+          >{#each [...word] as letter, i}<b
+              style={`--letter-tilt:${[-7, 4, -2, 6, -4, 2][i]}deg`}>{letter}</b
+            >{/each}</span
+        >{/each}
+    </h1>
     <p>{practice ? m.ls_practice() : m.ls_briefing()}</p>
-    <h1>Little Secret</h1>
-    <span
-      >{m.ls_mission({ number: s.mission })} · {m.ls_score({
-        points: s.scores[playerId] ?? 0,
-      })}</span
-    >
   </header>
-  {#if !connected}<p class="notice" role="status">{m.ls_offline()}</p>{/if}
-  {#if localError}<p class="notice" role="alert">{localError}</p>{/if}
+  <div class="phase-banner">
+    <Paper kind="banner"
+      ><h2 aria-live="polite">{bannerLabel}</h2>
+      <span
+        >{m.ls_mission({ number: s.mission })} · {m.ls_table_cycle({
+          number: s.cycle || 1,
+        })}</span
+      ></Paper
+    >
+  </div>
+  {#if !connected || localError}<p class="notice" role="alert">
+      {!connected ? m.ls_offline() : localError}
+    </p>{/if}
   <div class="table-layout">
     <div class="seats" aria-label={m.ls_actor()}>
       {#each players as p, i}<article
@@ -237,277 +265,343 @@
           class:out={s.eliminated.includes(p.id)}
           class:active={s.speaker === p.id}
           class:own={p.id === playerId}
-          style={`--x:${50 + 43 * Math.cos((2 * Math.PI * i) / players.length - Math.PI / 2)}%;--y:${50 + 40 * Math.sin((2 * Math.PI * i) / players.length - Math.PI / 2)}%`}
+          class:selected={target === p.id && choosing}
+          class:winner={!!s.result &&
+            (s.result.winners.length
+              ? s.result.winners.includes(p.id)
+              : s.result.points[p.id] > 0)}
+          style={seatPosition(players.length, i)}
         >
           <div class="seat-top">
-            <span class="number">{i + 1}</span>{#if s.powers[p.id]}<Badge
-                power={s.powers[p.id]!}
+            {#if choosing && choices.includes(p.id)}<button
+                class="seat-choice"
+                aria-label={`${m.ls_choose()}: ${p.name}`}
+                aria-pressed={target === p.id}
+                onclick={() => {
+                  gesture();
+                  target = p.id;
+                }}
+                ><PlayerToken
+                  name={p.name}
+                  seat={i + 1}
+                  active={s.speaker === p.id || target === p.id}
+                  muted={s.eliminated.includes(p.id)}
+                /></button
+              >
+            {:else}<PlayerToken
+                name={p.name}
+                seat={i + 1}
+                active={s.speaker === p.id ||
+                  (!!s.result &&
+                    (s.result.winners.length
+                      ? s.result.winners.includes(p.id)
+                      : s.result.points[p.id] > 0))}
+                muted={s.eliminated.includes(p.id)}
               />{/if}
+            {#if s.powers[p.id]}<span
+                class="power-badge"
+                role="img"
+                aria-label={power(s.powers[p.id]!)}
+                title={power(s.powers[p.id]!)}
+                ><Badge power={s.powers[p.id]!} /></span
+              >{/if}
           </div>
-          <strong>{p.name}</strong><span
-            >{m.ls_score({ points: s.scores[p.id] ?? 0 })}</span
+          <div class="name-slip">
+            <Paper kind="slip"><strong title={p.name}>{p.name}</strong></Paper>
+          </div>
+          {#if s.clues[p.id] !== undefined}<div class="clue-slip">
+              <Paper kind="slip">
+                <!-- svelte-ignore a11y_no_noninteractive_tabindex (Long clue slips need keyboard scrolling without moving seats.) -->
+                <span
+                  class="clue-strip"
+                  tabindex="0"
+                  role="region"
+                  aria-label={`${p.name} · ${m.ls_clues()}`}
+                  >{s.powers[p.id] === 'mime'
+                    ? m.ls_table_mimed()
+                    : s.clues[p.id]}</span
+                ></Paper
+              >
+            </div>{/if}
+          <small class="seat-score"
+            >{m.ls_score({ points: s.scores[p.id] ?? 0 })}{p.id === playerId
+              ? ' ◆'
+              : ''}</small
           >
-          {#if s.powers[p.id]}<small>{power(s.powers[p.id]!)}</small>{/if}
-          {#if s.revealed[p.id]}<small
-              >{m.ls_eliminated()} · {role(s.revealed[p.id]!)}</small
+          {#if s.result || s.revealed[p.id]}<small class="role-stamp"
+              >{role(s.result?.roles[p.id] ?? s.revealed[p.id]!)}</small
             >{/if}
-          {#if !p.connected}<small>{m.ls_offline()}</small>{/if}
-          {#if s.speaker === p.id}<small>{m.ls_speaker()}</small>{/if}
+          {#if !p.connected}<small class="status-stamp">{m.ls_offline()}</small
+            >{/if}
           {#if (s.phase === 'setup' && s.ready.includes(p.id)) || (s.phase === 'vote' && s.committed.includes(p.id)) || (s.phase === 'tie' && s.rpsCommitted.includes(p.id)) || (s.phase === 'missionResult' && s.continued.includes(p.id))}<small
-              >✓ {m.ls_committed()}</small
+              class="commit-mark"
+              aria-label={m.ls_committed()}>✓</small
             >{/if}
         </article>{/each}
     </div>
-    <main class="action-area" aria-label={phaseLabel}>
-      <h2 aria-live="polite">{phaseLabel}</h2>
-      {#if s.phase === 'setup'}
-        <p>{m.ls_conversation()}</p>
-        <label
-          >{m.ls_language()}<select
-            aria-label={m.ls_language()}
-            bind:value={language}
-            disabled={!canConfigure || disabled}
-            ><option value="en">English</option><option value="es"
-              >Español</option
-            ></select
-          ></label
+    <main class="action-area" aria-label={bannerLabel}>
+      <Paper taped>
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex (Keyboard users must be able to scroll the bounded action panel.) -->
+        <div
+          class="action-scroll"
+          tabindex="0"
+          role="region"
+          aria-label={bannerLabel}
         >
-        <label class="check"
-          ><input
-            type="checkbox"
-            bind:checked={powers}
-            disabled={!canConfigure || disabled || players.length < 6}
-          />{m.ls_powers()}</label
-        >
-        {#if canConfigure}<button
-            disabled={disabled ||
-              busy ||
-              (language === s.options.wordLanguage &&
-                powers === s.options.powers)}
-            onclick={() =>
-              act({
-                type: 'configure',
-                version: s.setupVersion,
-                options: { wordLanguage: language, powers },
-              })}>{m.ls_save()}</button
-          >{/if}
-        <button
-          class="primary"
-          disabled={disabled ||
-            busy ||
-            s.ready.includes(playerId) ||
-            s.connectedPlayers.length !== s.players.length ||
-            language !== s.options.wordLanguage ||
-            powers !== s.options.powers}
-          onclick={() => act({ type: 'ready', version: s.setupVersion })}
-          >{m.ls_ready()}</button
-        >
-      {:else if s.phase === 'volunteer'}<p>{m.ls_uncertain()}</p>
-        <button
-          class="primary"
-          disabled={disabled || busy}
-          onclick={() => act({ type: 'volunteer', mission: s.mission })}
-          >{m.ls_volunteer_action()}</button
-        >
-      {:else if s.phase === 'clues'}<p>{name(s.speaker!)} · {m.ls_speaker()}</p>
-        {#if s.powers[playerId]}<p>
-            {m[`ls_${s.powers[playerId]!}_hint`]()}
-          </p>{/if}{#if s.speaker === playerId}<button
-            class="primary"
-            disabled={disabled || busy}
-            onclick={() =>
-              act({ type: 'clue', mission: s.mission, cycle: s.cycle })}
-            >{m.ls_clue_action()}</button
-          >{/if}
-      {:else if s.phase === 'debate'}<p>{m.ls_conversation()}</p>
-        {#if s.powers[playerId] === 'novice'}<p>
-            {m.ls_novice_hint()}
-          </p>{/if}{#if canConfigure}<button
-            class="primary"
-            disabled={disabled || busy}
-            onclick={() =>
-              act({ type: 'openVote', mission: s.mission, cycle: s.cycle })}
-            >{m.ls_open_vote()}</button
-          >{/if}
-      {:else if s.phase === 'vote' && living.includes(playerId) && !s.committed.includes(playerId)}
-        <label
-          >{m.ls_choose()}<select
-            aria-label={m.ls_choose()}
-            bind:value={target}
-            disabled={disabled || busy}
-            ><option value="">—</option>{#each choices as id}<option value={id}
-                >{name(id)}</option
-              >{/each}</select
-          ></label
-        ><button
-          class="primary"
-          disabled={disabled || busy || !target}
-          onclick={() => act({ type: 'vote', ballotId: s.ballotId, target })}
-          >{m.ls_confirm_vote()}</button
-        >
-      {:else if s.phase === 'tie' && !s.prompt && s.candidates.includes(playerId) && !s.rpsCommitted.includes(playerId)}
-        <div class="symbols">
-          {#each ['rock', 'paper', 'scissors'] as value}<button
-              aria-pressed={symbol === value}
-              disabled={disabled || busy}
-              onclick={() => {
-                gesture();
-                symbol = value as Symbol;
-              }}>{m[`ls_${value as Symbol}`]()}</button
-            >{/each}
-        </div>
-        <button
-          class="primary"
-          disabled={disabled || busy || symbol === ' '}
-          onclick={() => act({ type: 'rps', rpsId: s.rpsId, symbol })}
-          >{m.ls_confirm_rps()}</button
-        >
-      {:else if entitled && s.prompt?.kind === 'journalist'}
-        <p>{m.ls_guess_hint()}</p>
-        <form
-          onsubmit={(e) => {
-            e.preventDefault();
-            void act({ type: 'guess', promptId: s.prompt!.id, answer });
-          }}
-        >
-          <label
-            >{m.ls_answer()}<input
-              bind:value={answer}
-              maxlength="120"
-              autocomplete="off"
-              disabled={disabled || busy}
-            /></label
-          ><button class="primary" disabled={disabled || busy || !answer.trim()}
-            >{m.ls_confirm_guess()}</button
-          >
-        </form>
-      {:else if entitled && (s.prompt?.kind === 'sage' || s.prompt?.kind === 'revenant')}
-        <p>{m[`ls_${s.prompt.kind}_hint`]()}</p>
-        <label
-          >{m.ls_choose()}<select
-            aria-label={m.ls_choose()}
-            bind:value={target}
-            disabled={disabled || busy}
-            ><option value="">—</option>{#each choices as id}<option value={id}
-                >{name(id)}</option
-              >{/each}</select
-          ></label
-        ><button
-          class="primary"
-          disabled={disabled || busy || !target}
-          onclick={() =>
-            act({
-              type: s.prompt!.kind === 'sage' ? 'resolveTie' : 'revenant',
-              promptId: s.prompt!.id,
-              target,
-            })}>{m.ls_confirm_target()}</button
-        >{#if s.prompt.kind === 'revenant'}<button
-            disabled={disabled || busy}
-            onclick={() =>
-              act({ type: 'revenant', promptId: s.prompt!.id, target: null })}
-            >{m.ls_decline()}</button
-          >{/if}
-      {:else if s.result}
-        <p>{m[`ls_reason_${s.result.reason}`]()}</p>
-        <dl>
-          <dt>{m.ls_password()}</dt>
-          <dd>{s.result.password}</dd>
-          <dt>{m.ls_alternative()}</dt>
-          <dd>{s.result.alternative}</dd>
-        </dl>
-        <ul class="results">
-          {#each players as p}<li>
-              <strong>{p.name}</strong>
-              {role(s.result.roles[p.id]!)} · +{s.result.points[p.id]} → {s
-                .scores[p.id]}
-            </li>{/each}
-        </ul>
-        {#if s.result.winners.length}<p>
-            <strong
-              >{m.ls_winners()}: {s.result.winners.map(name).join(', ')}</strong
-            >
-          </p>
-          {#if canRematch}<button
-              class="primary"
-              disabled={disabled || busy}
-              onclick={() => rematch()}>{m.ls_rematch()}</button
-            >{/if}{:else}<button
-            class="primary"
-            disabled={disabled || busy || s.continued.includes(playerId)}
-            onclick={() => act({ type: 'continue', mission: s.mission })}
-            >{m.ls_continue()}</button
-          >{/if}
-      {:else}<p>{m.ls_wait()}</p>{/if}
-      {#if s.prompt && !entitled}<p>
-          {name(s.prompt.actor)} · {m.ls_wait()}
-        </p>{/if}
-
-      {#if s.phase !== 'setup' && !s.result}<aside class="envelope">
-          <button
-            aria-expanded={secret}
-            onclick={() => {
-              gesture();
-              secret = !secret;
-            }}
-            >{secret ? m.ls_conceal() : m.ls_reveal()}
-            <svg class="envelope-mark" viewBox="0 0 64 44" aria-hidden="true"
-              ><rect
-                x="2"
-                y="2"
-                width="60"
-                height="40"
-                rx="2"
-                fill="#f6e9ca"
-                stroke="#a38960"
-              /><path
-                d="M2 2l30 25L62 2M2 42l20-17m40 17L42 25"
-                fill="none"
-                stroke="#a38960"
-              /><circle cx="32" cy="27" r="9" fill="#823f3b" /><path
-                d="M26 27q6-8 12 0-6 8-12 0z"
-                fill="none"
-                stroke="#e1ba75"
-              /></svg
-            ></button
-          >{#if secret}<div data-testid="own-secret">
-              <h3>{m.ls_envelope()}</h3>
-              <strong class="password"
-                >{mine.role === 'journalist'
-                  ? m.ls_no_word()
-                  : mine.password}</strong
-              >{#if mine.solution}<h4>{m.ls_solution()}</h4>
-                <p>
-                  {m.ls_password()}: {mine.solution.password}<br
-                  />{m.ls_alternative()}: {mine.solution.alternative}
+          {#if ballotReview}<BallotReview
+              ballot={ballotReview}
+              {players}
+              close={() => (ballotReview = null)}
+            />{:else}
+            {#if s.phase === 'setup'}
+              <p>{m.ls_conversation()}</p>
+              <label
+                >{m.ls_language()}<select
+                  aria-label={m.ls_language()}
+                  bind:value={language}
+                  disabled={!canConfigure || disabled}
+                  ><option value="en">English</option><option value="es"
+                    >Español</option
+                  ></select
+                ></label
+              >
+              <label class="check"
+                ><input
+                  type="checkbox"
+                  bind:checked={powers}
+                  disabled={!canConfigure || disabled || players.length < 6}
+                />{m.ls_powers()}</label
+              >
+              {#if canConfigure}<button
+                  disabled={disabled ||
+                    busy ||
+                    (language === s.options.wordLanguage &&
+                      powers === s.options.powers)}
+                  onclick={() =>
+                    act({
+                      type: 'configure',
+                      version: s.setupVersion,
+                      options: { wordLanguage: language, powers },
+                    })}>{m.ls_save()}</button
+                >{/if}
+              <button
+                class="primary"
+                disabled={disabled ||
+                  busy ||
+                  s.ready.includes(playerId) ||
+                  s.connectedPlayers.length !== s.players.length ||
+                  language !== s.options.wordLanguage ||
+                  powers !== s.options.powers}
+                onclick={() => act({ type: 'ready', version: s.setupVersion })}
+                >{m.ls_ready()}</button
+              >
+            {:else if s.phase === 'volunteer'}<p>{m.ls_uncertain()}</p>
+              <button
+                class="primary"
+                disabled={disabled || busy}
+                onclick={() => act({ type: 'volunteer', mission: s.mission })}
+                >{m.ls_volunteer_action()}</button
+              >
+            {:else if s.phase === 'clues'}<p class="speaker-label">
+                <span>{m.ls_speaker()}</span><strong>{name(s.speaker!)}</strong>
+              </p>
+              {#if s.powers[playerId]}<p>
+                  {m[`ls_${s.powers[playerId]!}_hint`]()}
+                </p>{/if}{#if s.speaker === playerId}{#if s.powers[playerId] !== 'mime'}<input
+                    aria-label={m.ls_table_clue()}
+                    placeholder={m.ls_table_clue()}
+                    maxlength={80}
+                    bind:value={clueText}
+                    autocomplete="off"
+                    disabled={disabled || busy}
+                  />{/if}<button
+                  class="primary"
+                  disabled={disabled ||
+                    busy ||
+                    (s.powers[playerId] !== 'mime' && !clueText.trim())}
+                  onclick={() =>
+                    act({
+                      type: 'clue',
+                      text: clueText,
+                      mission: s.mission,
+                      cycle: s.cycle,
+                    })}>{m.ls_clue_action()}</button
+                >{/if}
+            {:else if s.phase === 'debate'}<p>{m.ls_conversation()}</p>
+              {#if s.powers[playerId] === 'novice'}<p>
+                  {m.ls_novice_hint()}
+                </p>{/if}{#if canConfigure}<button
+                  class="primary"
+                  disabled={disabled || busy}
+                  onclick={() =>
+                    act({
+                      type: 'openVote',
+                      mission: s.mission,
+                      cycle: s.cycle,
+                    })}>{m.ls_open_vote()}</button
+                >{/if}
+            {:else if s.phase === 'vote' && living.includes(playerId) && !s.committed.includes(playerId)}
+              <label
+                >{m.ls_choose()}<select
+                  aria-label={m.ls_choose()}
+                  bind:value={target}
+                  disabled={disabled || busy}
+                  ><option value="">—</option>{#each choices as id}<option
+                      value={id}>{name(id)}</option
+                    >{/each}</select
+                ></label
+              ><button
+                class="primary"
+                disabled={disabled || busy || !target}
+                onclick={() =>
+                  act({ type: 'vote', ballotId: s.ballotId, target })}
+                >{m.ls_confirm_vote()}</button
+              >
+            {:else if s.phase === 'tie' && !s.prompt && s.candidates.includes(playerId) && !s.rpsCommitted.includes(playerId)}
+              <div class="symbols">
+                {#each ['rock', 'paper', 'scissors'] as value}<button
+                    aria-pressed={symbol === value}
+                    disabled={disabled || busy}
+                    onclick={() => {
+                      gesture();
+                      symbol = value as Symbol;
+                    }}>{m[`ls_${value as Symbol}`]()}</button
+                  >{/each}
+              </div>
+              <button
+                class="primary"
+                disabled={disabled || busy || symbol === ' '}
+                onclick={() => act({ type: 'rps', rpsId: s.rpsId, symbol })}
+                >{m.ls_confirm_rps()}</button
+              >
+            {:else if entitled && s.prompt?.kind === 'journalist'}
+              <p>{m.ls_guess_hint()}</p>
+              <form
+                onsubmit={(e) => {
+                  e.preventDefault();
+                  void act({ type: 'guess', promptId: s.prompt!.id, answer });
+                }}
+              >
+                <label
+                  >{m.ls_answer()}<input
+                    bind:value={answer}
+                    maxlength="120"
+                    autocomplete="off"
+                    disabled={disabled || busy}
+                  /></label
+                ><button
+                  class="primary"
+                  disabled={disabled || busy || !answer.trim()}
+                  >{m.ls_confirm_guess()}</button
+                >
+              </form>
+            {:else if entitled && (s.prompt?.kind === 'sage' || s.prompt?.kind === 'revenant')}
+              <p>{m[`ls_${s.prompt.kind}_hint`]()}</p>
+              <label
+                >{m.ls_choose()}<select
+                  aria-label={m.ls_choose()}
+                  bind:value={target}
+                  disabled={disabled || busy}
+                  ><option value="">—</option>{#each choices as id}<option
+                      value={id}>{name(id)}</option
+                    >{/each}</select
+                ></label
+              ><button
+                class="primary"
+                disabled={disabled || busy || !target}
+                onclick={() =>
+                  act({
+                    type: s.prompt!.kind === 'sage' ? 'resolveTie' : 'revenant',
+                    promptId: s.prompt!.id,
+                    target,
+                  })}>{m.ls_confirm_target()}</button
+              >{#if s.prompt.kind === 'revenant'}<button
+                  disabled={disabled || busy}
+                  onclick={() =>
+                    act({
+                      type: 'revenant',
+                      promptId: s.prompt!.id,
+                      target: null,
+                    })}>{m.ls_decline()}</button
+                >{/if}
+            {:else if s.result}
+              <Outcome state={s} {players} />
+              {#if s.result.winners.length}<p>
+                  <strong
+                    >{m.ls_winners()}: {s.result.winners
+                      .map(name)
+                      .join(', ')}</strong
+                  >
                 </p>
-                <ul>
-                  {#each players as p}<li>
-                      {p.name}: {role(mine.solution.roles[p.id]!)}
-                    </li>{/each}
-                </ul>{/if}
-            </div>{/if}
-          <p>{m.ls_uncertain()}</p>
-        </aside>{/if}
+                {#if canRematch}<button
+                    class="primary"
+                    disabled={disabled || busy}
+                    onclick={() => rematch()}>{m.ls_rematch()}</button
+                  >{/if}{:else}<button
+                  class="primary"
+                  disabled={disabled || busy || s.continued.includes(playerId)}
+                  onclick={() => act({ type: 'continue', mission: s.mission })}
+                  >{m.ls_continue()}</button
+                >{/if}
+            {:else}<p>{m.ls_wait()}</p>{/if}
+            {#if s.prompt && !entitled}<p>
+                {name(s.prompt.actor)} · {m.ls_wait()}
+              </p>{/if}
+
+            {#if s.phase !== 'setup' && !s.result}<aside class="envelope">
+                <button
+                  aria-expanded={secret}
+                  onclick={() => {
+                    gesture();
+                    secret = !secret;
+                  }}
+                  >{secret ? m.ls_conceal() : m.ls_reveal()}
+                  <svg
+                    class="envelope-mark"
+                    viewBox="0 0 64 44"
+                    aria-hidden="true"
+                    ><rect
+                      x="2"
+                      y="2"
+                      width="60"
+                      height="40"
+                      rx="2"
+                      fill="#f6e9ca"
+                      stroke="#a38960"
+                    /><path
+                      d="M2 2l30 25L62 2M2 42l20-17m40 17L42 25"
+                      fill="none"
+                      stroke="#a38960"
+                    /><circle cx="32" cy="27" r="9" fill="#823f3b" /><path
+                      d="M26 27q6-8 12 0-6 8-12 0z"
+                      fill="none"
+                      stroke="#e1ba75"
+                    /></svg
+                  ></button
+                >{#if secret}<div data-testid="own-secret">
+                    <h3>{m.ls_envelope()}</h3>
+                    <strong class="password"
+                      >{mine.role === 'journalist'
+                        ? m.ls_no_word()
+                        : mine.password}</strong
+                    >{#if mine.solution}<h4>{m.ls_solution()}</h4>
+                      <p>
+                        {m.ls_password()}: {mine.solution.password}<br
+                        />{m.ls_alternative()}: {mine.solution.alternative}
+                      </p>
+                      <ul>
+                        {#each players as p}<li>
+                            {p.name}: {role(mine.solution.roles[p.id]!)}
+                          </li>{/each}
+                      </ul>{/if}
+                  </div>{/if}
+              </aside>{/if}
+          {/if}
+        </div>
+      </Paper>
     </main>
   </div>
-  {#if s.history.length}<details class="history">
-      <summary>{m.ls_history()}</summary>
-      <ol>
-        {#each s.history as e}<li>
-            {eventLabel(e)}{#if e.type === 'ballots'}<ul>
-                {#each Object.entries(e.ballots) as [v, t]}<li>
-                    {name(v)} → {name(t)}{s.powers[v] === 'dictator'
-                      ? ' ×2'
-                      : ''}
-                  </li>{/each}
-              </ul>{:else if e.type === 'rps'}<ul>
-                {#each Object.entries(e.choices) as [p, c]}<li>
-                    {name(p)}: {m[`ls_${c}`]()}
-                  </li>{/each}
-              </ul>{/if}
-          </li>{/each}
-      </ol>
-    </details>{/if}
+  <SideSheet state={s} {players} onreview={(event) => (ballotReview = event)} />
 </section>
 <dialog
   bind:this={dialog}
@@ -523,7 +617,7 @@
     </h2>
     <button onclick={close}>{m.ls_close()}</button>
   </div>
-  {#if panel === 'rules'}<Rulebook />{:else if panel === 'settings'}<div
+  {#if panel === 'rules'}{@render rulesContent?.()}{:else if panel === 'settings'}<div
       class="settings"
     >
       {@render settingsContent?.()}<label class="check"
@@ -539,376 +633,472 @@
 </dialog>
 
 <style>
+  @font-face {
+    font-family: 'Secret Hand';
+    src: url('/fonts/little-secret/kalam.woff2') format('woff2');
+    font-display: swap;
+  }
   :global(body:has(.ls-table) .site-header) {
     display: none;
   }
-  :global(body:has(.ls-table)) {
-    margin: 0;
-    background: #112b29;
-  }
   .ls-table {
-    min-height: 100dvh;
-    background: radial-gradient(ellipse at 50% 45%, #2a5149, #112b29 75%);
-    color: #f0e1c3;
-    padding: 16px clamp(12px, 3vw, 44px) 32px;
-    font-family: system-ui, sans-serif;
-    box-sizing: border-box;
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    isolation: isolate;
+    color: #f4e1b9;
+    background: #123b3a url('/games/little-secret/table.webp') center / cover;
+    font-family: Georgia, serif;
   }
   .corners {
+    position: absolute;
+    inset: 16px 20px auto;
     display: flex;
     justify-content: space-between;
-    gap: 10px;
+    z-index: 6;
+    pointer-events: none;
   }
   .corners button {
-    background: #17342f;
-    color: #f0e1c3;
-    border: 1px solid #b29b6d;
+    pointer-events: auto;
+    width: 46px;
+    height: 46px;
+    padding: 0;
+    border-radius: 50%;
+    background: #e2c58f;
+    color: #423223;
+    border: 3px double #88653c;
+    box-shadow: 0 3px 7px #071c1d88;
+    font:
+      25px Georgia,
+      serif;
   }
-  .ls-table header {
+  .brand-note {
+    position: absolute;
+    left: 2%;
+    top: 105px;
+    width: 12%;
+    transform: rotate(-7deg);
     text-align: center;
-    margin: 0 auto 16px;
   }
-  .ls-table header p {
-    font-size: 11px;
-    letter-spacing: 0.18em;
+  h1 {
+    margin: 0;
+    font:
+      bold clamp(20px, 2.2vw, 34px) Georgia,
+      serif;
   }
-  .ls-table h1 {
-    font-family: Georgia, serif;
-    font-size: clamp(36px, 5vw, 64px);
-    margin: 4px 0;
+  .brand-line {
+    display: flex;
+    justify-content: center;
+    margin: 5px 0;
+    gap: 2px;
   }
-  .ls-table header span {
-    font-size: 13px;
-    color: #d4c198;
+  .brand-line b {
+    display: inline-block;
+    padding: 2px;
+    color: #2d2b23;
+    background: #e9d6b3;
+    transform: rotate(var(--letter-tilt));
+    box-shadow: 1px 3px 3px #091e1c77;
+  }
+  .brand-line b:nth-child(3n) {
+    background: #903c31;
+    color: #f3ddb0;
+  }
+  .brand-note p {
+    font:
+      14px 'Secret Hand',
+      cursive;
+    color: #f8e4c0;
+    text-shadow: 0 1px 4px #000;
+  }
+  .phase-banner {
+    position: absolute;
+    top: 22px;
+    left: 44%;
+    transform: translateX(-50%) rotate(-1deg);
+    min-width: 250px;
+    max-width: 48%;
+    text-align: center;
+  }
+  .phase-banner h2 {
+    margin: 0 0 4px;
+    font:
+      26px 'Secret Hand',
+      cursive;
+  }
+  .phase-banner span {
+    font-size: 12px;
   }
   .table-layout {
-    position: relative;
-    max-width: 1250px;
-    margin: auto;
-    min-height: 780px;
-    padding: 140px 0;
-    box-sizing: border-box;
-    display: grid;
-    place-items: center;
+    position: absolute;
+    inset: 112px 27% 40px 14%;
   }
   .seats {
     position: absolute;
     inset: 0;
-    pointer-events: none;
   }
   .seat {
     position: absolute;
     left: var(--x);
     top: var(--y);
+    width: clamp(96px, 9vw, 130px);
     transform: translate(-50%, -50%);
-    width: 142px;
-    min-height: 100px;
-    padding: 10px;
-    border: 1px solid #7b8d73;
-    border-radius: 8px;
-    background: #183b34;
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    overflow-wrap: anywhere;
-    box-sizing: border-box;
+    align-items: center;
+    gap: 5px;
+    text-align: center;
+    --token-size: clamp(48px, 8.5vh, 82px);
+  }
+  .dense .seat {
+    --token-size: clamp(42px, 6.5vh, 64px);
   }
   .seat-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    position: relative;
   }
-  .seat .number {
-    color: #d8b974;
+  .seat-choice {
+    display: block;
+    padding: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+  }
+  .seat-choice:hover:enabled {
+    background: transparent;
+  }
+  .power-badge {
+    position: absolute;
+    bottom: -4px;
+    right: -19px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #f0dcad;
+    box-shadow: 1px 2px 4px #071c1d88;
+  }
+  .power-badge :global(svg) {
+    width: 100%;
+    height: 100%;
+  }
+  .name-slip {
+    width: 100%;
+    margin-top: 4px;
+    transform: rotate(-2deg);
+  }
+  .name-slip strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font:
-      italic 22px Georgia,
-      serif;
+      18px/1.25 'Secret Hand',
+      cursive;
   }
-  .seat strong {
-    font-size: 14px;
+  .clue-slip {
+    width: 100%;
+    transform: rotate(2deg);
   }
-  .seat span,
-  .seat small {
+  .clue-strip {
+    display: block;
+    max-height: 2.5em;
+    overflow: auto;
+    scrollbar-width: thin;
+    overflow-wrap: anywhere;
+    font:
+      14px/1.25 'Secret Hand',
+      cursive;
+  }
+  .seat-score {
     font-size: 12px;
+    text-shadow: 0 1px 3px #000;
   }
-  .seat.out {
-    background: #283631;
-    border-color: #6d7062;
+  .role-stamp,
+  .status-stamp {
+    font:
+      12px 'Secret Hand',
+      cursive;
+    background: #edd5a7;
+    color: #7f3128;
+    padding: 2px 6px;
   }
-  .seat.own {
-    border: 2px solid #d7b570;
+  .out .name-slip {
+    opacity: 0.7;
   }
-  .seat.active {
-    box-shadow: 0 0 0 3px #d7b570;
+  .commit-mark {
+    position: absolute;
+    top: -6px;
+    left: 4px;
+    display: grid;
+    place-items: center;
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    background: #e9d8aa;
+    color: #305a43;
   }
   .action-area {
-    z-index: 1;
-    width: min(390px, 100%);
-    box-sizing: border-box;
-    padding: 24px;
-    background: #f1e4c7;
-    color: #352c24;
-    border: 1px solid #cfb586;
-    border-radius: 4px;
-    box-shadow: 0 14px 40px #061f2677;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(48%, 370px);
   }
-  .action-area h2 {
-    font:
-      24px Georgia,
-      serif;
-    margin: 0 0 14px;
+  .action-scroll {
+    max-height: calc((100dvh - 152px) * 0.42 - 48px);
+    overflow: auto;
+    scrollbar-width: thin;
+    padding: 2px 4px;
+    overflow-wrap: anywhere;
   }
   .action-area p {
     font-size: 14px;
-    line-height: 1.55;
+    line-height: 1.5;
+    margin: 0 0 12px;
   }
-  .action-area button {
+  .action-area label {
+    margin-bottom: 12px;
+  }
+  .action-area input:not([type='checkbox']),
+  .action-area select {
     width: 100%;
-    margin-top: 10px;
+    margin-bottom: 8px;
   }
-  .action-area form {
-    display: grid;
-    gap: 8px;
-  }
-  .ls-table button,
-  dialog button {
-    font: inherit;
-    font-size: 14px;
+  button {
     min-height: 44px;
-    padding: 10px 14px;
-    border-radius: 5px;
-    border: 1px solid #b5a17b;
-    background: #e0cfaa;
-    color: #352c24;
-    cursor: pointer;
+    border: 1px solid #9c784d;
+    border-radius: 3px;
+    background: #dcc192;
+    color: #38291f;
+    font-family: 'Secret Hand', cursive;
   }
-  .ls-table button:disabled,
-  dialog button:disabled {
-    opacity: 0.5;
-    cursor: default;
+  button:hover:enabled {
+    background: #ecd4a9;
   }
-  .ls-table button.primary {
-    background: #753c39;
-    color: #fff4df;
-    border-color: #753c39;
-    font-weight: 600;
-  }
-  .ls-table button[aria-pressed='true'] {
-    background: #32544b;
-    color: #fff4df;
-  }
-  .ls-table label,
-  dialog label {
-    display: grid;
-    gap: 8px;
-    font-size: 14px;
-    margin: 10px 0;
-  }
-  .ls-table select,
-  .ls-table input,
-  dialog input {
-    min-height: 44px;
-    font: inherit;
-    color: #352c24;
-    background: #fff7e5;
-    border: 1px solid #9f8c6c;
-    border-radius: 4px;
-    padding: 8px;
+  button.primary {
     width: 100%;
-    box-sizing: border-box;
+    background: #983d31;
+    color: #fff0d0;
+    margin: 6px 0;
+    border-color: #713128;
   }
-  .ls-table .check,
-  dialog .check {
+  button.primary:hover:enabled {
+    background: #ac4939;
+  }
+  .speaker-label span,
+  .speaker-label strong {
+    display: block;
+  }
+  .speaker-label strong {
+    font:
+      26px 'Secret Hand',
+      cursive;
+  }
+  .check {
     display: flex;
     align-items: center;
     gap: 10px;
   }
   .check input {
-    width: 22px;
-    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    flex: none;
+    accent-color: #923e30;
   }
   .symbols {
     display: flex;
-    gap: 5px;
+    flex-wrap: wrap;
+    gap: 6px;
   }
-  .ls-table :is(button, input, select, summary):focus-visible,
-  dialog :is(button, input, select, summary):focus-visible {
-    outline: 3px solid #c98836;
-    outline-offset: 3px;
+  .symbols button {
+    flex: 1;
+    padding: 8px;
+  }
+  .symbols button[aria-pressed='true'] {
+    background: #983d31;
+    color: #fff0d0;
   }
   .envelope {
-    max-width: 560px;
-    margin: 20px auto 0;
-    border-top: 1px solid #bca681;
-    padding-top: 8px;
-    text-align: center;
-  }
-  .envelope-mark {
-    width: 50px;
-    height: 34px;
-    vertical-align: middle;
-    margin-left: 8px;
+    margin-top: 15px;
+    padding-top: 12px;
+    border-top: 1px dashed #a2875b;
   }
   .envelope > button {
-    background: #edddba;
-    min-width: 230px;
-  }
-  .envelope p {
-    font-size: 13px;
-    line-height: 1.6;
-    color: #5d4b36;
-  }
-  .envelope > div {
-    background: #ecdfc3;
-    color: #352c24;
-    padding: 22px;
-    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
     text-align: left;
+    gap: 12px;
+    padding: 6px 10px;
   }
-  .envelope > div p {
-    color: inherit;
+  .envelope-mark {
+    flex: none;
+    width: 48px;
+    height: 34px;
   }
   .envelope h3 {
     font:
-      18px Georgia,
-      serif;
+      22px 'Secret Hand',
+      cursive;
+    margin: 12px 0 6px;
   }
   .password {
+    display: block;
     font:
-      24px Georgia,
-      serif;
-    overflow-wrap: anywhere;
+      26px 'Secret Hand',
+      cursive;
+    color: #923e30;
   }
-  .history {
-    max-width: 680px;
-    margin: 24px auto;
+  .envelope ul {
+    padding-left: 20px;
     font-size: 13px;
-    line-height: 1.7;
   }
-  .history summary {
-    min-height: 44px;
-    cursor: pointer;
+  .ls-table > :global(.side-sheet) {
+    position: absolute;
+    width: 22%;
+    right: 2.5%;
+    top: 50%;
+    transform: translateY(-50%) rotate(2deg);
   }
   .notice {
-    padding: 12px;
-    border: 1px solid #d7b570;
-  }
-  .results {
-    padding-left: 16px;
+    position: absolute;
+    z-index: 7;
+    top: 80px;
+    left: 25%;
+    right: 25%;
+    padding: 8px 12px;
+    margin: 0;
+    background: #812f29;
+    color: #fff2d9;
+    text-align: center;
     font-size: 13px;
-    line-height: 1.8;
-  }
-  .action-area dt {
-    font-size: 12px;
-  }
-  .action-area dd {
-    font-weight: 700;
-    margin: 3px 0 10px;
   }
   dialog {
-    width: min(880px, 92vw);
-    max-height: 85dvh;
-    box-sizing: border-box;
-    background: #f1e4c7;
-    color: #352c24;
-    border: 1px solid #b39b6d;
-    border-radius: 10px;
+    width: min(680px, calc(100% - 24px));
+    max-height: calc(100dvh - 32px);
     padding: 24px;
+    border: 2px solid #967446;
+    border-radius: 4px;
+    background: #f4e7cc;
+    color: #342a24;
+    box-shadow: 0 18px 70px #0008;
   }
   dialog::backdrop {
-    background: #081c20bf;
+    background: #061d20bb;
   }
   .dialog-head {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
+    margin-bottom: 18px;
   }
   .dialog-head h2 {
     font:
-      24px Georgia,
-      serif;
+      28px 'Secret Hand',
+      cursive;
+    margin: 0;
   }
   .settings {
     display: grid;
-    gap: 12px;
+    gap: 16px;
   }
-  @media (max-width: 900px) {
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  .action-scroll:focus-visible,
+  .clue-strip:focus-visible {
+    outline: 3px solid #c28639;
+    outline-offset: 3px;
+  }
+  @media (max-width: 1099px), (max-height: 699px) {
+    .ls-table {
+      overflow-y: auto;
+      background: radial-gradient(ellipse at top, #245653, #0c292b);
+      padding: 78px 16px 32px;
+    }
+    .corners {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+    }
+    .brand-note {
+      position: static;
+      width: auto;
+      transform: none;
+      margin: 0 auto 20px;
+    }
+    .brand-note h1 {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      font-size: 25px;
+    }
+    .brand-note p {
+      margin: 6px 0;
+    }
+    .phase-banner {
+      position: static;
+      transform: none;
+      width: min(100%, 650px);
+      max-width: none;
+      min-width: 0;
+      margin: 0 auto 28px;
+    }
+    .phase-banner h2 {
+      font-size: 25px;
+    }
     .table-layout {
+      position: static;
       display: flex;
       flex-direction: column;
-      gap: 20px;
-      min-height: 0;
-      padding: 0;
+      gap: 32px;
+      max-width: 650px;
+      margin: auto;
+    }
+    .action-area {
+      position: static;
+      transform: none;
+      order: -1;
+      width: 100%;
+    }
+    .action-scroll {
+      max-height: none;
+      overflow: visible;
     }
     .seats {
       position: static;
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
-      width: 100%;
-      max-width: 660px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 30px 18px;
+      padding: 6px 6px 32px;
     }
-    .seat {
+    .seat,
+    .dense .seat {
+      position: relative;
+      inset: auto;
+      transform: none;
+      width: 100%;
+      --token-size: 70px;
+    }
+    .name-slip,
+    .clue-slip {
+      max-width: 170px;
+    }
+    .ls-table > :global(.side-sheet) {
       position: static;
       transform: none;
-      width: auto;
-      min-height: 105px;
-      padding: 8px;
+      width: 100%;
+      margin: 0 auto;
     }
-    .action-area {
-      width: min(560px, 100%);
-    }
-    .ls-table {
-      padding: 12px;
-    }
-    .ls-table header {
-      margin: 16px 0;
-    }
-    .ls-table header p {
-      letter-spacing: 0.08em;
-    }
-    .ls-table h1 {
-      font-size: 40px;
-    }
-    .seat strong {
-      font-size: 13px;
-    }
-    .seat small {
-      font-size: 11px;
-    }
-    .action-area {
-      padding: 20px;
-    }
-    .ls-table {
-      height: calc(100dvh - 76px);
-      min-height: 0;
-      overflow: auto;
-      margin-bottom: 76px;
-    }
-    .ls-table button.primary {
-      position: fixed;
-      bottom: 12px;
-      left: 12px;
-      width: calc(100% - 24px);
-      margin: 0;
-      z-index: 5;
-      box-shadow: 0 0 0 12px #112b29;
-    }
-
-    .envelope {
-      margin-top: 20px;
+    .notice {
+      position: sticky;
+      top: 0;
+      margin-bottom: 16px;
     }
     dialog {
-      padding: 16px;
-    }
-    .dialog-head h2 {
-      font-size: 20px;
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    * {
-      scroll-behavior: auto;
+      padding: 18px;
     }
   }
 </style>

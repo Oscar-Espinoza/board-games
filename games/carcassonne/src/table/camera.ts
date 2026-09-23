@@ -2,7 +2,7 @@ export type Point = { x: number; y: number };
 export type Camera = Point & { scale: number };
 // One affine ground plane drives drawing, hit testing, panning and focus.
 // An orthographic view avoids shrinking distant tiles and fragile CSS 3D hits.
-export const ground = { a: 1, b: 0.16, c: -0.23, d: 0.82 };
+export const ground = { a: 1, b: 0.05, c: -0.13, d: 0.74 };
 export const groundMatrix = `matrix(${ground.a} ${ground.b} ${ground.c} ${ground.d} 0 0)`;
 const determinant = ground.a * ground.d - ground.b * ground.c;
 export const uprightMatrix = `matrix(${ground.d / determinant} ${-ground.b / determinant} ${-ground.c / determinant} ${ground.a / determinant} 0 0)`;
@@ -14,6 +14,10 @@ export function unproject({ x, y }: Point): Point {
     x: (ground.d * x - ground.c * y) / determinant,
     y: (-ground.b * x + ground.a * y) / determinant,
   };
+}
+/** World offset that reads as `h` units straight up on screen. */
+export function lift(h: number): Point {
+  return unproject({ x: 0, y: -h });
 }
 export function screen(point: Point, camera: Camera, anchor: Point): Point {
   const p = project({ x: point.x - camera.x, y: point.y - camera.y });

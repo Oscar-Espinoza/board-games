@@ -1,3 +1,4 @@
+import { createAudio } from '@board-games/shared/ui';
 import { diceThrow } from './dice-throw.js';
 import type { PresentationEvent } from './presentation.js';
 
@@ -384,125 +385,81 @@ export function playEffects(
 }
 
 export function softAudio() {
-  let context: AudioContext | undefined;
+  const audio = createAudio();
   let ready: Promise<void> | undefined;
   let generation = 0;
+  // Cues run once the context has resumed, unless cancelled or stale by then.
+  const later = (fn: () => void, requested = performance.now()) => {
+    const current = generation;
+    void ready?.then(() => {
+      if (current === generation && performance.now() - requested <= 650) fn();
+    });
+  };
   return {
     unlock() {
-      try {
-        context ??= new AudioContext();
-        ready = context.resume().catch(() => {});
-      } catch {}
+      ready = audio.unlock();
     },
     cancel() {
       generation++;
     },
     reject() {
-      const current = generation;
-      void ready?.then(() => {
-        try {
-          if (context?.state !== 'running' || current !== generation) return;
-          const at = context.currentTime;
-          const oscillator = context.createOscillator();
-          const gain = context.createGain();
-          oscillator.frequency.setValueAtTime(220, at);
-          oscillator.frequency.exponentialRampToValueAtTime(110, at + 0.16);
-          gain.gain.setValueAtTime(0.001, at);
-          gain.gain.linearRampToValueAtTime(0.09, at + 0.015);
-          gain.gain.exponentialRampToValueAtTime(0.001, at + 0.18);
-          oscillator.connect(gain).connect(context.destination);
-          oscillator.start(at);
-          oscillator.stop(at + 0.18);
-        } catch {}
-      });
+      later(() =>
+        audio.tone({
+          from: 220,
+          to: 110,
+          duration: 0.18,
+          volume: 0.09,
+          attack: 0.015,
+        }),
+      );
     },
     play(events: PresentationEvent[]) {
-      const requested = performance.now(),
-        current = generation;
-      void ready?.then(() => {
-        try {
-          if (
-            context?.state !== 'running' ||
-            current !== generation ||
-            performance.now() - requested > 650
-          )
-            return;
-          const ctx = context;
-          const tone = (
-            at: number,
-            from: number,
-            to: number,
-            volume: number,
-            duration: number,
-          ) => {
-            const oscillator = ctx.createOscillator(),
-              gain = ctx.createGain();
-            oscillator.frequency.setValueAtTime(from, at);
-            oscillator.frequency.exponentialRampToValueAtTime(
-              to,
-              at + duration,
-            );
-            gain.gain.setValueAtTime(0.001, at);
-            gain.gain.exponentialRampToValueAtTime(volume, at + 0.006);
-            gain.gain.exponentialRampToValueAtTime(0.001, at + duration);
-            oscillator.connect(gain).connect(ctx.destination);
-            oscillator.start(at);
-            oscillator.stop(at + duration);
-          };
-          const noise = (
-            at: number,
-            volume: number,
-            duration: number,
-            frequency: number,
-          ) => {
-            const buffer = ctx.createBuffer(
-                1,
-                Math.ceil(ctx.sampleRate * duration),
-                ctx.sampleRate,
-              ),
-              data = buffer.getChannelData(0);
-            for (let i = 0; i < data.length; i++)
-              data[i] = Math.random() * 2 - 1;
-            const source = ctx.createBufferSource(),
-              filter = ctx.createBiquadFilter(),
-              gain = ctx.createGain();
-            source.buffer = buffer;
-            filter.type = 'lowpass';
-            filter.frequency.setValueAtTime(frequency, at);
-            gain.gain.setValueAtTime(0.001, at);
-            gain.gain.exponentialRampToValueAtTime(volume, at + 0.01);
-            gain.gain.exponentialRampToValueAtTime(0.001, at + duration);
-            source.connect(filter).connect(gain).connect(ctx.destination);
-            source.start(at);
-            source.stop(at + duration);
-          };
-          const placement = events.find((e) => e.type === 'placement');
-          if (placement?.type === 'placement') {
-            const impact =
-                ctx.currentTime + (placement.piece === 'road' ? 0.19 : 0.275),
-              weight = placement.piece === 'road' ? 0.45 : 1;
-            noise(ctx.currentTime, 0.08 * weight, 0.25, 1800);
-            tone(impact, 130, 32, 0.55 * weight, 0.55);
-            tone(impact, 67, 28, 0.3 * weight, 0.65);
-            noise(impact, 0.35 * weight, 0.35, 1300);
-            noise(impact + 0.1, 0.12 * weight, 0.45, 420);
-          } else if (events.some((e) => e.type === 'roll')) {
-            for (let i = 0; i < 5; i++) {
-              const roll = events.find((e) => e.type === 'roll');
-              const scale =
-                0.3 + ((roll?.type === 'roll' ? roll.strength : 0) ?? 0) * 0.3;
-              const at =
-                ctx.currentTime + [0.05, 0.91, 1.12, 1.38, 1.52][i] * scale;
-              noise(at, 0.1 * (1 - i * 0.16), 0.055, 2800);
-              tone(at, 280 + i * 30, 120, 0.055, 0.065);
-            }
-          } else tone(ctx.currentTime, 360, 150, 0.035, 0.16);
-        } catch {}
+      later(() => {
+        const tone = (
+          delay: number,
+          from: number,
+          to: number,
+          volume: number,
+          duration: number,
+        ) => audio.tone({ delay, from, to, volume, duration, attack: 0.006 });
+        const noise = (
+          delay: number,
+          volume: number,
+          duration: number,
+          frequency: number,
+        ) =>
+          audio.noise({
+            delay,
+            volume,
+            duration,
+            frequency,
+            filter: 'lowpass',
+            attack: 0.01,
+          });
+        const placement = events.find((e) => e.type === 'placement');
+        if (placement?.type === 'placement') {
+          const impact = placement.piece === 'road' ? 0.19 : 0.275,
+            weight = placement.piece === 'road' ? 0.45 : 1;
+          noise(0, 0.08 * weight, 0.25, 1800);
+          tone(impact, 130, 32, 0.55 * weight, 0.55);
+          tone(impact, 67, 28, 0.3 * weight, 0.65);
+          noise(impact, 0.35 * weight, 0.35, 1300);
+          noise(impact + 0.1, 0.12 * weight, 0.45, 420);
+        } else if (events.some((e) => e.type === 'roll')) {
+          const roll = events.find((e) => e.type === 'roll');
+          const scale =
+            0.3 + ((roll?.type === 'roll' ? roll.strength : 0) ?? 0) * 0.3;
+          for (let i = 0; i < 5; i++) {
+            const at = [0.05, 0.91, 1.12, 1.38, 1.52][i] * scale;
+            noise(at, 0.1 * (1 - i * 0.16), 0.055, 2800);
+            tone(at, 280 + i * 30, 120, 0.055, 0.065);
+          }
+        } else tone(0, 360, 150, 0.035, 0.16);
       });
     },
     close() {
       generation++;
-      void context?.close().catch(() => {});
+      audio.close();
     },
   };
 }

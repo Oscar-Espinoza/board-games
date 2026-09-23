@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Rulebook from '$lib/catalog/Rulebook.svelte';
   import Board from '@board-games/codenames/Board.svelte';
   import {
     practice,
@@ -58,6 +59,7 @@
     rematch={async () => reset()}
     {locale}
   >
+    {#snippet rulesContent()}<Rulebook game="codenames" />{/snippet}
     {#snippet settingsContent()}<nav>
         <a href="/">{m.back()}</a><label
           >{m.cn_practice()}<select

@@ -38,58 +38,47 @@ export function movements(before: UnoView, after: UnoView, playerId: string) {
   return moves;
 }
 
-/** Fixed seat positions, relative to the viewer. 2–4 players occupy cardinal points. */
-export function seatPosition(index: number, count: number) {
-  const places: Record<number, [number, number][]> = {
-    2: [
-      [50, 89],
-      [50, 10],
-    ],
-    3: [
-      [50, 89],
-      [9, 48],
-      [91, 48],
-    ],
-    4: [
-      [50, 89],
-      [9, 48],
-      [50, 10],
-      [91, 48],
-    ],
-    5: [
-      [50, 89],
-      [8, 57],
-      [25, 11],
-      [75, 11],
-      [92, 57],
-    ],
-    6: [
-      [50, 89],
-      [8, 64],
-      [16, 23],
-      [50, 9],
-      [84, 23],
-      [92, 64],
-    ],
-    7: [
-      [50, 89],
-      [8, 65],
-      [10, 28],
-      [34, 9],
-      [66, 9],
-      [90, 28],
-      [92, 65],
-    ],
-    8: [
-      [50, 89],
-      [15, 79],
-      [8, 46],
-      [22, 12],
-      [50, 9],
-      [78, 12],
-      [92, 46],
-      [85, 79],
-    ],
-  };
-  return places[count]?.[index] ?? [50, 10];
+/**
+ * Opponent seat centre in % of the table, relative to the viewer (south, index 0).
+ * Opponents arc across the top rim; larger tables wrap a little down the sides.
+ */
+export function seatPosition(index: number, count: number): [number, number] {
+  if (count < 3) return [50, 11];
+  const spread = count >= 5 ? Math.PI * 0.14 : 0;
+  const angle =
+    Math.PI - spread + ((index - 1) / (count - 2)) * (Math.PI + spread * 2);
+  return [50 + 41 * Math.cos(angle), 52 + 41 * Math.sin(angle)];
+}
+
+/**
+ * Players who called UNO in this revision. Only a declared last card leaves a
+ * player at one card without being catchable; wild plays resolve after the colour.
+ */
+export function unoCalls(before: UnoView, after: UnoView) {
+  if (after.public.revision !== before.public.revision + 1) return [];
+  if (after.public.phase === 'color') return [];
+  return after.public.players
+    .filter((seat) => {
+      if (seat.count !== 1 || after.public.catchable === seat.id) return false;
+      const was = before.public.players.find((p) => p.id === seat.id)?.count;
+      return (
+        was === 2 ||
+        (was === 1 &&
+          before.public.phase === 'color' &&
+          before.public.turn === seat.id)
+      );
+    })
+    .map((seat) => seat.id);
+}
+
+/** Penalty-sized draws (2+) worth a "+N" bubble, from public counts only. */
+export function bigDraws(before: UnoView, after: UnoView) {
+  if (after.public.revision !== before.public.revision + 1) return [];
+  return after.public.players.flatMap((seat) => {
+    const gained =
+      seat.count -
+      (before.public.players.find((p) => p.id === seat.id)?.count ??
+        seat.count);
+    return gained >= 2 ? [{ id: seat.id, count: gained }] : [];
+  });
 }

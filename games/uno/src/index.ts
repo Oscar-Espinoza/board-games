@@ -1,3 +1,4 @@
+import { shuffle } from '@board-games/game-core';
 import type { GameDefinition } from '@board-games/game-core';
 import { botAction } from './bot.js';
 
@@ -48,12 +49,6 @@ export function deck(): Card[] {
                     : '+2',
     };
   });
-}
-function shuffle(cards: Card[], random: () => number) {
-  for (let i = cards.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [cards[i], cards[j]] = [cards[j]!, cards[i]!];
-  }
 }
 function create(players: string[], random: () => number): State {
   if (

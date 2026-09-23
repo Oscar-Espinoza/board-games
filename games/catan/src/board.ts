@@ -1,3 +1,5 @@
+import { shuffle } from '@board-games/game-core';
+export { shuffle };
 // Integer topology and published layouts ported from crates/catan/src/board.rs.
 export interface Hex {
   q: number;
@@ -25,13 +27,6 @@ export function edgeId(b: Board, a: number, c: number) {
 }
 export function incident(b: Board, v: number) {
   return b.edges.flatMap((e, i) => (e.includes(v) ? [i] : []));
-}
-export function shuffle<T>(values: T[], random: () => number) {
-  for (let i = values.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [values[i], values[j]] = [values[j], values[i]];
-  }
-  return values;
 }
 export function makeBoard(
   extended: boolean,

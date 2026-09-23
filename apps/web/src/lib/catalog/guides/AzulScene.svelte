@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Lesson } from '../types';
-  import HelpScene from '../../../../../../games/azul/src/HelpScene.svelte';
+  import HelpScene from '@board-games/azul/HelpScene.svelte';
   let { lesson, step }: { lesson: Lesson; step: number } = $props();
 </script>
 

@@ -1,3 +1,4 @@
+import { shuffle } from '@board-games/game-core';
 import type { GameDefinition } from '@board-games/game-core';
 import {
   manifest,
@@ -111,12 +112,6 @@ const token = (random: () => number) =>
       .toString(16)
       .padStart(8, '0'),
   ).join('');
-function shuffle<T>(a: T[], random: () => number) {
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-}
 function entry(c: Card, random: () => number): Entry {
   return {
     physical: c.physical,

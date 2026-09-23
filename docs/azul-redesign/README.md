@@ -8,12 +8,11 @@ The earlier Table Light study remains labelled historical evidence:
 
 ![Historical Table Light design study](images/table-light-desktop.webp)
 
-| Document                      | Purpose                                              |
-| ----------------------------- | ---------------------------------------------------- |
-| [Migration](migration.md)     | Dependent implementation milestones and verification |
-| [Tokens](tokens.md)           | Materials, fonts, palette and contrast               |
-| [Components](components.md)   | Board, supply and inspection contracts               |
-| [Motion](motion.md)           | Accepted-event timeline and cancellation             |
-| [Mobile](mobile.md)           | Viewport fit, picker, geometry and safe areas        |
-| [Screenshots](screenshots.md) | Preserved before-images and actual after-evidence    |
-| [Mockups](images/README.md)   | Design studies, separately labelled                  |
+| Document                    | Purpose                                              |
+| --------------------------- | ---------------------------------------------------- |
+| [Migration](migration.md)   | Dependent implementation milestones and verification |
+| [Tokens](tokens.md)         | Materials, fonts, palette and contrast               |
+| [Components](components.md) | Board, supply and inspection contracts               |
+| [Motion](motion.md)         | Accepted-event timeline and cancellation             |
+| [Mobile](mobile.md)         | Viewport fit, picker, geometry and safe areas        |
+| [Mockups](images/README.md) | Design studies, separately labelled                  |

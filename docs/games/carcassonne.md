@@ -27,8 +27,6 @@ or shortened decks is used by the server or imported by catalog metadata.
 
 **Painted landscape · 6 seats** opens a deterministic, playable 29-tile table for
 reviewing the redesign. Link directly with `/practice/carcassonne?scenario=table`.
-The separate `/practice/carcassonne/artwork` inventory shows all 138 tile designs
-at four rotations using the production artwork renderer.
 
 ## Play and controls
 
@@ -57,15 +55,28 @@ Select a region marker to inspect its connected feature, owners, strength, open
 ends and provisional score. Pick up a physical meeple from your hand to reveal its legal region targets, then drag it onto one. Tab and Enter provide equivalent placement. A standard
 meeple cannot join an occupied connected feature; flying and Crop Circles provide
 their specified exceptions. Farmers remain until final scoring unless an expansion
-explicitly returns them. The journal links accepted actions and scores to the map.
+explicitly returns them. The **Table journal** (scroll button in the header) is a
+parchment panel beside the map listing accepted public actions and scores, newest
+first; private tile draws are omitted. Entries with a map-pin pan to their tile and
+highlight the feature while the panel stays open (compact screens close it to show
+the map).
 Scoring updates the seats around the screen and briefly shows a point receipt.
 
 Local painted WebP materials supply the wooden table, meadows, town roofs, earth,
 abbeys and keeps. SVG still defines every tile's roads, walls, rivers, regions and
-module symbols; decoration cannot change topology. Numbered wooden meeples
-supplement player colors; farmers
-lie down and large meeples have a larger silhouette. Attached figures remain
+module symbols; decoration cannot change topology. Farmers lie down and large
+meeples stand taller. Attached figures remain
 linked to their meeple. English and Spanish text use Paraglide.
+
+Completed cities rise into walled towns with houses, towers and, for cities of
+three or more tiles, a keep; completed monasteries stand as churches. Unfinished
+cities keep a low wall rim. The rise plays only for the accepted placement that
+completed the feature, never on reload or reconnect. Trees, sheep and windmills
+stand in the meadows, rivers flow under bridges and legal slots glow. **Ambient
+motion** in Settings (also off under reduced motion) stops the river, wind, smoke
+and rise animations. Meeples, abbots, builders and pigs on the table and in the
+tray, and on the seat plaques, are painted glossy figures tinted to each player's
+colour. See [ADR 025](../adr/025-carcassonne-standing-scenery.md).
 
 Brass guide, overview and settings controls sit in the upper-right header.
 Hovering or focusing a physical figure explains its purpose. The field guide covers
@@ -182,6 +193,9 @@ credentials. The optional game-contract `presence` hook protects unconsumed setu
 readiness without changing an in-progress decision. Readiness alone permits a
 bounded stale-revision retry for the same setup and original request ID.
 
-See [validation](../validation.md) for actual executed checks and limitations.
 Physical Safari, native device audio/touch quality, and a real group Full Big Box
 playtest remain separate human validation; browser automation cannot certify them.
+
+## Invariants
+
+Tile regions and field half-edges are explicit; feature components are recomputed, never a merge-only cache (ferries disconnect roads). Preserve Big Box 3.1 builder/pig and unfinished-feature behavior, and resumable actor-owned choices ([ADR 012](../adr/012-carcassonne-table.md)). One affine camera draws and inverts hit testing — never add CSS perspective. Desktop keeps a fixed player column and tile tray; compact uses a seat strip and expandable supply; tile drops are previews needing confirmation ([ADR 024](../adr/024-carcassonne-painted-table.md)). Completed cities/monasteries stand as painted sprites and stacked `lift()` walls in a non-interactive, depth-sorted pass; only accepted placements trigger the rise, never reloads; ambient motion honors its setting and reduced motion ([ADR 025](../adr/025-carcassonne-standing-scenery.md)). Practice fixtures stay out of rooms and catalog metadata.

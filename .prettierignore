@@ -5,8 +5,6 @@ build/
 dist/
 packages/shared/src/paraglide/
 games/*/assets/
-test-results/
-playwright-report/
 packages/shared/project.inlang/cache/
 packages/shared/project.inlang/.meta.json
 packages/shared/project.inlang/README.md

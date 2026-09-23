@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, tick, type Snippet } from 'svelte';
-  import { RevisionGate } from './presentation.js';
+  import { RevisionGate, read, write } from '@board-games/shared/ui';
+  import { prefersReducedMotion } from 'svelte/motion';
   import { playEffects, softAudio } from './effects.js';
   import type { playerView } from './index.js';
   import Dice from './Dice.svelte';
@@ -52,9 +53,9 @@
 
   let root: HTMLElement;
   let map: SVGSVGElement;
-  let sound = $state(true),
-    motion = $state(true),
-    reduced = $state(false);
+  let sound = $state(read('catan:sound') !== 'false'),
+    motion = $state(read('catan:motion') !== 'false');
+  const reduced = $derived(prefersReducedMotion.current);
   let settings = $state(false);
   let rulesDialog: HTMLDialogElement;
   let tradeOpen = $state(false),
@@ -268,24 +269,9 @@
       if (sound) audio.unlock();
       else audio.cancel();
     } else motion = !motion;
-    try {
-      localStorage.setItem(
-        'catan:' + key,
-        String(key === 'sound' ? sound : motion),
-      );
-    } catch {}
+    write('catan:' + key, String(key === 'sound' ? sound : motion));
   }
   onMount(() => {
-    try {
-      sound = localStorage.getItem('catan:sound') !== 'false';
-      motion = localStorage.getItem('catan:motion') !== 'false';
-    } catch {}
-    const media = matchMedia('(prefers-reduced-motion: reduce)');
-    const update = () => {
-      reduced = media.matches;
-    };
-    update();
-    media.addEventListener('change', update);
     const observer = new ResizeObserver(() => {
       stopEffects();
     });
@@ -293,7 +279,6 @@
     return () => {
       cancelCharge();
       observer.disconnect();
-      media.removeEventListener('change', update);
       stopEffects();
       audio.close();
     };
@@ -1241,7 +1226,7 @@
           >{priv.development.filter((c) => c.kind === kind).length}</b
         >
         <span class="card-title">{label({ type: kind })}</span>
-        <img class="card-art" src={developmentBack} alt="" />
+        <img decoding="async" class="card-art" src={developmentBack} alt="" />
         <span class="card-footer">CATAN</span>
       </button>
     {/each}

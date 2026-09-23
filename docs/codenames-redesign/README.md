@@ -1,6 +1,6 @@
 # Codenames Table redesign
 
-**Status:** implemented 2026-09-13; validation is recorded in the [evidence](../evidence/codenames/table-redesign/README.md).
+**Status:** implemented 2026-09-13.
 
 The checked-in realistic reference (`images/reference.webp`) takes precedence
 for materials, warm upper-left lighting and restrained card edges. The mockup and
@@ -55,13 +55,6 @@ running app**.
 
 The migration plan lists where the mockup deliberately differs from the rules, for
 example the revealed assassin and the key visible to an operative.
-
-Before-images of the superseded voice-led table are already in the repository and are
-not duplicated here:
-
-- [desktop](../evidence/codenames/voice-table/desktop.webp)
-- [phone](../evidence/codenames/voice-table/phone.webp)
-- [spymaster](../evidence/codenames/voice-table/spymaster.webp)
 
 No phone mockup exists. Compact layouts follow the written rules in
 [migration § 4](migration.md#4-compact-layouts).

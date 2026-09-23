@@ -50,3 +50,7 @@ Build controls pair each piece icon with its name. Selecting Road, Settlement or
 Player summaries arrange identity, stats and trading horizontally on desktop. The controlled player summary sits to the left of the build controls, clear of the bottom harbor. At zoom levels above 100%, drag to pan (or use arrow keys with the map focused); panning keeps part of the island visible and never selects a placement. Reset view restores the fitted island.
 
 The hand grows to the right from a fixed starting position and overlaps cards when space is tight, without scrollbars. Duplicate resources and development cards share quantity badges, so there are at most ten visible stacks (five resource types and five development types).
+
+## Invariants
+
+Presentation events are typed, generated only by accepted rules actions and projected per player; theft identities and hidden development cards stay recipient-only ([ADR 011](../adr/011-catan-presentation.md)). The physical tabletop uses bundled painted WebP scenery under the real SVG island, cardinal wooden plaques, a local hand below its plaque and parchment building costs; desktop stays within the viewport and the last dice result may rest in the bowl without replaying an event ([ADR 022](../adr/022-catan-physical-table.md)). `/practice/catan` fixtures never reach multiplayer or eager catalog metadata.

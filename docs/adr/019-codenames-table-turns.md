@@ -31,6 +31,4 @@ revealed cards retain coloured paper word faces. No chat or new runtime dependen
 Self-host Archivo, retain contrast corrections, hide props on compact screens,
 keep a fixed viewport and accessible internal-scrolling dialogs. Existing audio
 remains gesture-unlocked; no sounds are added. Accepted events alone drive motion,
-and reduced motion suppresses it. Browser evidence lives in
-[table-redesign](../evidence/codenames/table-redesign/README.md); physical Safari
-validation must be recorded separately from WebKit automation.
+and reduced motion suppresses it.

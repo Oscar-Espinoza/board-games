@@ -52,10 +52,10 @@ export function cityPath(r: Region) {
 export const meeplePath =
   'M-4,-6A5,5 0 1 1 4,-6L11,1Q12,4 8,5L5,3L7,13H1L0,7L-1,13H-7L-5,3L-8,5Q-12,4 -11,1Z';
 export const colors = [
-  '#a93625',
-  '#22559b',
-  '#487934',
-  '#d5a725',
+  '#bb2c1c',
+  '#1f58b8',
+  '#3c8a2c',
+  '#e2b01c',
   '#e9e0c9',
   '#353d42',
 ];

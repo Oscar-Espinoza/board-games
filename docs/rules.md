@@ -50,3 +50,7 @@ The TypeScript port lives in `games/uno`. The server injects randomness; histori
 ChaCha replay/checkpoint formats and browser bots are retired. Shared rooms
 support human players, reconnecting seats and rematches. Rule tests cover card
 conservation, complete rounds, penalty combinations, catches and invalid actions.
+
+## Invariants
+
+UNO presentation compares consecutive recipient snapshots; opponents' drawn faces are never delivered. Resynchronization cancels obsolete effects.

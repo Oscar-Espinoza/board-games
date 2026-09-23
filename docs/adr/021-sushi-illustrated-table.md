@@ -4,7 +4,7 @@ Date: 2026-09-15. Status: accepted.
 
 ## Decision
 
-Migrate the approved [desktop prototype](../sushi-go-party-prototype.md) into
+Migrate the approved desktop prototype into
 the existing production `Board.svelte`. This supersedes the visual arrangement
 in ADR 016, not its rules, privacy, action, audio or presentation contracts.
 

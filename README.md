@@ -54,12 +54,11 @@ See [lesson coverage](docs/games/library-guide-coverage.md) for the content sour
 
 ```sh
 bun run check        # TypeScript and Svelte checks
-bun run test         # Game rules and room/session tests
-bun run test:e2e     # Browser integration tests
+bun run build        # Production build
 bun run format      # Format maintained source
 ```
 
-See [architecture](docs/architecture.md), [validation](docs/validation.md), and [migration decision](docs/adr/009-typescript-catalog.md). All catalog and game translations live in `packages/shared/messages/`; add a locale there and in `packages/shared/project.inlang/settings.json` to extend Paraglide.
+See [architecture](docs/architecture.md) and [migration decision](docs/adr/009-typescript-catalog.md). All catalog and game translations live in `packages/shared/messages/`; add a locale there and in `packages/shared/project.inlang/settings.json` to extend Paraglide.
 
 Zombies (the previous Survival game) is now the independent sibling `../zombies-game`. Its Rust/Wasm simulation, renderer, assets, saves and tooling are preserved there; run `pnpm install` and `make dev` from that directory. It is not part of this workspace.
 

@@ -21,10 +21,6 @@ settles immediately rather than replaying effects.
 No commercial rulebook images or third-party artwork are bundled. CATAN is not
 an official CATAN product.
 
-Run the rule regression suite from the workspace root with
-`bun test games/catan/src/index.test.ts`.
-
 The lazy `/practice/catan` route runs `src/practice.ts` fixtures with seeded local
 rules and four switchable seats. It never creates a room or changes multiplayer
-setup. Run all Catan rule, event/privacy and fixture tests with
-`bun test games/catan`; browser coverage lives in `tests/e2e/catan-island.spec.ts`.
+setup.

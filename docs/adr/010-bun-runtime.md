@@ -36,12 +36,9 @@ The implementation follows Bun's documented [workspaces](https://bun.com/docs/pm
 [runtime and `--bun` flag](https://bun.com/docs/runtime), and
 [Bun-target bundling](https://bun.com/docs/bundler). Its
 [Node API compatibility reference](https://bun.com/docs/runtime/nodejs-compat)
-explicitly describes partial `node:test` support; the existing suite uses its
-supported in-process API and passes under `bun test`. Keep real Socket.IO tests
-and browser tests as regression checks rather than assuming blanket compatibility.
+explicitly describes partial `node:test` support.
 
 Use `bun install --frozen-lockfile` in CI and hosting setup. Review release notes
-before changing the pinned runtime, then run checks, tests, production build and
-Chrome/WebKit coverage. `bun run check` remains necessary because execution and
-bundling transpile TypeScript without checking its types. Use `bun run test` for
-the scoped rule/session suite; browser scenarios belong to `bun run test:e2e`.
+before changing the pinned runtime, then run `bun run check` and the production
+build. `bun run check` remains necessary because execution and bundling transpile
+TypeScript without checking its types.

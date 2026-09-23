@@ -31,9 +31,7 @@ the table renders the latest state without replaying older events.
 ## Edition evidence and inventory
 
 The [Gamewright rulebook](https://gamewright.com/pdfs/Rules/SushiGoPartyTM-RULES.pdf)
-is the rules baseline. The original plan and the bounded photographic inventory
-pass are retained in [the plan](sushi-go-party-plan.md) and
-[implementation handoff](../handoffs/sushi-go-party.md). Card art here is original
+is the rules baseline. Card art here is original
 SVG; no publisher or seller card images ship in the application.
 
 | Family                        | Physical cards                                                      |
@@ -142,9 +140,10 @@ seeded matches, real independent Socket.IO clients, and browser journeys are
 reported separately. WebKit automation is not physical Safari-device validation.
 Physical Safari and a live human group playtest remain unverified.
 
-The [independent review](../handoffs/sushi-go-party-review.md) records rules/privacy
-assessment, presentation fixes, exact viewport evidence and remaining device limits.
-
 The [illustrated production migration](../sushi-go-party-redesign.md) adds the
 approved desktop board, score pawns and player trays without changing these
 rules. Rules/settings remain available in both desktop and compact layouts.
+
+## Invariants
+
+Illustrated table with eight real-text menu tiles, ivory trays and a perimeter score track ([ADR 021](../adr/021-sushi-illustrated-table.md)). Hands, picks and Menu offers stay private in recipient payloads; presentation uses only accepted public reveal/pass events. Preserve all 26 cards, 2–8 seats, compact layouts and no-replay cancellation. Only still-valid picks/readiness retry coded stale errors (same action ID, at most three attempts).

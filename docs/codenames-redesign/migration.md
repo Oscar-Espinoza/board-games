@@ -285,29 +285,6 @@ least 44 px, safe areas are respected, and 200% text keeps every action reachabl
   - Metamorphic privacy.
   - Presentation gate with the new events.
 - Server: `apps/server/src/codenames-socket.test.ts` as in milestone 2.
-- Browser (`tests/e2e/codenames.spec.ts`, Chromium and WebKit):
-  - Practice `midgame` desktop layout: header, team row, grid, panels and history all visible, no page scroll.
-  - Multiplayer: spymaster gives a clue, operative guesses and ends the turn, the other team plays, then assassin and normal wins.
-  - Operative payload/UI never shows the key; spymaster toggle persists.
-  - Compact geometry at every size above, plus eight-seat 200% text.
-  - English and Spanish.
-  - Reconnect mid-turn cancels a pending selection.
-  - Silent audio fallback.
-  - Assert the table's anchors are non-zero sized and that the page does not scroll.
-- Evidence:
-  - Build first, then capture into `docs/evidence/codenames/table-redesign/`: desktop 1440, 1280×720, tablet, phone 390/360/320, spymaster, history dialog on phone, Spanish, WebKit desktop.
-  - Compare materials/lighting against `images/reference.webp` (Image #2), and structure against `images/design-desktop.webp` and the migration. Record the result in a README there and in `docs/validation.md`.
-  - These are review captures, not automated baselines. Do not claim "no snapshot differences".
-
-## Validation commands
-
-```sh
-bun run check
-bun run test
-bun run build
-bun run test:e2e tests/e2e/codenames.spec.ts   # Chromium and WebKit projects
-bun run format:check
-```
 
 Report any check you could not run as unverified. Physical Safari/iOS, real-device
 touch and audio, and fluent Spanish review stay unverified until someone does them.

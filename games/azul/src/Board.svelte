@@ -14,10 +14,11 @@
   } from './index.js';
   import Tile from './Tile.svelte';
   import PlayerBoard from './PlayerBoard.svelte';
-  import Help from './Help.svelte';
   import './tokens.css';
   import { ringGeometry, scatter } from './geometry.js';
-  import { RevisionGate, planPresentation } from './presentation.js';
+  import { planPresentation } from './presentation.js';
+  import { RevisionGate, readJson, write } from '@board-games/shared/ui';
+  import { prefersReducedMotion } from 'svelte/motion';
   import { ceramicAudio, tileFlights, measure } from './effects.js';
   let {
     view,
@@ -29,6 +30,7 @@
     connected = true,
     pending = false,
     settingsContent,
+    rulesContent,
     canConfigure = false,
     practice = false,
     canRematch = false,
@@ -44,6 +46,7 @@
     connected?: boolean;
     pending?: boolean;
     settingsContent?: Snippet;
+    rulesContent?: Snippet;
     canConfigure?: boolean;
     practice?: boolean;
     canRematch?: boolean;
@@ -78,7 +81,6 @@
   let sound = $state(true),
     volume = $state(0.25),
     motion = $state<'system' | 'reduced' | 'full'>('system'),
-    systemReduced = $state(false),
     mounted = $state(false),
     phone = $state(false),
     trayExpanded = $state(false),
@@ -113,6 +115,7 @@
       active === playerId &&
       visual.phase === 'drafting',
   );
+  const systemReduced = $derived(prefersReducedMotion.current);
   const reduced = $derived(
     motion === 'reduced' || (motion === 'system' && systemReduced),
   );
@@ -271,20 +274,16 @@
   }
   onMount(() => {
     mounted = true;
-    try {
-      const saved = JSON.parse(
-        localStorage.getItem('azul-preferences') ?? '{}',
-      );
-      if (typeof saved.sound === 'boolean') sound = saved.sound;
-      if (
-        typeof saved.volume === 'number' &&
-        saved.volume >= 0 &&
-        saved.volume <= 1
-      )
-        volume = saved.volume;
-      if (['system', 'reduced', 'full'].includes(saved.motion))
-        motion = saved.motion;
-    } catch {}
+    const saved = readJson('azul-preferences');
+    if (typeof saved.sound === 'boolean') sound = saved.sound;
+    if (
+      typeof saved.volume === 'number' &&
+      saved.volume >= 0 &&
+      saved.volume <= 1
+    )
+      volume = saved.volume;
+    if (saved.motion === 'reduced' || saved.motion === 'full')
+      motion = saved.motion;
     const phoneMedia = matchMedia('(max-width: 900px), (max-height: 800px)');
     phone = phoneMedia.matches;
     const phoneChanged = () => {
@@ -296,12 +295,6 @@
       baseline();
     };
     phoneMedia.addEventListener('change', phoneChanged);
-    const media = matchMedia('(prefers-reduced-motion: reduce)');
-    systemReduced = media.matches;
-    const changed = () => {
-      systemReduced = media.matches;
-      baseline();
-    };
     const scroll = () => {
       if (
         animating &&
@@ -309,9 +302,12 @@
       )
         settle();
     };
-    const resize = () => baseline(),
+    let frame = 0;
+    const resize = () => {
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(() => baseline());
+      },
       visibility = () => baseline();
-    media.addEventListener('change', changed);
     window.addEventListener('resize', resize);
     root
       ?.querySelector('.surface')
@@ -319,9 +315,9 @@
     document.fonts?.addEventListener('loadingdone', resize);
     document.addEventListener('visibilitychange', visibility);
     return () => {
+      cancelAnimationFrame(frame);
       settle();
       audio.close();
-      media.removeEventListener('change', changed);
       window.removeEventListener('resize', resize);
       phoneMedia.removeEventListener('change', phoneChanged);
       root?.querySelector('.surface')?.removeEventListener('scroll', scroll);
@@ -332,10 +328,10 @@
   $effect(() => {
     const prefs = { sound, volume, motion };
     audio.configure(sound, volume);
+    // System motion changes also restart presentation from a fresh baseline.
+    void systemReduced;
     if (mounted) {
-      try {
-        localStorage.setItem('azul-preferences', JSON.stringify(prefs));
-      } catch {}
+      write('azul-preferences', prefs);
       untrack(baseline);
     }
   });
@@ -471,6 +467,7 @@
   data-azul-layout={phone ? 'compact' : 'tabletop'}
 >
   <img
+    decoding="async"
     class="table-prop lantern-prop"
     src="/games/azul/rich/lantern-v2.webp"
     alt=""
@@ -478,6 +475,7 @@
     draggable="false"
   />
   <img
+    decoding="async"
     class="table-prop chest-prop"
     src="/games/azul/rich/tile-chest.webp"
     alt=""
@@ -485,6 +483,7 @@
     draggable="false"
   />
   <img
+    decoding="async"
     class="table-prop tea-prop"
     src="/games/azul/rich/tea-glass.webp"
     alt=""
@@ -607,6 +606,7 @@
               aria-label={m.azul_factory({ number: index + 1 })}
             >
               <img
+                decoding="async"
                 class="factory-plate"
                 src="/games/azul/rich/factory-plate.webp"
                 alt=""
@@ -970,7 +970,7 @@
               >{m.azul_rematch()}</button
             >{/if}
         </section>{/if}
-    {:else if modal === 'help'}<Help />{:else if modal === 'settings'}<div
+    {:else if modal === 'help'}{@render rulesContent?.()}{:else if modal === 'settings'}<div
         class="settings"
       >
         <label class="toggle"

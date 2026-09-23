@@ -4,7 +4,5 @@ build/
 dist/
 packages/shared/src/paraglide/
 packages/shared/project.inlang/.cache/
-test-results/
-playwright-report/
 .env
 .env.local

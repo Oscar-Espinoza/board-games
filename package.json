@@ -11,17 +11,14 @@
     "build": "bun run --filter @board-games/web build && bun build apps/server/src/index.ts --target=bun --external=socket.io --external=sirv --outfile=apps/server/dist/index.js",
     "start": "bun apps/server/dist/index.js",
     "check": "bun run --filter @board-games/web check && bun --bun tsc --noEmit",
-    "test": "bun test ./games ./apps/server ./scripts",
-    "test:e2e": "bun --bun playwright test",
     "format": "bun --bun prettier --write .",
     "format:check": "bun --bun prettier --check ."
   },
   "devDependencies": {
-    "@playwright/test": "^1.63.0",
     "@types/bun": "^1.4.2",
     "@types/node": "^24.0.0",
-    "prettier": "3.9.6",
-    "prettier-plugin-svelte": "^3.4.0",
+    "prettier": "3.9.8",
+    "prettier-plugin-svelte": "^4.1.1",
     "typescript": "^5.9.0"
   },
   "workspaces": [

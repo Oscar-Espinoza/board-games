@@ -73,6 +73,7 @@
   aria-label={m.azul_board({ name })}
 >
   <img
+    decoding="async"
     class="board-substrate"
     src="/games/azul/rich/board-blank-v3.webp"
     alt=""
@@ -193,6 +194,7 @@
   </svelte:element>
   <div class="score-rail" aria-label={m.azul_score({ score: displayedScore })}>
     <img
+      decoding="async"
       class="score-substrate"
       src="/games/azul/rich/score-rail.webp"
       alt=""
@@ -207,6 +209,7 @@
       style="left:calc(10.4% + {railPosition(displayedScore) * 0.792}%)"
       aria-hidden="true"
       ><img
+        decoding="async"
         src="/games/azul/rich/score-marker.webp"
         alt=""
         aria-hidden="true"

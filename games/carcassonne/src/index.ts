@@ -1,3 +1,4 @@
+import { shuffled as shuffle } from '@board-games/game-core';
 import type { ActionContext, GameDefinition } from '@board-games/game-core';
 import {
   tiles,
@@ -89,14 +90,6 @@ export type State = Landscape & {
 const clone = <T>(v: T): T => structuredClone(v);
 function fail(): never {
   throw new Error('Invalid Carcassonne action');
-}
-function shuffle<T>(items: T[], random: () => number) {
-  const a = [...items];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
 }
 const actor = (s: State) => s.players[s.active];
 const ordered = (s: State, first = s.active) =>

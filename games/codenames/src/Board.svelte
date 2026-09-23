@@ -10,8 +10,8 @@
   import coaster from './table/coaster.webp';
   import notepad from './table/notepad.webp';
   import books from './table/books.webp';
-  import Rulebook from './Rulebook.svelte';
-  import { eventGate } from './presentation.js';
+  import { eventGate, readJson, write } from '@board-games/shared/ui';
+  import { prefersReducedMotion } from 'svelte/motion';
   import { soundEffects } from './effects.js';
   let {
     view,
@@ -22,6 +22,7 @@
     connected = true,
     pending = false,
     settingsContent,
+    rulesContent,
     canRematch = false,
     rematch = async () => {},
     errorCode = null,
@@ -51,6 +52,7 @@
     practice?: boolean;
     canConfigure?: boolean;
     settingsContent?: Snippet;
+    rulesContent?: Snippet;
     canRematch?: boolean;
     rematch?: () => Promise<void>;
     errorCode?: string | null;
@@ -104,7 +106,6 @@
   let sound = $state(true),
     volume = $state(0.5),
     reduced = $state(false),
-    systemReduced = $state(false),
     mounted = $state(false),
     showKey = $state(true),
     enlarged = $state(false),
@@ -140,7 +141,10 @@
       : m.cn_guesses_unlimited(),
   );
   let root: HTMLElement;
-  const gate = eventGate(stopEffects),
+  const gate = eventGate<PublicEvent>(
+      stopEffects,
+      (event, i, sequence) => event.sequence === sequence && event.index === i,
+    ),
     audio = soundEffects();
   const animations = new Set<Animation>();
   function stopEffects() {
@@ -322,39 +326,25 @@
       preference = systemReduced;
     untrack(settleEffects);
   });
+  const systemReduced = $derived(prefersReducedMotion.current);
   $effect(() => {
     if (mounted) {
-      try {
-        localStorage.setItem(
-          'codenames:preferences',
-          JSON.stringify({ sound, volume, reduced, showKey }),
-        );
-      } catch {}
+      write('codenames:preferences', { sound, volume, reduced, showKey });
       if (!sound) audio.cancel();
     }
   });
   onMount(() => {
-    try {
-      const p = JSON.parse(
-        localStorage.getItem('codenames:preferences') ?? '{}',
-      );
-      sound = p.sound !== false;
-      if (typeof p.volume === 'number' && Number.isFinite(p.volume))
-        volume = Math.min(1, Math.max(0, p.volume));
-      reduced = p.reduced === true;
-      showKey = p.showKey !== false;
-    } catch {}
+    const p = readJson('codenames:preferences');
+    sound = p.sound !== false;
+    if (typeof p.volume === 'number' && Number.isFinite(p.volume))
+      volume = Math.min(1, Math.max(0, p.volume));
+    reduced = p.reduced === true;
+    showKey = p.showKey !== false;
     narrow = window.innerWidth < 1024;
     const textObserver = new ResizeObserver(([entry]) => {
       enlarged = (entry?.contentRect.width ?? 16) > 22;
     });
     textObserver.observe(root.querySelector('.text-measure')!);
-    const query = matchMedia('(prefers-reduced-motion: reduce)');
-    systemReduced = query.matches;
-    const media = () => {
-      systemReduced = query.matches;
-    };
-    query.addEventListener('change', media);
     const reset = () => {
       narrow = window.innerWidth < 1024;
       settleEffects();
@@ -368,7 +358,6 @@
       cancelEffects();
       audio.dispose();
       textObserver.disconnect();
-      query.removeEventListener('change', media);
       window.removeEventListener('resize', reset);
       document.removeEventListener('visibilitychange', reset);
     };
@@ -815,7 +804,7 @@
         rel="noreferrer">Español</a
       >
     </p>
-  {:else if panel === 'rules'}<Rulebook />
+  {:else if panel === 'rules'}{@render rulesContent?.()}
   {:else if panel === 'confirm' && selected !== null && s.board[selected]}
     <p class="chosen-word">{s.board[selected]!.word}</p>
     <p>{m.cn_confirm_hint()}</p>

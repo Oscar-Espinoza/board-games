@@ -70,6 +70,4 @@ passed hands, setup changes and actual socket recipient privacy. Game-specific
 rules/session/browser suites exercise each game's distinct boundaries; the
 combined suite covers all six catalog entries and existing-game regressions.
 Actual Safari devices, human group playtests and fluent Spanish review remain
-separate from Chromium/WebKit automation. See [validation](../validation.md) for
-actual run results, and the per-game rules documents for evidence and disclosed
-app conventions.
+unverified. See the per-game rules documents for disclosed app conventions.

@@ -6,6 +6,7 @@ export function attachSockets(server: HttpServer, rooms: Rooms) {
   const io = new Server(server, {
     maxHttpBufferSize: 16_384,
     serveClient: false,
+    perMessageDeflate: { threshold: 1024 },
   });
   const publish = (id: string) => {
     // Never broadcast the canonical state. Each socket gets its own projection.
@@ -16,7 +17,13 @@ export function attachSockets(server: HttpServer, rooms: Rooms) {
     let roomId: string | null = null;
     let count = 0;
     let window = Date.now();
-    const handle = (name: string, fn: (request: any) => unknown) =>
+    // Only accepted mutations rebuild every seat's projection; rejected
+    // requests and sync replies (which already carry the view) do not.
+    const handle = (
+      name: string,
+      fn: (request: any) => unknown,
+      broadcast = true,
+    ) =>
       socket.on(name, (request: unknown, ack: unknown) => {
         if (typeof ack !== 'function') return;
         const reply = ack as (value: Reply<unknown>) => void;
@@ -30,6 +37,7 @@ export function attachSockets(server: HttpServer, rooms: Rooms) {
             throw new Error('Invalid request');
           const data = fn(request);
           reply({ ok: true, data });
+          if (broadcast && roomId) publish(roomId);
         } catch (error) {
           reply({
             ok: false,
@@ -39,7 +47,6 @@ export function attachSockets(server: HttpServer, rooms: Rooms) {
               : {}),
           });
         }
-        if (roomId) publish(roomId);
       });
     handle('create', (request) => {
       const credentials = rooms.create(socket.id, request);
@@ -59,10 +66,14 @@ export function attachSockets(server: HttpServer, rooms: Rooms) {
       if (!roomId) throw new Error('Join first');
       rooms.start(roomId, socket.id);
     });
-    handle('sync', (request) => {
-      if (!roomId) throw new Error('Join first');
-      return rooms.synchronize(roomId, socket.id, request);
-    });
+    handle(
+      'sync',
+      (request) => {
+        if (!roomId) throw new Error('Join first');
+        return rooms.synchronize(roomId, socket.id, request);
+      },
+      false,
+    );
     handle('action', (request: ActionRequest) => {
       if (!roomId) throw new Error('Join first');
       rooms.action(roomId, socket.id, request);

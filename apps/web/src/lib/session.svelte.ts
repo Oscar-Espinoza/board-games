@@ -63,7 +63,7 @@ export function request<T>(event: string, data: unknown): Promise<T> {
 }
 export function connect() {
   if (socket) return;
-  socket = io({ autoConnect: false });
+  socket = io({ autoConnect: false, transports: ['websocket', 'polling'] });
   socket.on('snapshot', (room: RoomView) => {
     session.room = room;
   });

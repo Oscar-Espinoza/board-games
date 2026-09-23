@@ -1,3 +1,4 @@
+import { createAudio } from '@board-games/shared/ui';
 import { mount, unmount, flushSync } from 'svelte';
 import Tile from './Tile.svelte';
 import type { Presentation, PresentationStep } from './presentation.js';
@@ -13,75 +14,29 @@ export function measure(root: HTMLElement): Bounds {
   return map;
 }
 export function ceramicAudio() {
-  let context: AudioContext | undefined;
-  const sources = new Set<OscillatorNode>();
+  const audio = createAudio();
   let enabled = true,
     volume = 0.25;
   return {
-    unlock() {
-      try {
-        context ??= new AudioContext();
-        if (context.state === 'suspended')
-          void context.resume().catch(() => {});
-      } catch {
-        /* Silent play is complete. */
-      }
-    },
+    unlock: () => void audio.unlock(),
     configure(sound: boolean, level: number) {
       enabled = sound;
       volume = level;
-      if (!sound) this.stop();
+      if (!sound) audio.stop();
     },
     play(kind: 'tile' | 'marker' | 'score', delay = 0) {
-      if (
-        !enabled ||
-        !context ||
-        context.state !== 'running' ||
-        document.hidden
-      )
-        return;
-      try {
-        const oscillator = context.createOscillator(),
-          gain = context.createGain(),
-          when = context.currentTime + delay;
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(
-          kind === 'score' ? 880 : kind === 'marker' ? 360 : 680,
-          when,
-        );
-        oscillator.frequency.exponentialRampToValueAtTime(
-          kind === 'score' ? 1320 : 220,
-          when + 0.06,
-        );
-        gain.gain.setValueAtTime(0, when);
-        gain.gain.linearRampToValueAtTime(volume * 0.12, when + 0.003);
-        gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.11);
-        oscillator.connect(gain);
-        gain.connect(context.destination);
-        sources.add(oscillator);
-        oscillator.onended = () => {
-          sources.delete(oscillator);
-          oscillator.disconnect();
-          gain.disconnect();
-        };
-        oscillator.start(when);
-        oscillator.stop(when + 0.13);
-      } catch {
-        /* Browser audio denial must not alter play. */
-      }
+      if (!enabled || document.hidden) return;
+      audio.tone({
+        delay,
+        from: kind === 'score' ? 880 : kind === 'marker' ? 360 : 680,
+        to: kind === 'score' ? 1320 : 220,
+        duration: 0.11,
+        volume: volume * 0.12,
+        attack: 0.003,
+      });
     },
-    stop() {
-      for (const source of sources) {
-        try {
-          source.stop();
-        } catch {}
-      }
-      sources.clear();
-    },
-    close() {
-      this.stop();
-      void context?.close().catch(() => {});
-    },
+    stop: audio.stop,
+    close: audio.close,
   };
 }
 export function tileFlights() {

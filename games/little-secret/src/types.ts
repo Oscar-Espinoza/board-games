@@ -57,6 +57,7 @@ export type Public = {
   mission: number;
   cycle: number;
   speaker: string | null;
+  clues: Record<string, string>;
   powers: Record<string, Power>;
   eliminated: string[];
   revealed: Record<string, Role>;

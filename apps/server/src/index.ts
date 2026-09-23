@@ -26,7 +26,17 @@ const rooms = new Rooms(
   ]),
   grace,
 );
-const assets = sirv(resolve('apps/web/build'), { single: '200.html' });
+const assets = sirv(resolve('apps/web/build'), {
+  single: '200.html',
+  gzip: true,
+  brotli: true,
+  etag: true,
+  setHeaders(res, path) {
+    // Hashed build output never changes under the same name.
+    if (path.startsWith('/_app/immutable/'))
+      res.setHeader('cache-control', 'public, max-age=31536000, immutable');
+  },
+});
 const server = createServer((req, res) => {
   if (req.url === '/health') {
     res.setHeader('content-type', 'application/json');

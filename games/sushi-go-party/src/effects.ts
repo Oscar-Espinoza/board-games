@@ -1,50 +1,21 @@
+import { createAudio } from '@board-games/shared/ui';
 /** Gesture-only, disposable synthesis. No network assets, loops or hidden-card cues. */
 export function tableAudio() {
-  let context: AudioContext | null = null;
+  const audio = createAudio();
+  const cues = { paper: [220, 100], ceramic: [740, 430], score: [490, 690] };
   return {
-    unlock() {
-      try {
-        if (!context) context = new AudioContext();
-        if (context.state === 'suspended')
-          void context.resume().catch(() => {});
-      } catch {}
+    unlock: () => void audio.unlock(),
+    play(kind: keyof typeof cues, volume: number) {
+      const [from, to] = cues[kind];
+      audio.tone({
+        from,
+        to,
+        duration: 0.12,
+        volume: Math.min(0.035, Math.max(0, volume) * 0.045),
+        attack: 0.002,
+      });
     },
-    play(kind: 'paper' | 'ceramic' | 'score', volume: number) {
-      try {
-        if (!context || context.state !== 'running') return;
-        const osc = context.createOscillator(),
-          gain = context.createGain();
-        osc.connect(gain);
-        gain.connect(context.destination);
-        const now = context.currentTime;
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(
-          kind === 'paper' ? 220 : kind === 'ceramic' ? 740 : 490,
-          now,
-        );
-        osc.frequency.exponentialRampToValueAtTime(
-          kind === 'paper' ? 100 : kind === 'ceramic' ? 430 : 690,
-          now + 0.08,
-        );
-        gain.gain.setValueAtTime(
-          Math.min(0.035, Math.max(0, volume) * 0.045),
-          now,
-        );
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
-        osc.start(now);
-        osc.stop(now + 0.14);
-        osc.onended = () => {
-          osc.disconnect();
-          gain.disconnect();
-        };
-      } catch {}
-    },
-    close() {
-      try {
-        void context?.close().catch(() => {});
-      } catch {}
-      context = null;
-    },
+    close: audio.close,
   };
 }
 export function passBundles(

@@ -64,10 +64,12 @@ Publisher evidence and the independently transcribed wall were locked during the
 
 ## Validation
 
-Rule tests include independent scoring examples, exact wall mapping, invalid payload/RNG immutability, every marker convention, partial refill, full conserved seeded games for all seat counts, final resolution and ties. Session tests exercise actual Socket.IO delivery, identity binding, concurrent intentions, request deduplication, reconnect, replacement/revoked credentials and rematch generations. Browser tests and inspected visual evidence are recorded in `docs/handoffs/azul.md`; the independent final review and corrections are in [Azul review](../handoffs/azul-review.md).
-
 ## Table presentation
 
 The accepted visual direction is Rich & Dramatic, recorded in [ADR 020](../adr/020-azul-rich-dramatic.md), with implementation details in [Azul redesign](../azul-redesign/README.md). Generated ceramic, textile, board and brass imagery sits under live state-driven components; no rule, convention or architecture boundary above changes. Two rulebook details remain important: the retail player board is flat printed cardboard with nothing recessed, and faded tile motifs are printed on the wall rather than the pattern lines.
 
 Actual Safari on macOS/iOS, device touch/audio quality, a multi-human game and fluent Spanish editorial review require human validation and are not established by WebKit automation.
+
+## Invariants
+
+Rich & Dramatic table ([ADR 020](../adr/020-azul-rich-dramatic.md)): raster materials under live Svelte state, one collision-free ring of factories around the centre pool, opponents as real boards, decorative 0–100 score track with exact uncapped scores and `100+`. The main table never scrolls; compact uses whole-factory buttons, colour/destination dialogs and a collapsed local tray. Stage scoring only from accepted public events. Keep every `data-azul-location` anchor — a missing or zero-sized anchor silently drops its flight. Never retry drafts automatically.

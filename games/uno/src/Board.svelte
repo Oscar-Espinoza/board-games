@@ -1,10 +1,17 @@
 <script lang="ts">
-  import { onMount, tick, untrack } from 'svelte';
+  import { onMount, tick, untrack, type Snippet } from 'svelte';
+  import { prefersReducedMotion } from 'svelte/motion';
+  import { modal, read, write } from '@board-games/shared/ui';
   import { m } from '@board-games/shared/messages';
   import type { Locale } from '@board-games/shared/runtime';
   import type { Player } from '@board-games/game-core';
   import type { Action, Card, Color } from './index.js';
-  import { seatPosition, type UnoView } from './presentation.js';
+  import {
+    bigDraws,
+    seatPosition,
+    unoCalls,
+    type UnoView,
+  } from './presentation.js';
   import { cardMotion, cardAudio } from './motion.js';
   let {
     view,
@@ -15,7 +22,9 @@
     round = 0,
     connected = true,
     pending = false,
-    practice = false,
+    canRematch = false,
+    rematch,
+    settingsContent,
   }: {
     view: UnoView;
     playerId: string;
@@ -25,30 +34,45 @@
     round?: number;
     connected?: boolean;
     pending?: boolean;
-    practice?: boolean;
+    canRematch?: boolean;
+    rematch?: () => void;
+    settingsContent?: Snippet;
   } = $props();
   let root: HTMLElement;
   let declared = $state(false),
-    soundEnabled = $state(true),
-    motionEnabled = $state(true),
-    showRules = $state(false);
+    soundEnabled = $state(read('uno:sound') !== 'off'),
+    // An explicit choice wins; otherwise follow the system motion preference.
+    motionSetting = $state(read('uno:motion')),
+    settingsOpen = $state(false),
+    // Players currently holding a declared last card.
+    called = $state<Record<string, boolean>>({}),
+    pops = $state<{ key: number; id: string; count: number }[]>([]),
+    burst = $state<{ key: number; id: string } | null>(null);
+  const motionEnabled = $derived(
+    motionSetting ? motionSetting !== 'off' : !prefersReducedMotion.current,
+  );
   let motion = $state<ReturnType<typeof cardMotion>>();
   const audio = cardAudio();
   const palette = {
-    red: '#cd514f',
-    yellow: '#d4a63d',
-    green: '#36896b',
-    blue: '#447ec0',
+    red: '#e2332d',
+    yellow: '#f5bd1d',
+    green: '#2fa04c',
+    blue: '#1f6fcf',
   };
   const colors: Color[] = ['red', 'yellow', 'green', 'blue'];
   let pub = $derived(view.public),
     hand = $derived(view.private.hand),
     legal = $derived(view.private.legalActions);
   let ownIndex = $derived(pub.players.findIndex((p) => p.id === playerId));
-  let seats = $derived([
-    ...pub.players.slice(ownIndex),
+  let opponents = $derived([
+    ...pub.players.slice(ownIndex + 1),
     ...pub.players.slice(0, ownIndex),
   ]);
+  let myTurn = $derived(pub.turn === playerId && pub.phase === 'turn');
+  // Arc the hand: small rotation steps that tighten as it grows.
+  let step = $derived(
+    hand.length > 1 ? Math.min(5, 36 / (hand.length - 1)) : 0,
+  );
   let t = $derived({
     red: m.uno_red({}, { locale }),
     yellow: m.uno_yellow({}, { locale }),
@@ -71,6 +95,14 @@
     `${card.color ? t[card.color] : ''} ${card.symbol === 'wild' || card.symbol === 'skip' || card.symbol === 'reverse' ? t[card.symbol] : card.symbol}`.trim();
   const playable = (id: number) =>
     legal.some((a) => a.type === 'PLAY_CARD' && a.cardId === id);
+  const timers = new Set<ReturnType<typeof setTimeout>>();
+  function later(fn: () => void, ms: number) {
+    const id = setTimeout(() => {
+      timers.delete(id);
+      fn();
+    }, ms);
+    timers.add(id);
+  }
   function act(action: Action) {
     audio.unlock();
     send(action);
@@ -80,15 +112,13 @@
     declared = false;
   }
   function preference(kind: 'sound' | 'motion', value: boolean) {
-    try {
-      localStorage.setItem(`uno:${kind}`, value ? 'on' : 'off');
-    } catch {}
+    write(`uno:${kind}`, value ? 'on' : 'off');
     if (kind === 'sound') {
       soundEnabled = value;
       audio.setEnabled(value);
       audio.unlock();
     } else {
-      motionEnabled = value;
+      motionSetting = value ? 'on' : 'off';
       if (!value) motion?.clear();
     }
   }
@@ -107,18 +137,46 @@
     const animate = untrack(() => controller.prepare(next, enabled, online));
     void tick().then(animate);
   });
+  // UNO calls and penalty draws, read from consecutive public revisions only.
+  let lastView: UnoView | undefined,
+    lastRound = -1;
   $effect(() => {
-    if (hand.length !== 2 || pub.turn !== playerId || pub.phase !== 'turn')
-      declared = false;
+    const next = view,
+      currentRound = round;
+    untrack(() => {
+      const before = lastView;
+      lastView = next;
+      if (currentRound !== lastRound) {
+        lastRound = currentRound;
+        called = {};
+        return;
+      }
+      for (const seat of next.public.players)
+        if (seat.count !== 1 && called[seat.id]) delete called[seat.id];
+      if (!before) return;
+      const fresh = !document.hidden;
+      for (const id of unoCalls(before, next)) {
+        called[id] = true;
+        if (fresh) audio.call();
+        if (fresh && motionEnabled) {
+          const key = Date.now();
+          burst = { key, id };
+          later(() => {
+            if (burst?.key === key) burst = null;
+          }, 1400);
+        }
+      }
+      for (const draw of bigDraws(before, next)) {
+        const key = Math.random();
+        pops.push({ key, ...draw });
+        later(() => (pops = pops.filter((p) => p.key !== key)), 1700);
+      }
+    });
+  });
+  $effect(() => {
+    if (hand.length !== 2 || !myTurn) declared = false;
   });
   onMount(() => {
-    const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-    motionEnabled = !reduced.matches;
-    try {
-      soundEnabled = localStorage.getItem('uno:sound') !== 'off';
-      const setting = localStorage.getItem('uno:motion');
-      if (setting) motionEnabled = setting !== 'off';
-    } catch {}
     audio.setEnabled(soundEnabled);
     motion = cardMotion(root, playerId, () => {
       if (!document.hidden) audio.play();
@@ -126,26 +184,18 @@
     const unlock = () => audio.unlock();
     const reset = () => motion?.reset();
     const resize = () => motion?.clear();
-    const reducedChanged = () => {
-      try {
-        if (localStorage.getItem('uno:motion') !== null) return;
-      } catch {}
-      motionEnabled = !reduced.matches;
-      if (!motionEnabled) motion?.clear();
-    };
     document.addEventListener('pointerdown', unlock, true);
     document.addEventListener('keydown', unlock, true);
     document.addEventListener('visibilitychange', reset);
     window.addEventListener('resize', resize);
-    reduced.addEventListener('change', reducedChanged);
     return () => {
       motion?.reset();
       audio.dispose();
+      for (const id of timers) clearTimeout(id);
       document.removeEventListener('pointerdown', unlock, true);
       document.removeEventListener('keydown', unlock, true);
       document.removeEventListener('visibilitychange', reset);
       window.removeEventListener('resize', resize);
-      reduced.removeEventListener('change', reducedChanged);
     };
   });
 </script>
@@ -154,54 +204,32 @@
   <span class="corner">{symbol(card)}</span>
   {#if !card.color}
     <svg class="wild-art" viewBox="0 0 80 100" aria-hidden="true">
-      {#if card.symbol === '+4'}
-        <g transform="rotate(-18 40 50)" stroke="#fff8e5" stroke-width="2.5">
-          <rect x="8" y="20" width="24" height="40" rx="4" fill={palette.red} />
-          <rect
-            x="22"
-            y="28"
-            width="24"
-            height="40"
-            rx="4"
-            fill={palette.blue}
-          />
-          <rect
-            x="36"
-            y="36"
-            width="24"
-            height="40"
-            rx="4"
-            fill={palette.green}
-          />
-          <rect
-            x="50"
-            y="44"
-            width="24"
-            height="40"
-            rx="4"
-            fill={palette.yellow}
-          />
-        </g>
-      {:else}
-        <g transform="rotate(25 40 50)">
-          <path d="M40 50V12A30 38 0 0 1 70 50Z" fill={palette.red} />
-          <path d="M40 50H70A30 38 0 0 1 40 88Z" fill={palette.blue} />
-          <path d="M40 50V88A30 38 0 0 1 10 50Z" fill={palette.yellow} />
-          <path d="M40 50H10A30 38 0 0 1 40 12Z" fill={palette.green} />
-          <ellipse
-            cx="40"
-            cy="50"
-            rx="30"
-            ry="38"
-            fill="none"
-            stroke="#fff8e5"
-            stroke-width="2.5"
-          />
-        </g>
-      {/if}
+      <g transform="rotate(25 40 50)">
+        <path d="M40 50V12A30 38 0 0 1 70 50Z" fill={palette.red} />
+        <path d="M40 50H70A30 38 0 0 1 40 88Z" fill={palette.blue} />
+        <path d="M40 50V88A30 38 0 0 1 10 50Z" fill={palette.yellow} />
+        <path d="M40 50H10A30 38 0 0 1 40 12Z" fill={palette.green} />
+        <ellipse
+          cx="40"
+          cy="50"
+          rx="30"
+          ry="38"
+          fill="none"
+          stroke="#fff"
+          stroke-width="3"
+        />
+      </g>
     </svg>
+    {#if card.symbol === '+4'}<strong class="wild-plus">+4</strong>{/if}
   {:else}<strong>{symbol(card)}</strong>{/if}
   <span class="corner bottom">{symbol(card)}</span>
+{/snippet}
+
+{#snippet bubbles(id: string)}
+  {#if called[id]}<span class="bubble uno">UNO!</span>{/if}
+  {#each pops.filter((p) => p.id === id) as pop (pop.key)}<span
+      class="bubble draw">+{pop.count}</span
+    >{/each}
 {/snippet}
 
 <section
@@ -213,89 +241,99 @@
   data-sound={soundEnabled}
   data-motion={motionEnabled}
 >
-  <div class="table-surface" aria-hidden="true">
-    <div class="table-stitch"></div>
-    <span class="table-brand"
-      >UNO<span
-        >{practice
-          ? m.uno_practice_table({}, { locale })
-          : m.uno_table({}, { locale })}</span
-      ></span
+  <nav class="tools" aria-label={m.uno_settings({}, { locale })}>
+    <button
+      aria-pressed={soundEnabled}
+      aria-label={m.uno_sound({}, { locale })}
+      title={m.uno_sound({}, { locale })}
+      onclick={() => preference('sound', !soundEnabled)}
+      ><svg viewBox="0 0 24 24" aria-hidden="true"
+        ><path d="M4 9h4l5-4v14l-5-4H4z" class="fill" />{#if soundEnabled}<path
+            d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"
+          />{:else}<path d="M16.5 9.5l5 5M21.5 9.5l-5 5" />{/if}</svg
+      ></button
+    ><button
+      aria-pressed={motionEnabled}
+      aria-label={m.uno_motion({}, { locale })}
+      title={m.uno_motion({}, { locale })}
+      onclick={() => preference('motion', !motionEnabled)}
+      ><svg viewBox="0 0 24 24" aria-hidden="true"
+        ><rect
+          x="10"
+          y="4"
+          width="10"
+          height="15"
+          rx="2"
+          transform="rotate(14 15 11.5)"
+        /><path d="M2.5 9h4.5M1.5 13h5M3.5 17h3" />{#if !motionEnabled}<path
+            d="M3 3l18 18"
+          />{/if}</svg
+      ></button
+    ><button
+      aria-label={m.uno_settings({}, { locale })}
+      title={m.uno_settings({}, { locale })}
+      onclick={() => (settingsOpen = true)}
+      ><svg viewBox="0 0 24 24" aria-hidden="true"
+        ><circle cx="12" cy="12" r="3" /><path
+          d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+        /></svg
+      ></button
     >
-  </div>
-  <div class="seating roster">
-    {#each seats as seat, index (seat.id)}
-      {@const position = seatPosition(index, seats.length)}
+  </nav>
+  <div class="seating">
+    {#each opponents as seat, index (seat.id)}
+      {@const position = seatPosition(index + 1, pub.players.length)}
       {@const member = players.find((p) => p.id === seat.id)}
       <div
         class="seat"
-        class:local={index === 0}
         class:active={pub.turn === seat.id && pub.phase !== 'finished'}
         class:offline={member?.connected === false}
         style={`--seat-x:${position[0]}%;--seat-y:${position[1]}%`}
         data-seat={seat.id}
-        data-position={index === 0
-          ? 'south'
-          : position[0] === 50
-            ? 'north'
-            : position[0] < 50
-              ? 'west'
-              : 'east'}
       >
-        <div class="chair" aria-hidden="true"></div>
-        <div class="portrait" aria-hidden="true">
-          {name(seat.id).slice(0, 1).toUpperCase()}
+        <div class="plate">
+          <div class="portrait" aria-hidden="true">
+            {name(seat.id).slice(0, 1).toUpperCase()}
+          </div>
+          <b>{name(seat.id)}</b>
+          {#if member?.bot || member?.connected === false}<span
+              >{member?.connected === false
+                ? m.reserved({}, { locale })
+                : m.uno_bot({}, { locale })}</span
+            >{/if}
         </div>
-        <div class="seat-label">
-          <b>{name(seat.id)}</b><span
-            >{index === 0
-              ? m.uno_you({}, { locale })
-              : member?.bot
-                ? m.uno_bot({}, { locale })
-                : member?.connected === false
-                  ? m.reserved({}, { locale })
-                  : `${seat.count} ${m.uno_cards({}, { locale })}`}</span
-          >
+        <div class="seat-cards" aria-hidden="true">
+          {#each Array(Math.min(seat.count, 7)) as _, i}<span
+              class="mini-back"
+              style={`--fan:${i - (Math.min(seat.count, 7) - 1) / 2}`}
+            ></span>{/each}
         </div>
-        {#if index !== 0}<div
-            class="seat-cards"
-            aria-label={`${seat.count} ${m.uno_cards({}, { locale })}`}
-          >
-            {#each Array(Math.min(seat.count, 7)) as _, i}<span
-                class="mini-back"
-                style={`--fan:${i - (Math.min(seat.count, 7) - 1) / 2}`}
-                aria-hidden="true">◈</span
-              >{/each}
-            <strong>{seat.count === 1 ? 'UNO!' : seat.count}</strong>
-          </div>{:else}<span class="seat-cards local-anchor" aria-hidden="true"
-          ></span>{/if}
+        {@render bubbles(seat.id)}
       </div>
     {/each}
   </div>
   <div class="center-table">
-    <div class="status" aria-live="polite">
-      {#if pub.phase === 'finished'}<h2>
-          {pub.winner
-            ? `${name(pub.winner)} ${m.uno_won({}, { locale })}`
-            : m.uno_tie({}, { locale })}
-        </h2>
-      {:else}<p class="turn-label">
-          {pub.turn === playerId
-            ? m.uno_your_move({}, { locale })
-            : `${m.uno_waiting({}, { locale })} · ${name(pub.turn)}`}
-        </p>{/if}
-      <span
-        class="color-indicator"
-        style:--active-color={palette[pub.activeColor]}
-        ><i></i>{t[pub.activeColor]}
-        <span
-          aria-label={pub.direction === 1
-            ? m.uno_clockwise({}, { locale })
-            : m.uno_counter({}, { locale })}
-          >{pub.direction === 1 ? '↻' : '↺'}</span
-        ></span
+    <svg
+      class="flow"
+      class:counter={pub.direction === -1}
+      viewBox="0 0 400 300"
+      aria-hidden="true"
+    >
+      <defs
+        ><marker
+          id="uno-arrow"
+          viewBox="0 0 10 10"
+          refX="5"
+          refY="5"
+          markerWidth="3"
+          markerHeight="3"
+          orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" /></marker
+        ></defs
       >
-    </div>
+      <path d="M96 30Q150 2 214 8" marker-end="url(#uno-arrow)" />
+      <path d="M150 300Q100 296 76 262" marker-end="url(#uno-arrow)" />
+      <path d="M252 300Q300 296 326 262" marker-end="url(#uno-arrow)" />
+    </svg>
     <div class="piles">
       <div class="pile-group">
         <button
@@ -306,42 +344,48 @@
             !legal.some((a) => a.type === 'DRAW')}
           onclick={() => act({ type: 'DRAW' })}
         >
-          <span class="card card-back"
-            ><span class="back-emblem">UNO</span><span class="back-detail"
-              >◈</span
-            ></span
-          >
-          <span class="draw-label"
-            >{pub.penalty ? `+${pub.penalty.amount}` : `+1`}</span
-          >
-        </button><small
-          >{m.uno_draw_pile({}, { locale })} · {pub.stockCount}</small
-        >
+          <span class="card card-back"><span class="back-oval"></span></span>
+          {#if pub.penalty}<span class="penalty">+{pub.penalty.amount}</span
+            >{/if}
+        </button>
+        <small>{m.uno_draw({}, { locale })}</small>
       </div>
       <div class="pile-group">
-        {#key pub.top.id}<div
-            class="card discard"
-            class:wild-card={!pub.top.color}
-            style:--card-color={pub.top.color
-              ? palette[pub.top.color]
-              : '#282c3b'}
-            aria-label={label(pub.top)}
-          >
-            {@render cardFace(pub.top)}
-          </div>{/key}<small>{m.uno_discard_pile({}, { locale })}</small>
+        <div class="discard-stack">
+          {#key pub.top.id}<div
+              class="card discard"
+              class:wild-card={!pub.top.color}
+              style:--card-color={pub.top.color
+                ? palette[pub.top.color]
+                : '#17171b'}
+              aria-label={label(pub.top)}
+            >
+              {@render cardFace(pub.top)}
+            </div>{/key}
+        </div>
+        <small>{m.uno_discard_pile({}, { locale })}</small>
+        <span class="color-pill" style:--active-color={palette[pub.activeColor]}
+          >{t[pub.activeColor]}</span
+        >
       </div>
     </div>
+    <p class="flow-label">
+      {m.uno_play_continues({}, { locale })}<br />{pub.direction === 1
+        ? m.uno_clockwise({}, { locale })
+        : m.uno_counter({}, { locale })}
+    </p>
     {#if pub.phase === 'color' && pub.turn === playerId}<div
         class="color-choice"
       >
         <p>{m.uno_choose({}, { locale })}</p>
         <div>
           {#each colors as color}<button
-              style:background={palette[color]}
+              style:--swatch={palette[color]}
+              aria-label={t[color]}
+              title={t[color]}
               disabled={pending || !connected}
               onclick={() => act({ type: 'CHOOSE_COLOR', color })}
-              >{t[color]}</button
-            >{/each}
+            ></button>{/each}
         </div>
       </div>{/if}
     {#each legal.filter((a) => a.type === 'CATCH_UNO') as action}<button
@@ -353,324 +397,363 @@
         )}</button
       >{/each}
   </div>
-  <div class="hand-area">
-    <div class="hand-heading">
-      <h3>{m.uno_hand({}, { locale })}<span>{hand.length}</span></h3>
-      <button
-        class="declare"
-        class:armed={declared}
-        aria-pressed={declared}
-        disabled={hand.length !== 2 ||
-          pub.phase !== 'turn' ||
-          pub.turn !== playerId ||
-          pending ||
-          !connected}
-        onclick={() => {
-          audio.unlock();
-          declared = !declared;
-        }}
-        title={m.uno_declared_hint({}, { locale })}
-        >{declared
-          ? m.uno_armed({}, { locale })
-          : m.uno_declare({}, { locale })}<strong>UNO!</strong></button
-      >
+  {#if burst}{#key burst.key}<div class="burst" aria-hidden="true">
+        UNO!<small>{name(burst.id)}</small>
+      </div>{/key}{/if}
+  <div class="hand-area" class:mine={myTurn}>
+    <div class="turn-row" aria-live="polite">
+      {#if pub.phase === 'finished'}<p class="turn-pill done">
+          {pub.winner
+            ? `${name(pub.winner)} ${m.uno_won({}, { locale })}`
+            : m.uno_tie({}, { locale })}
+        </p>
+        {#if canRematch}<button class="rematch" onclick={() => rematch?.()}
+            >{m.rematch({}, { locale })}</button
+          >{/if}
+      {:else}<p class="turn-pill" class:mine={pub.turn === playerId}>
+          {pub.turn === playerId
+            ? m.uno_turn({}, { locale })
+            : m.uno_turn_of({ name: name(pub.turn) }, { locale })}
+        </p>{/if}
+      <span class="self-bubbles">{@render bubbles(playerId)}</span>
     </div>
-    <div class="hand-scroll">
-      <div class="hand" style={`--count:${hand.length}`}>
-        {#each hand as card (card.id)}<button
-            class="card"
-            class:wild-card={!card.color}
-            data-card={card.id}
-            class:playable={playable(card.id)}
-            style:--card-color={card.color ? palette[card.color] : '#282c3b'}
-            disabled={!playable(card.id) || pending || !connected}
-            onclick={() => play(card.id)}
-            aria-label={label(card)}
-            title={label(card)}>{@render cardFace(card)}</button
-          >{/each}
-      </div>
+    <div class="hand" style={`--count:${hand.length}`}>
+      {#each hand as card, i (card.id)}
+        {@const angle = (i - (hand.length - 1) / 2) * step}
+        <button
+          class="card"
+          class:wild-card={!card.color}
+          class:playable={playable(card.id)}
+          class:dim={myTurn && !playable(card.id)}
+          data-card={card.id}
+          style:--card-color={card.color ? palette[card.color] : '#17171b'}
+          style:--rot={`${angle}deg`}
+          style:--a2={((angle * Math.PI) / 180) ** 2}
+          disabled={!playable(card.id) || pending || !connected}
+          onclick={() => play(card.id)}
+          aria-label={label(card)}
+          title={label(card)}>{@render cardFace(card)}</button
+        >
+      {/each}
     </div>
   </div>
-  <header class="table-tools">
-    <button
-      aria-pressed={soundEnabled}
-      onclick={() => preference('sound', !soundEnabled)}
-      ><span aria-hidden="true">{soundEnabled ? '♫' : '♩'}</span>{m.uno_sound(
-        {},
-        { locale },
-      )}<i class:on={soundEnabled}></i></button
-    ><button
-      aria-pressed={motionEnabled}
-      onclick={() => preference('motion', !motionEnabled)}
-      >{m.uno_motion({}, { locale })}<i class:on={motionEnabled}></i></button
-    ><button aria-expanded={showRules} onclick={() => (showRules = !showRules)}
-      >{m.uno_rules({}, { locale })}</button
-    >
-  </header>
-  {#if showRules}<aside class="rules-panel">
-      <p>{m.uno_hint({}, { locale })}</p>
-      <p>{m.uno_declared_hint({}, { locale })}</p>
-      <button onclick={() => (showRules = false)}>×</button>
-    </aside>{/if}
+  <button
+    class="declare"
+    class:armed={declared}
+    aria-pressed={declared}
+    aria-label={declared
+      ? m.uno_armed({}, { locale })
+      : m.uno_declare({}, { locale })}
+    title={m.uno_declared_hint({}, { locale })}
+    disabled={hand.length !== 2 || !myTurn || pending || !connected}
+    onclick={() => {
+      audio.unlock();
+      declared = !declared;
+    }}>UNO!</button
+  >
+  <dialog
+    class="settings"
+    aria-label={m.uno_settings({}, { locale })}
+    {@attach modal(() => settingsOpen)}
+    onclose={() => (settingsOpen = false)}
+    onclick={(e) => {
+      if (e.target === e.currentTarget) settingsOpen = false;
+    }}
+  >
+    <header>
+      <h2>{m.uno_settings({}, { locale })}</h2>
+      <button
+        class="close"
+        aria-label={m.uno_close({}, { locale })}
+        onclick={() => (settingsOpen = false)}>×</button
+      >
+    </header>
+    <div class="settings-body">{@render settingsContent?.()}</div>
+  </dialog>
 </section>
 
 <style>
+  @font-face {
+    font-family: 'Nunito';
+    font-style: normal;
+    font-weight: 700 900;
+    font-display: swap;
+    src: url('/fonts/nunito/nunito-latin.woff2') format('woff2');
+  }
   .uno-table {
-    --card-w: 90px;
-    --card-h: 132px;
+    --card-h: min(19vh, 12.5vw);
+    --card-w: calc(var(--card-h) * 0.69);
+    --hand-h: min(27vh, 17vw);
+    --hand-w: calc(var(--hand-h) * 0.69);
+    --portrait: clamp(52px, 9.4vh, 92px);
+    --ink: #1b1512;
     position: absolute;
     inset: 0;
     isolation: isolate;
     overflow: hidden;
-    color: #f4efda;
-    background: radial-gradient(ellipse at 50% 30%, #363e33, #171d19 80%);
-    font-family: system-ui, sans-serif;
+    color: #fff;
+    background: #1d120a url('/games/uno/table-wide.webp') center / cover
+      no-repeat;
+    font-family: 'Nunito', ui-rounded, system-ui, sans-serif;
+    font-weight: 800;
   }
-  .table-surface {
-    position: absolute;
-    inset: 14% 12% 19%;
-    border: 14px solid #67503c;
-    border-radius: 48% / 44%;
-    background: radial-gradient(
-      ellipse at 48% 40%,
-      #356858,
-      #194e42 68%,
-      #133c34
-    );
-    box-shadow:
-      0 0 0 2px #947153,
-      0 12px 0 #332a22,
-      0 24px 40px #0007,
-      inset 0 0 0 2px #b18a5f55,
-      inset 0 0 65px #001f1b66;
-  }
-  .table-surface::after {
+  .uno-table::before {
     content: '';
     position: absolute;
+    z-index: -1;
     inset: 0;
-    border-radius: inherit;
-    opacity: 0.16;
-    background: repeating-linear-gradient(
-      0deg,
-      transparent 0 2px,
-      #b8d3b733 3px 4px
+    background: radial-gradient(
+      ellipse 75% 70% at 50% 45%,
+      #0000 55%,
+      #0a050280 100%
     );
     pointer-events: none;
   }
-  .table-stitch {
+  .tools {
     position: absolute;
-    inset: 10px;
-    border: 1px dashed #c5d4a644;
-    border-radius: inherit;
+    z-index: 6;
+    top: max(20px, env(safe-area-inset-top));
+    right: 24px;
+    display: flex;
+    gap: 14px;
   }
-  .table-brand {
-    position: absolute;
-    left: 50%;
-    top: 28%;
-    transform: translate(-50%, -50%);
-    font-weight: 900;
-    font-style: italic;
-    letter-spacing: -0.06em;
-    font-size: 54px;
-    color: #bbd8be16;
-    text-align: center;
+  .tools button {
+    width: 56px;
+    height: 56px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 1px solid #ffffff26;
+    background: #161009d0;
+    backdrop-filter: blur(6px);
+    color: #fff;
+    box-shadow: 0 6px 16px #0008;
   }
-  .table-brand span {
-    display: block;
-    white-space: nowrap;
-    font-size: 10px;
-    font-weight: 500;
-    font-style: normal;
-    letter-spacing: 0.3em;
-    text-transform: uppercase;
+  .tools button:hover {
+    background: #2b1f15;
+    transform: none;
+  }
+  .tools button[aria-pressed='false'] {
+    color: #a39585;
+  }
+  .tools svg {
+    width: 26px;
+    height: 26px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .tools svg .fill {
+    fill: currentColor;
   }
   .seating {
     position: absolute;
-    inset: 106px 0 20px;
-    margin: 0;
+    inset: 0;
     pointer-events: none;
   }
   .seat {
     position: absolute;
-    left: clamp(42px, var(--seat-x), calc(100% - 42px));
+    left: clamp(80px, var(--seat-x), calc(100% - 80px));
     top: var(--seat-y);
-    transform: translate(-50%, -50%);
+    /* Anchor on the portrait centre so seats sit on the painted rim. */
+    transform: translate(-50%, calc(var(--portrait) * -0.5));
     display: flex;
-    align-items: center;
     flex-direction: column;
-    width: 150px;
+    align-items: center;
+    width: 170px;
     z-index: 1;
     text-align: center;
   }
-  .chair {
-    position: absolute;
-    z-index: -1;
-    top: -13px;
-    width: 78px;
-    height: 86px;
-    border: 5px solid #745942;
-    border-radius: 30px 30px 19px 19px;
-    background: linear-gradient(145deg, #514236, #322c24);
-    box-shadow:
-      0 6px 0 #111a,
-      0 12px 14px #0005,
-      inset 0 0 0 1px #b4916344;
+  .plate {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: calc(var(--portrait) * 0.55);
+    padding: 0 22px 10px;
+    min-width: 128px;
+    max-width: 168px;
+    border-radius: 18px;
+    background: #1a120cc4;
+    backdrop-filter: blur(6px);
+    border: 1px solid #ffffff1a;
+    box-shadow: 0 10px 22px #0007;
   }
   .portrait {
-    width: 48px;
-    height: 48px;
+    width: var(--portrait);
+    height: var(--portrait);
+    margin-top: calc(var(--portrait) * -0.55);
+    margin-bottom: 4px;
     border-radius: 50%;
     display: grid;
     place-items: center;
     font-family: Georgia, serif;
-    font-size: 22px;
+    font-size: calc(var(--portrait) * 0.42);
     font-weight: 600;
-    background: #d7ccac;
-    color: #39483d;
-    border: 3px solid #536657;
-    box-shadow: 0 2px 8px #0004;
+    background: radial-gradient(circle at 40% 35%, #fbf1dc, #dcc79f);
+    color: #3f2f22;
+    border: 5px solid #2f9b86;
+    box-shadow:
+      0 0 0 3px #1a120c,
+      0 6px 16px #0009;
   }
   .seat.active .portrait {
-    border-color: #e9cf7e;
-    box-shadow:
-      0 0 0 4px #e9cf7e22,
-      0 0 20px #e9cf7e25;
+    border-color: #5fe483;
+    animation: turn-glow 1.6s ease-in-out infinite;
   }
   .seat.offline {
     opacity: 0.5;
   }
-  .seat-label {
-    margin-top: 7px;
-    background: #172b24e8;
-    box-shadow: 0 4px 9px #0003;
-    border: 1px solid #c0c9ae20;
-    border-radius: 7px;
-    padding: 6px 12px;
-    max-width: 140px;
-  }
-  .seat-label b {
+  .plate b {
     display: block;
-    font-size: 12px;
-    max-width: 120px;
+    max-width: 140px;
+    font-size: 19px;
+    font-weight: 900;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-shadow: 0 1px 2px #000;
   }
-  .seat-label span {
-    display: block;
-    font-size: 9px;
-    color: #adbaac;
-    margin-top: 2px;
+  .plate span {
+    font-size: 14px;
+    font-weight: 700;
+    color: #e3d6c4;
   }
   .seat-cards {
     position: relative;
-    height: 48px;
-    width: 100px;
-    margin-top: 5px;
+    width: 120px;
+    height: 58px;
+    margin-top: 6px;
   }
   .mini-back {
     position: absolute;
-    width: 27px;
-    height: 40px;
-    border: 2px solid #d5d1b9;
-    border-radius: 4px;
-    background: #273c38;
-    left: calc(36px + var(--fan) * 10px);
+    width: 32px;
+    height: 47px;
+    left: calc(44px + var(--fan) * 11px);
     top: calc(var(--fan) * var(--fan) * 1px);
     transform: rotate(calc(var(--fan) * 9deg));
-    color: #d0ae62;
-    display: grid;
-    place-items: center;
-    font-size: 12px;
-    box-shadow: 0 2px 3px #0005;
+    border: 2px solid #fff;
+    border-radius: 5px;
+    background: #121214;
+    box-shadow:
+      0 3px 6px #0008,
+      inset 0 0 0 1px #0006;
   }
-  .seat-cards strong {
+  .mini-back::after,
+  .back-oval {
+    content: '';
     position: absolute;
-    bottom: -7px;
-    right: 0;
-    font-size: 10px;
-    border-radius: 20px;
-    background: #e0c780;
-    color: #24372b;
-    padding: 3px 6px;
+    inset: 22% 12%;
+    border-radius: 50%;
+    background: conic-gradient(
+      from 25deg,
+      #e2332d 0 25%,
+      #1f6fcf 0 50%,
+      #f5bd1d 0 75%,
+      #2fa04c 0
+    );
+    transform: rotate(25deg);
   }
-  .local .chair {
-    width: 100px;
+  .bubble {
+    position: absolute;
+    z-index: 3;
+    top: -4px;
+    left: calc(50% + var(--portrait) * 0.45);
+    padding: 5px 14px;
+    border-radius: 18px 18px 18px 5px;
+    font-weight: 900;
+    font-size: 22px;
+    white-space: nowrap;
+    box-shadow: 0 5px 12px #0007;
+    animation: pop 0.55s cubic-bezier(0.3, 1.6, 0.5, 1) both;
   }
-  .local .seat-label {
-    display: block;
+  .bubble.uno {
+    background: #1d7a44;
+    border: 3px solid #8ff0a6;
+    color: #fff;
+    transform: rotate(-6deg);
   }
-  .local .portrait {
-    width: 36px;
-    height: 36px;
-    font-size: 17px;
+  .bubble.draw {
+    top: -24px;
+    background: #e02f3c;
+    border: 3px solid #fff;
+    color: #fff;
+    font-size: 30px;
+    animation:
+      pop 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) both,
+      fade 0.4s 1.3s both;
   }
-  .local-anchor {
-    display: none;
-  }
-  .seat.local {
-    top: auto;
-    bottom: calc(var(--card-h) + 68px);
-    transform: translateX(-50%);
+  .bubble.uno + .bubble.draw {
+    left: calc(50% + var(--portrait) * 0.45 + 90px);
   }
   .center-table {
     position: absolute;
     left: 50%;
-    top: 42%;
+    top: 44.5%;
     transform: translate(-50%, -50%);
+    width: calc(var(--card-w) * 4.6);
     text-align: center;
-    width: 330px;
     z-index: 2;
   }
-  .status {
-    margin-bottom: 18px;
-    min-height: 42px;
+  .flow {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 96%;
+    overflow: visible;
+    transform: translate(-50%, -50%);
+    fill: none;
+    stroke: #f6e8d38c;
+    stroke-width: 9;
+    stroke-linecap: round;
+    pointer-events: none;
   }
-  .turn-label {
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    margin: 0 0 7px;
-    color: #f3e8c4;
+  .flow marker path {
+    fill: #f6e8d38c;
+    stroke: none;
   }
-  .status h2 {
-    font-size: 24px;
-    margin: 0 0 8px;
-  }
-  .color-indicator {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 10px;
-    color: #c0cdbd;
-  }
-  .color-indicator i {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--active-color);
-    box-shadow: 0 0 0 2px #ffffff22;
-  }
-  .color-indicator > span {
-    font-size: 17px;
-    margin-left: 7px;
+  .flow.counter {
+    transform: translate(-50%, -50%) scaleX(-1);
   }
   .piles {
+    position: relative;
     display: flex;
     justify-content: center;
-    gap: 38px;
+    gap: calc(var(--card-w) * 0.75);
     align-items: flex-start;
   }
   .pile-group {
     display: flex;
     align-items: center;
     flex-direction: column;
-    gap: 12px;
+    gap: 6px;
   }
   .pile-group > small {
-    font-size: 9px;
-    color: #b0c2ad;
-    letter-spacing: 0.04em;
+    margin-top: 16px;
+    font-size: 20px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 2px 4px #000a;
+  }
+  .color-pill {
+    padding: 1px 18px;
+    border-radius: 20px;
+    border: 3px solid #fff;
+    background: var(--active-color);
+    font-size: 17px;
+    font-weight: 900;
+    text-shadow: 0 1px 2px #0008;
+    box-shadow: 0 4px 12px #0007;
+  }
+  .flow-label {
+    margin: 18px 0 0;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.3;
+    color: #f6e8d3d9;
+    text-shadow: 0 1px 3px #0009;
   }
   .card {
     position: relative;
@@ -678,94 +761,103 @@
     width: var(--card-w);
     height: var(--card-h);
     flex-shrink: 0;
-    border: 5px solid #f0ebd6;
-    border-radius: 11px;
     padding: 0;
-    color: #fff8e5;
+    border: calc(var(--card-w) * 0.065) solid #fff;
+    border-radius: calc(var(--card-w) * 0.11);
+    color: #fff;
     background: var(--card-color);
-    box-shadow: 0 4px 7px #0005;
-    font-family: system-ui, sans-serif;
+    box-shadow:
+      inset 0 0 0 1px #0003,
+      0 6px 14px #0007;
     overflow: hidden;
+    font-family: inherit;
     transition:
-      transform 0.15s,
-      filter 0.15s;
+      transform 0.16s ease,
+      filter 0.16s,
+      box-shadow 0.16s;
     cursor: default;
   }
   .card::before {
     content: '';
     position: absolute;
     z-index: -1;
-    inset: 18px 5px;
-    border: 3px solid #fff8e5bb;
+    inset: 15% 3%;
     border-radius: 50%;
-    transform: rotate(27deg);
+    background: #fff;
+    transform: rotate(28deg);
+  }
+  .card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      135deg,
+      #ffffff59 0%,
+      #ffffff14 30%,
+      #0000 50%,
+      #0000001f 100%
+    );
+    pointer-events: none;
   }
   .wild-card::before {
     display: none;
-  }
-  .wild-art {
-    position: absolute;
-    inset: 10% 8%;
-    width: 84%;
-    height: 80%;
   }
   .card > strong {
     position: absolute;
     inset: 0;
     display: grid;
     place-items: center;
-    font-size: 40px;
+    font-size: calc(var(--card-w) * 0.56);
     line-height: 1;
     font-weight: 900;
-    letter-spacing: -3px;
-    text-shadow: 1px 2px #0003;
+    letter-spacing: -0.04em;
+    color: var(--card-color);
+    -webkit-text-stroke: calc(var(--card-w) * 0.03) var(--ink);
+    paint-order: stroke fill;
+    text-shadow:
+      1px 1px 0 var(--ink),
+      2px 2px 0 var(--ink),
+      3px 3px 0 var(--ink),
+      4px 4px 0 var(--ink);
+  }
+  .card > strong.wild-plus {
+    color: #fff;
+    font-size: calc(var(--card-w) * 0.32);
+  }
+  .wild-art {
+    position: absolute;
+    inset: 8% 6%;
+    width: 88%;
+    height: 84%;
   }
   .corner {
     position: absolute;
-    top: 4px;
-    left: 6px;
-    font-size: 16px;
-    font-weight: 800;
+    top: 3%;
+    left: 7%;
+    font-size: calc(var(--card-w) * 0.22);
+    font-weight: 900;
     line-height: 1;
+    -webkit-text-stroke: 1px var(--ink);
+    paint-order: stroke fill;
+    text-shadow: 1px 2px 0 var(--ink);
   }
   .bottom {
     top: auto;
     left: auto;
-    right: 6px;
-    bottom: 4px;
+    right: 7%;
+    bottom: 3%;
     transform: rotate(180deg);
   }
   .card-back {
-    display: grid;
-    place-items: center;
-    background: repeating-linear-gradient(
-      45deg,
-      #253e37 0 3px,
-      #29433b 3px 5px
-    );
+    display: block;
+    background: #121214;
   }
   .card-back::before {
-    inset: 10px;
-    border: 1px solid #bca26b88;
-    border-radius: 5px;
-    transform: none;
+    display: none;
   }
-  .back-emblem {
-    font-size: 25px;
-    font-weight: 950;
-    font-style: italic;
-    letter-spacing: -2px;
-    color: #e6ce91;
-    background: #a33e39;
-    border-radius: 50%;
-    padding: 7px 5px;
-    transform: rotate(-22deg);
-  }
-  .back-detail {
-    position: absolute;
-    bottom: 12px;
-    font-size: 11px;
-    color: #c1a96e;
+  .back-oval {
+    inset: 14% 3%;
+    border: calc(var(--card-w) * 0.035) solid #fff;
   }
   .stock {
     display: block;
@@ -773,11 +865,17 @@
     border: 0;
     padding: 0;
     background: transparent;
-    border-radius: 11px;
+    border-radius: calc(var(--card-w) * 0.11);
     box-shadow:
-      3px 3px #c3c5af,
-      6px 6px #263b32,
-      8px 8px #b4b99f;
+      2px 3px 0 #e9e6df,
+      3px 5px 0 #26262a,
+      4px 7px 0 #e9e6df,
+      5px 9px 0 #26262a,
+      6px 11px 0 #e9e6df,
+      7px 13px 0 #26262a,
+      8px 15px 0 #e9e6df,
+      9px 17px 0 #1c1c20,
+      10px 30px 30px #000a;
     cursor: pointer;
     color: inherit;
   }
@@ -792,453 +890,546 @@
     background: transparent;
     transform: translateY(-3px);
   }
-  .draw-label {
-    position: absolute;
-    right: -10px;
-    bottom: -6px;
-    display: grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: #dbca92;
-    color: #283c31;
-    font-size: 12px;
-    font-weight: 750;
-    box-shadow: 0 2px 6px #0004;
+  .stock:enabled .card {
+    box-shadow:
+      0 0 0 4px #6bf08daa,
+      0 0 22px #6bf08d88;
   }
-  .stock:disabled .draw-label {
-    background: #7c8f77;
-    color: #20392b;
+  .penalty {
+    position: absolute;
+    right: -18px;
+    top: -16px;
+    padding: 3px 12px;
+    border-radius: 16px;
+    border: 3px solid #fff;
+    background: #e02f3c;
+    color: #fff;
+    font-size: 22px;
+    font-weight: 900;
+    box-shadow: 0 4px 10px #0007;
+  }
+  .discard-stack {
+    position: relative;
+    border-radius: calc(var(--card-w) * 0.11);
+    box-shadow:
+      -2px 3px 0 #e9e6df,
+      -3px 6px 0 #d8d4cc,
+      -4px 9px 0 #e9e6df,
+      -5px 12px 0 #cfcac1,
+      -4px 26px 30px #000a;
+  }
+  .discard-stack::before,
+  .discard-stack::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: #f4f1ea;
+    box-shadow: 0 3px 8px #0005;
+    transform: rotate(-7deg) translate(-5px, 4px);
+  }
+  .discard-stack::after {
+    background: #e2332d;
+    border: calc(var(--card-w) * 0.065) solid #fff;
+    transform: rotate(3deg) translate(4px, 6px);
   }
   .discard {
+    z-index: 1;
     transform: rotate(5deg);
+  }
+  .color-choice {
+    position: absolute;
+    z-index: 4;
+    top: calc(100% - 50px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 14px 18px;
+    border-radius: 20px;
+    background: #1a120cf2;
+    border: 1px solid #ffffff26;
+    box-shadow: 0 14px 34px #0009;
+  }
+  .color-choice p {
+    margin: 0 0 12px;
+    font-size: 16px;
+    white-space: nowrap;
+  }
+  .color-choice > div {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+  }
+  .color-choice button {
+    width: 56px;
+    height: 56px;
+    padding: 0;
+    border-radius: 50%;
+    border: 4px solid #fff;
+    background: var(--swatch);
+    box-shadow: 0 5px 12px #0008;
+  }
+  .color-choice button:hover:enabled {
+    background: var(--swatch);
+    transform: scale(1.1);
+  }
+  .catch {
+    position: absolute;
+    z-index: 4;
+    top: calc(100% + 12px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 10px 20px;
+    white-space: nowrap;
+    border-radius: 24px;
+    border: 3px solid #fff;
+    background: #e07b24;
+    color: #fff;
+    font-weight: 900;
+    font-size: 17px;
+    box-shadow: 0 5px 14px #0008;
+  }
+  .burst {
+    position: absolute;
+    z-index: 20;
+    left: 50%;
+    top: 42%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: clamp(72px, 13vw, 170px);
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    color: #f5bd1d;
+    -webkit-text-stroke: 6px #b3171d;
+    paint-order: stroke fill;
+    text-shadow:
+      0 7px 0 #6d0d10,
+      0 18px 44px #000b;
+    pointer-events: none;
+    animation: burst 1.4s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  }
+  .burst small {
+    font-size: 24px;
+    letter-spacing: 0;
+    color: #fff;
+    -webkit-text-stroke: 0;
+    text-shadow: 0 2px 6px #000;
   }
   .hand-area {
     position: absolute;
     left: 50%;
-    bottom: 46px;
+    bottom: calc(var(--hand-h) * -0.05);
     transform: translateX(-50%);
-    width: min(720px, 76vw);
+    width: min(1000px, calc(100vw - 360px));
+    container-type: inline-size;
     z-index: 3;
   }
-  .hand-heading {
+  .turn-row {
+    position: relative;
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
-    padding: 0 12px 2px;
     gap: 10px;
+    margin-bottom: 4px;
   }
-  .hand-heading h3 {
-    font: 500 10px system-ui;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: #bbc7b7;
+  .turn-pill {
     margin: 0;
+    padding: 6px 30px 8px;
+    border-radius: 28px;
+    font-size: 24px;
+    font-weight: 900;
+    background: #1a120cd9;
+    border: 3px solid #ffffff2e;
+    color: #fff;
+    box-shadow: 0 6px 16px #0007;
   }
-  .hand-heading h3 span {
-    margin-left: 8px;
-    display: inline-grid;
-    place-items: center;
-    width: 19px;
-    height: 19px;
-    background: #b4c0a520;
-    color: #e0e4d0;
-    border-radius: 50%;
-    font-size: 10px;
-    letter-spacing: 0;
+  .turn-pill.mine {
+    position: relative;
+    background: linear-gradient(#7af59c, #2fc15f 60%, #26a650);
+    border-color: #d8ffe2;
+    color: #0c3a1b;
+    box-shadow:
+      inset 0 2px 0 #ffffff80,
+      0 0 26px #4fe07a99,
+      0 6px 16px #0007;
   }
-  .hand-scroll {
-    overflow-x: auto;
-    overflow-y: hidden;
-    padding: 20px 10px 12px;
-    scrollbar-width: thin;
-    scrollbar-color: #7d907666 transparent;
+  .turn-pill.mine::before,
+  .turn-pill.mine::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 26px;
+    height: 44px;
+    translate: 0 -60%;
+    background:
+      linear-gradient(#f7d43c, #f7d43c) 100% 0 / 4px 12px no-repeat,
+      linear-gradient(#f7d43c, #f7d43c) 0 60% / 14px 4px no-repeat;
+    rotate: -20deg;
+  }
+  .turn-pill.mine::before {
+    right: calc(100% + 10px);
+  }
+  .turn-pill.mine::after {
+    left: calc(100% + 10px);
+    transform: scaleX(-1);
+    rotate: 20deg;
+  }
+  .turn-pill.done {
+    background: #f5bd1d;
+    color: #3a2505;
+    border-color: #fff3c4;
+  }
+  .rematch {
+    border-radius: 24px;
+    padding: 10px 22px;
+    border: 3px solid #fff;
+    font-weight: 900;
+    font-size: 18px;
+    background: #2fa04c;
+    color: #fff;
+  }
+  .self-bubbles {
+    position: absolute;
+    left: calc(50% + 130px);
+    top: -10px;
+  }
+  .self-bubbles .bubble {
+    left: 0;
+  }
+  .self-bubbles .bubble.uno + .bubble.draw {
+    left: 90px;
   }
   .hand {
     display: flex;
     justify-content: center;
-    gap: 0;
-    margin: 0 auto;
-    width: max-content;
-    min-width: 100%;
-    padding-right: 20px;
+    padding: 22px 0 0;
   }
   .hand .card {
-    margin-right: clamp(-38px, calc(22px - var(--count) * 4px), 0px);
-    cursor: pointer;
-    box-shadow: -3px 2px 9px #0006;
+    --step: min(
+      calc(var(--hand-w) * 0.5),
+      calc((100cqw - var(--hand-w)) / max(var(--count) - 1, 1))
+    );
+    --lift: calc(var(--a2) * var(--hand-h) * 1.8);
+    width: var(--hand-w);
+    height: var(--hand-h);
+    margin-right: calc(var(--step) - var(--hand-w));
+    transform-origin: 50% 120%;
+    transform: translateY(var(--lift)) rotate(var(--rot));
+    box-shadow:
+      inset 0 0 0 1px #0003,
+      -6px 4px 14px #0008;
+  }
+  .hand .card > strong {
+    font-size: calc(var(--hand-w) * 0.56);
+    -webkit-text-stroke: calc(var(--hand-w) * 0.03) var(--ink);
+  }
+  .hand .card .corner {
+    font-size: calc(var(--hand-w) * 0.22);
+  }
+  .hand .card {
+    border-width: calc(var(--hand-w) * 0.06);
+    border-radius: calc(var(--hand-w) * 0.1);
+  }
+  .hand .card:last-child {
+    margin-right: 0;
   }
   .hand .card:disabled {
     opacity: 1;
-    filter: saturate(0.75) brightness(0.78);
     cursor: default;
   }
+  .hand .card.dim {
+    filter: brightness(0.78) saturate(0.8);
+  }
   .hand .card.playable {
+    cursor: pointer;
     box-shadow:
-      inset 0 0 0 1px #fff8,
-      -3px 2px 9px #0006;
+      0 0 0 4px #86ffa6,
+      0 0 26px #4fe07acc,
+      -6px 4px 14px #0008;
   }
   .hand .card:hover:enabled,
   .hand .card:focus-visible {
     background: var(--card-color);
-    transform: translateY(-14px);
+    transform: translateY(calc(var(--lift) - 30px)) rotate(var(--rot));
     z-index: 2;
-    filter: brightness(1.08);
   }
   .declare {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    border: 1px solid #dec99166;
-    border-radius: 7px;
-    background: #263e32;
-    color: #d4ddc6;
-    padding: 7px 10px;
-    font-size: 9px;
-    min-height: 34px;
-  }
-  .declare strong {
-    font-style: italic;
-    font-size: 16px;
-    color: #f0d286;
-  }
-  .declare:disabled {
-    opacity: 0.42;
-  }
-  .declare.armed {
-    background: #ae433b;
-    color: white;
-    box-shadow: 0 0 16px #d7854933;
-  }
-  .declare.armed strong {
-    color: white;
-  }
-  .color-choice {
-    position: absolute;
-    top: calc(100% + 9px);
-    left: 50%;
-    transform: translateX(-50%);
-    width: 310px;
-    background: #182e27f5;
-    padding: 10px 12px;
-    border: 1px solid #a9b49055;
-    border-radius: 12px;
-    box-shadow: 0 8px 30px #0005;
-  }
-  .color-choice p {
-    font-size: 11px;
-    margin: 0 0 7px;
-  }
-  .color-choice > div {
-    display: flex;
-    gap: 6px;
-  }
-  .color-choice button {
-    flex: 1;
-    padding: 9px 4px;
-    font-size: 10px;
-    color: white;
-    min-height: 36px;
-    border: 1px solid #ffffff55;
-  }
-  .catch {
-    position: absolute;
-    top: calc(100% + 10px);
-    left: 50%;
-    transform: translateX(-50%);
-    white-space: nowrap;
-    padding: 8px 12px;
-    background: #b0743d;
-    font-size: 11px;
-    color: white;
-  }
-  .table-tools {
     position: absolute;
     z-index: 4;
-    top: 56px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    white-space: nowrap;
-  }
-  .table-tools button {
-    border: 1px solid #a9b49066;
-    border-radius: 8px;
-    background: #20332e;
-    color: #f4efda;
-    font-size: 13px;
-    font-weight: 600;
-    min-height: 38px;
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    padding: 8px 12px;
-  }
-  .table-tools button:hover {
-    background: #345044;
-    transform: none;
-  }
-  .table-tools i {
-    width: 14px;
-    height: 7px;
-    border-radius: 10px;
-    background: #4c584b;
-    position: relative;
-  }
-  .table-tools i::after {
-    content: '';
-    position: absolute;
-    width: 5px;
-    height: 5px;
-    top: 1px;
-    left: 1px;
-    background: #afbaaa;
+    right: 34px;
+    bottom: 30px;
+    width: 116px;
+    height: 116px;
+    padding: 0;
     border-radius: 50%;
+    border: 5px solid #fff;
+    background: radial-gradient(
+      circle at 35% 28%,
+      #ff6a5c,
+      #d4221f 55%,
+      #9c1414
+    );
+    color: #f7c928;
+    font-size: 31px;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    -webkit-text-stroke: 2px #5a0c0c;
+    paint-order: stroke fill;
+    text-shadow: 0 3px 0 #5a0c0c;
+    box-shadow:
+      inset 0 3px 0 #ffffff66,
+      0 7px 0 #6d0d10,
+      0 14px 28px #0009;
   }
-  .table-tools i.on {
-    background: #788e65;
+  .declare:hover:enabled {
+    transform: translateY(-2px);
   }
-  .table-tools i.on::after {
-    left: 8px;
-    background: #e8e5c4;
+  .declare:disabled {
+    opacity: 1;
+    filter: saturate(0.45) brightness(0.62);
   }
-  .rules-panel {
-    position: absolute;
-    z-index: 6;
-    top: 102px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: min(420px, 90vw);
-    padding: 18px 30px 18px 20px;
-    border: 1px solid #9fad8755;
-    border-radius: 12px;
-    background: #1b3029;
-    box-shadow: 0 12px 40px #0008;
+  .declare.armed {
+    animation: armed 0.9s ease-in-out infinite;
   }
-  .rules-panel p {
-    font-size: 12px;
-    line-height: 1.6;
-    margin: 0 0 10px;
+  .settings {
+    width: min(380px, calc(100vw - 32px));
+    padding: 20px 22px 24px;
+    border: 1px solid #ffffff26;
+    border-radius: 22px;
+    background: #22180f;
+    color: #fff;
+    font-family: 'Nunito', ui-rounded, system-ui, sans-serif;
+    box-shadow: 0 20px 50px #000a;
   }
-  .rules-panel button {
-    position: absolute;
-    top: 3px;
-    right: 3px;
+  .settings::backdrop {
+    background: #0009;
+  }
+  .settings header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .settings h2 {
+    margin: 0;
+    font-size: 21px;
+    font-weight: 900;
+  }
+  .settings .close {
     background: transparent;
-    color: #e9dfc0;
-    padding: 6px;
-    font-size: 18px;
+    color: inherit;
+    font-size: 26px;
+    padding: 2px 8px;
+  }
+  .settings-body {
+    display: grid;
+    gap: 10px;
+  }
+  .settings-body :global(a),
+  .settings-body :global(button),
+  .settings-body :global(select) {
+    display: block;
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid #ffffff2e;
+    background: #33251a;
+    color: #fff;
+    font: inherit;
+    font-weight: 800;
+    text-align: center;
+    text-decoration: none;
+  }
+  .settings-body :global([role='status']) {
+    font-size: 13px;
+    color: #d8c9b5;
+    text-align: center;
   }
   :focus-visible {
-    outline: 3px solid #efcc73;
+    outline: 3px solid #f7d43c;
     outline-offset: 3px;
   }
-  @media (min-height: 900px) {
+  [data-motion='false'] .bubble,
+  [data-motion='false'] .seat.active .portrait,
+  [data-motion='false'] .declare.armed {
+    animation: none;
+  }
+  @keyframes pop {
+    from {
+      scale: 0.2;
+      rotate: -18deg;
+      opacity: 0;
+    }
+    60% {
+      scale: 1.2;
+      rotate: 5deg;
+      opacity: 1;
+    }
+  }
+  @keyframes fade {
+    to {
+      opacity: 0;
+      translate: 0 -10px;
+    }
+  }
+  @keyframes burst {
+    0% {
+      transform: translate(-50%, -50%) scale(0.2) rotate(-14deg);
+      opacity: 0;
+    }
+    25% {
+      transform: translate(-50%, -50%) scale(1.15) rotate(-6deg);
+      opacity: 1;
+    }
+    75% {
+      transform: translate(-50%, -50%) scale(1) rotate(-6deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(-50%, -60%) scale(1.05) rotate(-6deg);
+      opacity: 0;
+    }
+  }
+  @keyframes turn-glow {
+    50% {
+      box-shadow:
+        0 0 0 3px #1a120c,
+        0 0 26px 6px #6bf08daa;
+    }
+  }
+  @keyframes armed {
+    50% {
+      transform: scale(1.08);
+      box-shadow:
+        inset 0 3px 0 #ffffff66,
+        0 7px 0 #6d0d10,
+        0 0 34px #ffcf3a;
+    }
+  }
+  @media (max-aspect-ratio: 3/4) {
     .uno-table {
-      --card-w: 104px;
-      --card-h: 152px;
-    }
-    .hand-area {
-      bottom: 64px;
-    }
-    .center-table {
-      top: 43%;
-    }
-    .hand .card > strong {
-      font-size: 46px;
+      background-image: url('/games/uno/table-tall.webp');
+      --card-h: min(17vh, 30vw);
+      --hand-h: min(22vh, 40vw);
+      --portrait: 50px;
     }
   }
   @media (max-width: 700px) {
-    .uno-table {
-      --card-w: 70px;
-      --card-h: 104px;
+    .tools {
+      gap: 8px;
+      right: 12px;
+      top: 12px;
     }
-    .table-surface {
-      inset: 18% 7% 24%;
-      border-width: 9px;
-      border-radius: 45% / 35%;
+    .tools button {
+      width: 42px;
+      height: 42px;
     }
-    .table-stitch {
-      inset: 6px;
+    .tools svg {
+      width: 21px;
+      height: 21px;
     }
     .seat {
-      width: 86px;
+      width: 100px;
+      left: clamp(52px, var(--seat-x), calc(100% - 52px));
+      top: calc(var(--seat-y) * 0.62);
+    }
+    .plate {
+      min-width: 78px;
+      max-width: 96px;
+      padding: 0 10px 6px;
+      border-radius: 14px;
     }
     .portrait {
-      width: 36px;
-      height: 36px;
-      font-size: 17px;
+      border-width: 3px;
     }
-    .chair {
-      width: 60px;
-      height: 69px;
-      border-width: 4px;
-      top: -10px;
+    .plate b {
+      max-width: 80px;
+      font-size: 13px;
     }
-    .seat-label {
-      padding: 4px 6px;
-      max-width: 82px;
-    }
-    .seat-label b {
+    .plate span {
       font-size: 10px;
-      max-width: 70px;
-    }
-    .seat-label span {
-      font-size: 8px;
     }
     .seat-cards {
-      transform: scale(0.75);
-      margin-top: -1px;
+      transform: scale(0.65);
+      margin-top: -8px;
+    }
+    .bubble {
+      font-size: 15px;
+      padding: 3px 9px;
+      top: calc(var(--portrait) * -0.6);
+      left: 50%;
+      translate: -50% 0;
+    }
+    .bubble.uno + .bubble.draw {
+      left: 50%;
+      top: calc(var(--portrait) * -1.3);
+    }
+    .bubble.draw {
+      font-size: 19px;
     }
     .center-table {
-      width: 230px;
-      top: 41%;
+      top: 51%;
     }
-    .piles {
-      gap: 23px;
-    }
-    .status {
-      margin-bottom: 12px;
-    }
-    .turn-label {
-      font-size: 10px;
-    }
-    .card > strong {
-      font-size: 32px;
-    }
-    .corner {
-      font-size: 12px;
-    }
-    .card {
-      border-width: 4px;
-      border-radius: 8px;
-    }
-    .card::before {
-      inset: 14px 3px;
-      border-width: 2px;
-    }
-    .back-emblem {
-      font-size: 20px;
+    .flow {
+      display: none;
     }
     .pile-group > small {
-      font-size: 8px;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+    .color-pill {
+      font-size: 13px;
+    }
+    .flow-label {
+      font-size: 12px;
     }
     .hand-area {
-      width: 94vw;
-      bottom: 40px;
+      width: calc(100vw - 20px);
+      bottom: 118px;
     }
-    .hand-heading {
-      padding: 0 10px;
+    .turn-pill {
+      font-size: 17px;
+      padding: 5px 20px;
     }
-    .hand .card {
-      margin-right: -22px;
-    }
-    .hand-scroll {
-      padding-top: 16px;
+    .self-bubbles {
+      left: calc(50% + 80px);
     }
     .declare {
-      font-size: 8px;
-      padding: 6px;
-      max-width: 180px;
-    }
-    .table-brand {
-      font-size: 35px;
-    }
-    .table-brand span {
-      font-size: 7px;
-    }
-    .color-choice {
-      width: 245px;
-      top: calc(100% + 5px);
-    }
-    .color-choice button {
-      font-size: 9px;
-      padding: 7px 3px;
-    }
-    .table-tools {
-      gap: 8px;
-      top: 50px;
-    }
-    .table-tools button {
-      font-size: 11px;
-      padding: 8px;
+      right: 50%;
+      translate: 50% 0;
+      bottom: 16px;
+      width: 84px;
+      height: 84px;
+      font-size: 22px;
     }
   }
   @media (max-height: 620px) {
-    .uno-table {
-      --card-w: 62px;
-      --card-h: 90px;
-    }
-    .table-surface {
-      inset: 17% 15% 17%;
-    }
-    .seating {
-      inset: 46px 0 15px;
-    }
     .seat-cards {
       display: none;
     }
-    .portrait {
-      width: 32px;
-      height: 32px;
-      font-size: 15px;
+    .flow,
+    .flow-label {
+      display: none;
     }
-    .chair {
-      width: 58px;
-      height: 62px;
+    .pile-group > small {
+      margin-top: 14px;
+      font-size: 14px;
     }
-    .seat-label {
-      margin-top: 3px;
-    }
-    .center-table {
-      top: 43%;
-    }
-    .status {
-      margin-bottom: 7px;
-      min-height: 30px;
-    }
-    .turn-label {
-      font-size: 10px;
-    }
-    .piles {
-      gap: 25px;
-    }
-    .card > strong {
-      font-size: 30px;
-    }
-    .hand-area {
-      bottom: 28px;
-      width: 65vw;
-    }
-    .hand-heading h3 {
-      font-size: 9px;
-    }
-    .hand-scroll {
-      padding-top: 12px;
-      padding-bottom: 4px;
+    .turn-pill {
+      font-size: 16px;
+      padding: 3px 18px;
     }
     .declare {
-      padding: 4px 7px;
-      min-height: 26px;
-    }
-    .table-tools {
-      bottom: 2px;
+      width: 84px;
+      height: 84px;
+      font-size: 22px;
+      bottom: 18px;
     }
     .color-choice {
-      left: calc(100% + 15px);
-      top: 30%;
+      top: 0;
+      left: calc(100% + 12px);
       transform: none;
-      width: 160px;
-    }
-    .color-choice > div {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-    }
-    .seat.local {
-      display: none;
     }
   }
 </style>

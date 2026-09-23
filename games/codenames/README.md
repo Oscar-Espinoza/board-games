@@ -17,6 +17,5 @@ Original optimized WebP table materials are bundled under `src/table/` with
 provenance. All interface text/cards use Svelte/CSS. Archivo is self-hosted.
 No runtime dependencies or sounds were added. Build and deploy client/server together.
 
-See [rules](../../docs/games/codenames.md), [ADR 019](../../docs/adr/019-codenames-table-turns.md),
-[redesign](../../docs/codenames-redesign/README.md) and
-[evidence](../../docs/evidence/codenames/table-redesign/README.md).
+See [rules](../../docs/games/codenames.md), [ADR 019](../../docs/adr/019-codenames-table-turns.md) and
+[redesign](../../docs/codenames-redesign/README.md).

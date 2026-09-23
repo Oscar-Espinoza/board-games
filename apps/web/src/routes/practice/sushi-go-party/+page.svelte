@@ -131,18 +131,14 @@
       practice
       canRematch
       rematch={async () => reset()}
+      practiceAction={others}
+      practiceActionLabel={m.sgp_practice_step({}, { locale })}
+      practiceActionDisabled={advancing}
       chooseSeat={(id) => {
         seat = id;
       }}
       {settingsContent}
     />{/key}
-  <button
-    class="practice-advance"
-    disabled={advancing}
-    onclick={others}
-    data-testid="sgp-practice-others"
-    >{m.sgp_practice_step({}, { locale })}</button
-  >
   {#if error}<p class="practice-error" role="alert">{error}</p>{/if}
 </main>
 {#snippet settingsContent()}
@@ -203,22 +199,6 @@
     inset: 0;
     z-index: 20;
   }
-  .practice-advance {
-    position: absolute;
-    right: 17px;
-    top: 70px;
-    z-index: 13;
-    max-width: 180px;
-    border: 1px solid #728f78;
-    border-radius: 14px;
-    background: #e9efd9;
-    color: #31544b;
-    font-size: 10px;
-    font-weight: 700;
-    min-height: 44px;
-    padding: 7px 10px;
-    box-shadow: 0 3px 0 #31544b18;
-  }
   .practice-error {
     position: absolute;
     top: 75px;
@@ -255,24 +235,6 @@
   @media (max-width: 1099px), (max-height: 679px) {
     :global(.practice-table .table-wordmark) {
       display: none;
-    }
-    .practice-advance {
-      top: 9px;
-      right: auto;
-      left: 50%;
-      translate: -50% 0;
-      max-width: min(180px, calc(100vw - 145px));
-      font-size: 9px;
-      padding: 5px;
-      min-height: 44px;
-    }
-  }
-  @media (max-height: 500px) and (min-width: 650px) {
-    .practice-advance {
-      top: 8px;
-      max-width: 160px;
-      min-height: 44px;
-      font-size: 9px;
     }
   }
 </style>
