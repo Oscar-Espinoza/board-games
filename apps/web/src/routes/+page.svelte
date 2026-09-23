@@ -8,6 +8,7 @@
   import SummaryStep from '$lib/catalog/SummaryStep.svelte';
   import Rulebook from '$lib/catalog/Rulebook.svelte';
   import type { GameId } from '$lib/catalog/types';
+  import { theme } from '$lib/theme.svelte';
   let selected = $state<GameId>('uno');
   let panel = $state<'start' | 'summary' | 'rules' | 'join' | null>(null);
   let secretPowers = $state(false);
@@ -145,58 +146,62 @@
 </script>
 
 <svelte:head><title>{m.catalog()}</title></svelte:head>
-<main class="library">
-  <section class="library-intro">
-    <p class="kicker">{m.library_eyebrow()}</p>
-    <h1>{m.library_heading()}</h1>
-    <p class="invitation">{m.library_intro()}</p>
-    <nav class="game-names" aria-label={m.library_select()}>
-      {#each catalog as item, i}<button
-          class:chosen={selected === item.id}
-          aria-pressed={selected === item.id}
-          onpointerenter={(event) => hover(event, item.id)}
-          onpointerleave={() => clearTimeout(hoverTimer)}
-          onfocus={() => select(item.id)}
-          onclick={() => select(item.id)}
-          ><span class="number">0{i + 1}</span><span>{item.name}</span><span
-            class="name-arrow"
-            aria-hidden="true">↗</span
-          ></button
-        >{/each}
-    </nav>
-  </section>
-  <section class="collection" aria-label={game.name}>
-    <div class="box-stage" data-selected={selected} aria-hidden="true">
-      <div class="sun-disc"></div>
-      {#each catalog as item, i}<div
-          class="game-box {item.id}"
-          class:front={selected === item.id}
-          class:previous={i ===
-            (selectedIndex + catalog.length - 1) % catalog.length}
-          class:next={i === (selectedIndex + 1) % catalog.length}
-          data-box={item.id}
-        >
-          <BoxArt game={item.id} />
-        </div>{/each}
-      <span class="spark one">✳</span><span class="spark two">✧</span>
-    </div>
-    <div class="selection-details">
-      {#key selected}<div class="selection-copy">
-          <p class="kicker">
-            {m.players({ min: game.minPlayers, max: game.maxPlayers })}
-          </p>
-          <h2>{game.name}</h2>
-          <p>{game.description()}</p>
-        </div>{/key}
-      <div class="primary-actions">
-        <button class="start" onclick={() => open('start')}
-          >{m.library_start()} <span aria-hidden="true">↗</span></button
-        ><button onclick={() => open('summary')}>{m.library_summary()}</button
-        ><button onclick={() => open('rules')}>{m.library_rules()}</button>
+{#if theme.value === 'pixel'}
+  {#await import('$lib/home/PixelStore.svelte') then { default: PixelStore }}
+    <main><PixelStore {selected} onselect={select} onopen={open} /></main>
+  {/await}
+{:else}<main class="library">
+    <section class="library-intro">
+      <p class="kicker">{m.library_eyebrow()}</p>
+      <h1>{m.library_heading()}</h1>
+      <p class="invitation">{m.library_intro()}</p>
+      <nav class="game-names" aria-label={m.library_select()}>
+        {#each catalog as item, i}<button
+            class:chosen={selected === item.id}
+            aria-pressed={selected === item.id}
+            onpointerenter={(event) => hover(event, item.id)}
+            onpointerleave={() => clearTimeout(hoverTimer)}
+            onfocus={() => select(item.id)}
+            onclick={() => select(item.id)}
+            ><span class="number">0{i + 1}</span><span>{item.name}</span><span
+              class="name-arrow"
+              aria-hidden="true">↗</span
+            ></button
+          >{/each}
+      </nav>
+    </section>
+    <section class="collection" aria-label={game.name}>
+      <div class="box-stage" data-selected={selected} aria-hidden="true">
+        <div class="sun-disc"></div>
+        {#each catalog as item, i}<div
+            class="game-box {item.id}"
+            class:front={selected === item.id}
+            class:previous={i ===
+              (selectedIndex + catalog.length - 1) % catalog.length}
+            class:next={i === (selectedIndex + 1) % catalog.length}
+            data-box={item.id}
+          >
+            <BoxArt game={item.id} />
+          </div>{/each}
+        <span class="spark one">✳</span><span class="spark two">✧</span>
       </div>
-    </div>
-  </section>
-</main>
+      <div class="selection-details">
+        {#key selected}<div class="selection-copy">
+            <p class="kicker">
+              {m.players({ min: game.minPlayers, max: game.maxPlayers })}
+            </p>
+            <h2>{game.name}</h2>
+            <p>{game.description()}</p>
+          </div>{/key}
+        <div class="primary-actions">
+          <button class="start" onclick={() => open('start')}
+            >{m.library_start()} <span aria-hidden="true">↗</span></button
+          ><button onclick={() => open('summary')}>{m.library_summary()}</button
+          ><button onclick={() => open('rules')}>{m.library_rules()}</button>
+        </div>
+      </div>
+    </section>
+  </main>{/if}
 <dialog
   bind:this={dialog}
   onclose={close}
@@ -661,6 +666,42 @@
   }
   .summary-actions button {
     flex: 1;
+  }
+  :global(body:has(.pixel-store)) dialog {
+    font-family: 'Pixelify Sans', system-ui, sans-serif;
+    background: #f6e7c8;
+    color: #2a1a10;
+    border: 4px solid #3a2213;
+    border-radius: 0;
+    box-shadow:
+      inset 0 0 0 3px #8a5a32,
+      0 10px 0 #1a0f08;
+  }
+  :global(body:has(.pixel-store)) .dialog-top {
+    background: #f6e7c8;
+  }
+  :global(body:has(.pixel-store)) dialog :is(h2, h3) {
+    font-family: inherit;
+  }
+  :global(body:has(.pixel-store)) dialog h2 {
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  :global(body:has(.pixel-store)) dialog button,
+  :global(body:has(.pixel-store)) .practice,
+  :global(body:has(.pixel-store)) dialog input {
+    border-radius: 0;
+    border: 2px solid #3a2213;
+    box-shadow: inset 0 -3px 0 #00000033;
+  }
+  :global(body:has(.pixel-store)) .solid {
+    background: #3f9a4a !important;
+    border-color: #1f5a27 !important;
+    text-transform: uppercase;
+  }
+  :global(body:has(.pixel-store)) dialog .close {
+    border: 0;
+    box-shadow: none;
   }
   @keyframes appear {
     from {
