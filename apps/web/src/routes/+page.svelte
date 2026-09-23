@@ -30,6 +30,7 @@
     uno: m.library_uno_summary,
     catan: m.library_catan_summary,
     carcassonne: m.library_carcassonne_summary,
+    domino: m.library_domino_summary,
   };
   const loops = {
     'little-secret': [m.ls_loop_0, m.ls_loop_1, m.ls_loop_2],
@@ -46,6 +47,11 @@
       m.library_carcassonne_loop_0,
       m.library_carcassonne_loop_1,
       m.library_carcassonne_loop_2,
+    ],
+    domino: [
+      m.library_domino_loop_0,
+      m.library_domino_loop_1,
+      m.library_domino_loop_2,
     ],
   };
   onMount(() => {

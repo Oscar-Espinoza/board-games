@@ -60,6 +60,14 @@ export const catalog = [
     description: m.ls_description,
     preview: 'envelopes',
   },
+  {
+    id: 'domino',
+    name: 'Dominó',
+    minPlayers: 4,
+    maxPlayers: 4,
+    description: m.domino_description,
+    preview: 'dominoes',
+  },
 ] as const;
 export type RoomView = {
   id: string;

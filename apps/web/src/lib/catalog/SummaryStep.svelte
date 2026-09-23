@@ -69,6 +69,23 @@
         stroke="#b88b47"
         stroke-width="3"
       />{/if}
+  {:else if game === 'domino'}
+    {#each step === 0 ? [[26, 39, 0]] : step === 1 ? [[26, 39, 0], [60, 39, 0]] : [[26, 39, -10], [62, 44, 14], [92, 30, 60]] as [x, y, r]}<g
+        transform={`translate(${x} ${y}) rotate(${r})`}
+        ><rect
+          x="-16"
+          y="-8"
+          width="32"
+          height="16"
+          rx="3"
+          fill="#f6efdc"
+          stroke="#b9a77c"
+        /><path d="M0-6v12" stroke="#3a2f22" /><circle
+          cx="-8"
+          r="2"
+          fill="#1c1712"
+        /><circle cx="8" r="2" fill="#1c1712" /></g
+      >{/each}
   {:else if game === 'uno'}
     {#if step === 2}<circle cx="60" cy="37" r="29" fill="#e6bb62" /><path
         d="M44 36l11 12 23-25"

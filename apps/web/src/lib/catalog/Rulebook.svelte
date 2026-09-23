@@ -26,6 +26,7 @@
     uno: () => import('./guides/UnoScene.svelte'),
     catan: () => import('./guides/CatanScene.svelte'),
     carcassonne: () => import('./guides/CarcassonneScene.svelte'),
+    domino: () => import('./guides/DominoScene.svelte'),
   };
   $effect(() => {
     const id = game;

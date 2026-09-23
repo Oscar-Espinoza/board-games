@@ -39,6 +39,7 @@
         'little-secret',
         'catan',
         'uno',
+        'domino',
       ].includes(room?.gameId ?? ''),
   );
   const metadata = $derived(catalog.find((game) => game.id === room?.gameId));

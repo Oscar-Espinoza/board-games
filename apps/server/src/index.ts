@@ -8,6 +8,7 @@ import { sushiGoParty } from '@board-games/sushi-go-party/server';
 import { uno } from '@board-games/uno/server';
 import { carcassonne } from '@board-games/carcassonne/server';
 import { catan } from '@board-games/catan/server';
+import { domino } from '@board-games/domino/server';
 import type { GameDefinition } from '@board-games/game-core';
 import { Rooms } from './rooms.js';
 import { attachSockets } from './socket.js';
@@ -23,6 +24,7 @@ const rooms = new Rooms(
     [sushiGoParty.id, sushiGoParty],
     [catan.id, catan],
     [carcassonne.id, carcassonne],
+    [domino.id, domino],
   ]),
   grace,
 );

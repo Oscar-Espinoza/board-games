@@ -35,6 +35,7 @@
     codenames: ['party'],
     'sushi-go-party': ['card', 'family'],
     'little-secret': ['party'],
+    domino: ['family', 'strategy'],
   };
   // Where each box lives on the painted shelves (% of scene width).
   const shelves: Record<GameId, Shelf> = {
@@ -45,6 +46,7 @@
     'little-secret': { x: 53, high: true },
     uno: { x: 58, high: false },
     codenames: { x: 63, high: true },
+    domino: { x: 30, high: false },
   };
   const labels = {
     all: m.pixel_all,

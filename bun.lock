@@ -19,6 +19,7 @@
         "@board-games/carcassonne": "workspace:*",
         "@board-games/catan": "workspace:*",
         "@board-games/codenames": "workspace:*",
+        "@board-games/domino": "workspace:*",
         "@board-games/game-core": "workspace:*",
         "@board-games/little-secret": "workspace:*",
         "@board-games/shared": "workspace:*",
@@ -35,6 +36,7 @@
         "@board-games/carcassonne": "workspace:*",
         "@board-games/catan": "workspace:*",
         "@board-games/codenames": "workspace:*",
+        "@board-games/domino": "workspace:*",
         "@board-games/game-core": "workspace:*",
         "@board-games/little-secret": "workspace:*",
         "@board-games/shared": "workspace:*",
@@ -97,6 +99,17 @@
         "svelte": "^5.29.0",
       },
     },
+    "games/domino": {
+      "name": "@board-games/domino",
+      "version": "0.0.0",
+      "dependencies": {
+        "@board-games/game-core": "workspace:*",
+        "@board-games/shared": "workspace:*",
+      },
+      "peerDependencies": {
+        "svelte": "^5.29.0",
+      },
+    },
     "games/little-secret": {
       "name": "@board-games/little-secret",
       "version": "0.0.0",
@@ -146,6 +159,8 @@
     "@board-games/catan": ["@board-games/catan@workspace:games/catan"],
 
     "@board-games/codenames": ["@board-games/codenames@workspace:games/codenames"],
+
+    "@board-games/domino": ["@board-games/domino@workspace:games/domino"],
 
     "@board-games/game-core": ["@board-games/game-core@workspace:packages/game-core"],
 

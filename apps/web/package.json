@@ -17,7 +17,8 @@
     "@board-games/azul": "workspace:*",
     "@board-games/codenames": "workspace:*",
     "@board-games/sushi-go-party": "workspace:*",
-    "@board-games/little-secret": "workspace:*"
+    "@board-games/little-secret": "workspace:*",
+    "@board-games/domino": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "3.0.10",

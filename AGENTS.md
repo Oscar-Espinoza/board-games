@@ -1,6 +1,6 @@
 # Board games
 
-Bun + TypeScript workspace: a SvelteKit static SPA (`apps/web`) and a Bun/Socket.IO server (`apps/server`) with authoritative in-memory rooms for UNO, Catan, Carcassonne, Azul, Codenames, Sushi Go Party and Little Secret (`games/*`). English/Spanish via Paraglide (`packages/shared/messages`). No database, accounts, Wasm or WebRTC.
+Bun + TypeScript workspace: a SvelteKit static SPA (`apps/web`) and a Bun/Socket.IO server (`apps/server`) with authoritative in-memory rooms for UNO, Catan, Carcassonne, Azul, Codenames, Sushi Go Party, Little Secret and Dominó (`games/*`). English/Spanish via Paraglide (`packages/shared/messages`). No database, accounts, Wasm or WebRTC.
 
 Side project — move fast: no tests. Validate with `bun run check` and `bun run build`. Commands: `bun install`, `bun run dev`, `bun run build`, `bun run start`, `bun run format`.
 
@@ -27,6 +27,7 @@ Side project — move fast: no tests. Validate with `bun run check` and `bun run
 | Codenames                                           | [docs/games/codenames.md](docs/games/codenames.md), [redesign](docs/codenames-redesign/README.md)         |
 | Sushi Go Party                                      | [docs/games/sushi-go-party.md](docs/games/sushi-go-party.md), [redesign](docs/sushi-go-party-redesign.md) |
 | Little Secret                                       | [docs/games/little-secret.md](docs/games/little-secret.md)                                                |
+| Dominó                                              | [docs/games/domino.md](docs/games/domino.md)                                                              |
 | Catalog lessons                                     | [docs/games/library-guide-coverage.md](docs/games/library-guide-coverage.md)                              |
 | Home page themes (8-bit store)                      | [docs/pixel-store.md](docs/pixel-store.md)                                                                |
 | Decisions (ADRs)                                    | [docs/adr/](docs/adr/)                                                                                    |

@@ -7,4 +7,5 @@ export const guideLoaders = {
   uno: () => import('./uno'),
   catan: () => import('./catan'),
   carcassonne: () => import('./carcassonne'),
+  domino: () => import('./domino'),
 } satisfies Record<GameId, () => Promise<unknown>>;

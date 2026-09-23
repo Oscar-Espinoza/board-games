@@ -7,4 +7,5 @@ export const gameClients = {
   uno: () => import('@board-games/uno/Board.svelte'),
   carcassonne: () => import('@board-games/carcassonne/Board.svelte'),
   catan: () => import('@board-games/catan/Board.svelte'),
+  domino: () => import('@board-games/domino/Board.svelte'),
 };
