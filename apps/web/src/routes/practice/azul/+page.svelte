@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Rulebook from '$lib/catalog/Rulebook.svelte';
   import { onMount, type Component } from 'svelte';
   import { gameClients } from '$lib/games';
   import {
@@ -78,6 +79,7 @@
         practice={true}
         canConfigure={true}
       >
+        {#snippet rulesContent()}<Rulebook game="azul" />{/snippet}
         {#snippet settingsContent()}<nav>
             <a href="/">{m.azul_back()}</a><label
               >{m.azul_scenario()}<select bind:value={scenario} onchange={reset}

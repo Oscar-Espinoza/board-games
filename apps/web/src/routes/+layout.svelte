@@ -10,6 +10,8 @@
   import { m } from '@board-games/shared/messages';
   import '../app.css';
   let { children } = $props();
+  const languageName = (locale: Locale) =>
+    new Intl.DisplayNames([locale], { type: 'language' }).of(locale) ?? locale;
   onMount(() => {
     document.documentElement.lang = getLocale();
   });
@@ -29,8 +31,7 @@
       onchange={(event) => setLocale(event.currentTarget.value as Locale)}
     >
       {#each locales as locale}<option value={locale}
-          >{new Intl.DisplayNames([locale], { type: 'language' }).of(locale) ??
-            locale}</option
+          >{languageName(locale)}</option
         >{/each}
     </select></label
   >

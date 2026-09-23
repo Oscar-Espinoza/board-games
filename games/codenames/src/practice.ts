@@ -1,3 +1,4 @@
+import { seeded } from '@board-games/game-core';
 /** Deliberately local training fixtures. Never imported by multiplayer. */
 import { create, apply, view } from './index.js';
 import type { State, Team } from './types.js';
@@ -15,12 +16,6 @@ export const scenarios = [
   'assassin',
 ] as const;
 export type Scenario = (typeof scenarios)[number];
-export function seeded(seed: number) {
-  return () => {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    return seed / 4294967296;
-  };
-}
 export function practice(
   scenario: Scenario = 'match',
   language: 'en' | 'es' = 'en',

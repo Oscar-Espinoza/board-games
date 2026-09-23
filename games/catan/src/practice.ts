@@ -1,3 +1,4 @@
+import { seeded } from '@board-games/game-core';
 import {
   applyAction,
   createGame,
@@ -21,12 +22,6 @@ export const scenarios = [
   'victory',
 ] as const;
 export type Scenario = (typeof scenarios)[number];
-export function seeded(seed: number) {
-  return () => {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    return seed / 4294967296;
-  };
-}
 /** Local fixtures only. Never imported by room creation or the catalog. */
 export function scenarioState(scenario: Scenario): State {
   const s = createGame(

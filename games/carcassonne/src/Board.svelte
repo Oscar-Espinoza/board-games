@@ -1,7 +1,11 @@
 <script lang="ts">
   import { onMount, untrack, type Snippet } from 'svelte';
-  import WoodenPiece from './table/WoodenPiece.svelte';
+  import { prefersReducedMotion } from 'svelte/motion';
+  import { modal, read, write } from '@board-games/shared/ui';
+  import FigureSprite from './table/FigureSprite.svelte';
   import {
+    ground,
+    lift,
     groundMatrix,
     uprightMatrix,
     screen,
@@ -22,14 +26,9 @@
   import { node, split, points, type Feature } from './features.js';
   import type { View, Option } from './index.js';
   import TileArt from './TileArt.svelte';
-  import {
-    colors,
-    meeplePath,
-    cityPath,
-    roadPath,
-    fieldPath,
-    ferryPath,
-  } from './art.js';
+  import Elevation, { type CityState } from './table/Elevation.svelte';
+  import { risingFeatures } from './table/scenery.js';
+  import { colors, cityPath, roadPath, fieldPath, ferryPath } from './art.js';
   import { label } from './labels.js';
   import { tableAudio, EventGate } from './effects.js';
   import {
@@ -80,7 +79,7 @@
     guide = $state(false),
     overview = $state(false),
     overviewScope = $state<FeatureScope>('mine'),
-    sound = $state(true);
+    sound = $state(read('carcassonne:sound') !== 'off');
   let cx = $state(50),
     cy = $state(50),
     scale = $state(1.5),
@@ -99,9 +98,6 @@
     cx -= delta.x;
     cy -= delta.y;
   }
-  let settingsDialog: HTMLDialogElement;
-  let guideDialog: HTMLDialogElement;
-  let overviewDialog: HTMLDialogElement;
   let settings = $state(false);
   const audio = tableAudio(),
     gate = new EventGate();
@@ -109,6 +105,82 @@
     null,
   );
   let recent = $state<string[]>([]);
+  // Cardboard thickness: stacked copies just below each tile on screen.
+  const tileEdge = [
+    { k: 3.2, fill: '#2b1f12' },
+    { k: 2.2, fill: '#6b5436' },
+    { k: 1.1, fill: '#9b8158' },
+  ].map(({ k, fill }) => ({ ...lift(-k), fill }));
+  let rising = $state<string[]>([]);
+  let risingTimer: ReturnType<typeof setTimeout>;
+  let motion = $state(
+    read('carcassonne:motion') !== 'off' && !prefersReducedMotion.current,
+  );
+  // Clickable regions per tile design never change, so filter them once.
+  const regionCache = new Map<string, (typeof tiles)[string]['regions']>();
+  const hitRegions = (id: string) => {
+    let list = regionCache.get(id);
+    if (!list)
+      regionCache.set(
+        id,
+        (list = tiles[id].regions.filter((r) => r.kind !== 'river')),
+      );
+    return list;
+  };
+  // Ground tiles in row order; computed once per board change, not per render.
+  const rowOrder = $derived(
+    Object.entries(p.board).sort((a, b) => a[1].y - b[1].y || a[1].x - b[1].x),
+  );
+  // Draw standing scenery back to front in screen depth.
+  const depthOrder = $derived(
+    Object.entries(p.board).sort(
+      (a, b) =>
+        ground.b * a[1].x +
+        ground.d * a[1].y -
+        (ground.b * b[1].x + ground.d * b[1].y),
+    ),
+  );
+  const byNode = $derived(
+    new Map(p.features.flatMap((f) => f.nodes.map((n) => [n, f] as const))),
+  );
+  // A completed city's keep stands on its broadest region.
+  const keeps = $derived(
+    new Set(
+      p.features
+        .filter((f) => f.kind === 'city' && f.complete && f.tiles.length >= 3)
+        .map(
+          (f) =>
+            [...f.nodes].sort((a, b) => {
+              const ports = (n: string) => {
+                const { tile, region } = split(n);
+                return tiles[p.board[tile].id].regions.find(
+                  (r) => r.id === region,
+                )!.ports.length;
+              };
+              return ports(b) - ports(a) || a.localeCompare(b);
+            })[0],
+        ),
+    ),
+  );
+  function cityStates(k: string, id: string): CityState[] {
+    return tiles[id].regions
+      .filter((r) => r.kind === 'city')
+      .map((r) => {
+        const f = byNode.get(node(k, r.id));
+        return {
+          region: r.id,
+          complete: !!f?.complete,
+          keep: keeps.has(node(k, r.id)),
+          rising: !!f && rising.includes(f.id),
+        };
+      });
+  }
+  function monasteryState(k: string, id: string) {
+    const r = tiles[id].regions.find((r) => r.kind === 'monastery');
+    if (!r) return null;
+    const f = byNode.get(node(k, r.id));
+    return { complete: !!f?.complete, rising: !!f && rising.includes(f.id) };
+  }
   let receipts = $state<{ id: number; player: string; points: number }[]>([]);
   let recentTimer: ReturnType<typeof setTimeout>;
   const locations = $derived([
@@ -376,6 +448,16 @@
           : source,
     );
   }
+  // Draws are private bookkeeping noise; the journal lists public outcomes.
+  const journalEntries = $derived(
+    [...p.events].reverse().filter((e) => e.kind !== 'draw'),
+  );
+  function showEvent(target: string) {
+    selected = target;
+    focus(split(target).tile);
+    // Compact screens have no room beside the panel; reveal the map instead.
+    if (width <= 900 || height <= 540) journal = false;
+  }
   function focusFeature(value: Feature) {
     selected = value.id;
     focus(split(value.id).tile);
@@ -444,24 +526,21 @@
         .filter((e) => e.points && e.player)
         .map((e) => ({ id: e.id, player: e.player!, points: e.points! }));
       recent = events.filter((e) => e.target).map((e) => split(e.target!).tile);
+      const lifted = events
+        .filter((e) => e.kind === 'place' && e.target)
+        .flatMap((e) => risingFeatures(p.features, e.target!));
+      if (lifted.length) {
+        rising = lifted;
+        audio.play('build', 0.15);
+        clearTimeout(risingTimer);
+        risingTimer = setTimeout(() => (rising = []), 1800);
+      }
       clearTimeout(recentTimer);
       recentTimer = setTimeout(() => {
         recent = [];
         receipts = [];
       }, 2400);
     }
-  });
-  $effect(() => {
-    if (settings) settingsDialog?.showModal();
-    else settingsDialog?.close();
-  });
-  $effect(() => {
-    if (guide) guideDialog?.showModal();
-    else guideDialog?.close();
-  });
-  $effect(() => {
-    if (overview) overviewDialog?.showModal();
-    else overviewDialog?.close();
   });
   $effect(() => {
     round;
@@ -472,9 +551,6 @@
     untrack(resetCamera);
   });
   onMount(() => {
-    try {
-      sound = localStorage.getItem('carcassonne:sound') !== 'off';
-    } catch {}
     let firstSize = true;
     const observer = new ResizeObserver((entries) => {
       width = entries[0].contentRect.width;
@@ -492,13 +568,15 @@
       clearTimeout(returnTimer);
     };
   });
+  function toggleMotion() {
+    motion = !motion;
+    write('carcassonne:motion', motion ? 'on' : 'off');
+  }
   function toggleSound() {
     sound = !sound;
     audio.mute(!sound);
     if (sound) audio.unlock();
-    try {
-      localStorage.setItem('carcassonne:sound', sound ? 'on' : 'off');
-    } catch {}
+    write('carcassonne:sound', sound ? 'on' : 'off');
   }
 
   type Piece = 'meeple' | 'large' | 'abbot';
@@ -722,6 +800,7 @@
   class="carc-table"
   class:carrying={!!drag?.moved}
   class:supply-open={supplyOpen}
+  class:motion
 >
   <header class="table-header">
     <span class="fleur" aria-hidden="true">⚜</span><span class="table-title"
@@ -758,7 +837,7 @@
       }}
     >
       <g class="board-plane" transform={cameraTransform}>
-        {#each Object.entries(p.board).sort((a, b) => a[1].y - b[1].y || a[1].x - b[1].x) as [k, tile] (k)}<g
+        {#each rowOrder as [k, tile] (k)}<g
             transform={`translate(${tile.x * 100} ${tile.y * 100})`}
             class:landed={recent.includes(k)}
           >
@@ -771,6 +850,13 @@
               fill="#080d08"
               opacity=".35"
             />
+            {#each tileEdge as e}<rect
+                width="100"
+                height="100"
+                rx="1.2"
+                fill={e.fill}
+                transform={`translate(${e.x} ${e.y})`}
+              />{/each}
             <g class="tile-surface"
               ><TileArt id={tile.id} rotation={tile.rotation} /></g
             >
@@ -845,40 +931,18 @@
                     paint-order="stroke">{i + 1}</text
                   >{/each}
               </g>{/if}
-            {#each tiles[tile.id].regions.filter((r) => r.kind !== 'river') as r}
-              {@const a = rotatePoint(r.anchor, tile.rotation)}{@const ref =
-                node(k, r.id)}
-              <circle
-                data-region={ref}
-                data-legal={legalRefs.has(ref) ? 'true' : undefined}
-                role={legalRefs.has(ref) ? 'button' : undefined}
-                tabindex={legalRefs.has(ref) ? 0 : undefined}
-                aria-label={legalRefs.has(ref)
-                  ? `${t('meeple')} · ${t(r.kind)} (${tile.x}, ${tile.y})`
-                  : undefined}
-                onkeydown={(e) => {
-                  if (
-                    legalRefs.has(ref) &&
-                    (e.key === 'Enter' || e.key === ' ')
-                  ) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const o = pieceOptions.find((o) => o.target === ref);
-                    if (o) choose(o);
-                  }
-                }}
-                cx={a[0]}
-                cy={a[1]}
-                r="13"
-                fill={selected === ref ? '#ffeab3' : 'transparent'}
-                fill-opacity=".65"
-                stroke={legalRefs.has(ref) ? '#ffebaf' : 'transparent'}
-                stroke-width="1.7"
-                stroke-dasharray="2 2"
-                class="region"
-                ><title>{t(r.kind)} ({tile.x}, {tile.y})</title></circle
-              >
-            {/each}
+          </g>{/each}
+        {#each depthOrder as [k, tile] (k)}<g
+            transform={`translate(${tile.x * 100} ${tile.y * 100})`}
+            class:landed={recent.includes(k)}
+            ><Elevation
+              id={tile.id}
+              rotation={tile.rotation}
+              tileKey={k}
+              cities={cityStates(k, tile.id)}
+              monastery={monasteryState(k, tile.id)}
+              detail={scale >= 0.45}
+            />
             {#each p.figures.filter((f) => f.tile === k) as f, i}
               {@const r = tiles[tile.id].regions.find(
                 (r) => r.id === f.region,
@@ -887,16 +951,12 @@
                 tile.rotation,
               )}{@const index = p.players.indexOf(f.owner)}
               <g
-                transform={`translate(${a[0] + (i % 2) * 4} ${a[1]}) ${uprightMatrix} rotate(${r.kind === 'field' ? 75 : 0}) scale(${f.type === 'large' ? 1.45 : 1.05})`}
+                transform={`translate(${a[0] + (i % 2) * 4} ${a[1]}) ${uprightMatrix} rotate(${r.kind === 'field' ? 75 : 0}) scale(${f.type === 'large' ? 1.75 : 1.3})`}
                 class="figure"
                 data-region={node(k, f.region)}
-                ><WoodenPiece
-                  color={colors[index]}
-                  type={f.type}
-                  mark={index + 1}
-                />
+                ><FigureSprite color={colors[index]} type={f.type} />
                 {#if f.attachment}<g transform="translate(17 6) scale(.65)"
-                    ><WoodenPiece
+                    ><FigureSprite
                       color={colors[index]}
                       type={f.attachment}
                     /></g
@@ -909,20 +969,57 @@
                   stroke="#f3dfaa"
                 />{/if}{/each}
           </g>{/each}
+        {#each Object.entries(p.board) as [k, tile] (k)}<g
+            transform={`translate(${tile.x * 100} ${tile.y * 100})`}
+          >
+            {#each hitRegions(tile.id) as r}
+              {@const a = rotatePoint(r.anchor, tile.rotation)}{@const ref =
+                node(k, r.id)}{@const legal = legalRefs.has(ref)}
+              <circle
+                data-region={ref}
+                data-legal={legal ? 'true' : undefined}
+                role={legal ? 'button' : undefined}
+                tabindex={legal ? 0 : undefined}
+                aria-label={legal
+                  ? `${t('meeple')} · ${t(r.kind)} (${tile.x}, ${tile.y})`
+                  : undefined}
+                onkeydown={(e) => {
+                  if (legal && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const o = pieceOptions.find((o) => o.target === ref);
+                    if (o) choose(o);
+                  }
+                }}
+                cx={a[0]}
+                cy={a[1]}
+                r="13"
+                fill={selected === ref ? '#ffeab3' : 'transparent'}
+                fill-opacity=".65"
+                stroke={legal ? '#ffebaf' : 'transparent'}
+                stroke-width="1.7"
+                stroke-dasharray="2 2"
+                class="region"
+                ><title>{t(r.kind)} ({tile.x}, {tile.y})</title></circle
+              >
+            {/each}
+          </g>{/each}
         {#if p.phase === 'place' && mine && tool === 'tile'}{#each locations as loc}<g
               transform={`translate(${loc.x * 100} ${loc.y * 100})`}
               data-location={`${loc.x},${loc.y}`}
+              class="slot"
               ><rect
-                x="5"
-                y="5"
-                width="90"
-                height="90"
-                rx="4"
-                fill="#b2c68e"
-                fill-opacity=".07"
-                stroke="#e1edb1"
-                stroke-opacity=".85"
-                stroke-dasharray="3 7"
+                x="4"
+                y="4"
+                width="92"
+                height="92"
+                rx="3"
+                fill="#8fdc6a"
+                fill-opacity=".1"
+                stroke="#b9ff8c"
+                stroke-width="2.4"
+                stroke-linecap="round"
+                stroke-dasharray=".1 4.2"
               /><path
                 d="M44 50H56M50 44V56"
                 stroke="#d7d6a5"
@@ -955,6 +1052,54 @@
           {name(receipt.player)} <strong>+{receipt.points}</strong>
         </div>{/each}
     </div>
+    {#if journal}<aside class="journal" aria-label={t('history')}>
+        <header>
+          <h2>{t('history')}</h2>
+          <button
+            class="close"
+            aria-label={t('close')}
+            onclick={() => (journal = false)}>×</button
+          >
+        </header>
+        {#if journalEntries.length}<ol>
+            {#each journalEntries as e (e.id)}
+              {@const seat = e.player ? p.players.indexOf(e.player) : -1}
+              <li>
+                {#snippet entry()}<small>{t('turn')} {e.turn}</small
+                  >{#if seat >= 0}<i style={`background:${colors[seat]}`}
+                    ></i>{/if}<span
+                    >{e.player ? name(e.player) + ' · ' : ''}{t(
+                      e.kind,
+                    )}{e.feature ? ' · ' + t(e.feature) : ''}</span
+                  >{#if e.points}<strong>+{e.points}</strong
+                    >{/if}{#if e.target}<svg
+                      class="pin"
+                      viewBox="0 0 16 16"
+                      aria-hidden="true"
+                      ><path
+                        d="M8 14.5s4.5-4.3 4.5-7.8a4.5 4.5 0 0 0-9 0c0 3.5 4.5 7.8 4.5 7.8Z"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.3"
+                      /><circle
+                        cx="8"
+                        cy="6.7"
+                        r="1.6"
+                        fill="currentColor"
+                      /></svg
+                    >{/if}{/snippet}
+                {#if e.target}<button
+                    class="journal-entry linked"
+                    title={t('show_on_map')}
+                    onclick={() => showEvent(e.target!)}
+                    >{@render entry()}</button
+                  >{:else}<div class="journal-entry">
+                    {@render entry()}
+                  </div>{/if}
+              </li>
+            {/each}
+          </ol>{:else}<p class="journal-empty">{t('journal_empty')}</p>{/if}
+      </aside>{/if}
     {#if feature}<aside class="inspection">
         <button
           class="close"
@@ -999,8 +1144,8 @@
         class:offline={player.connected === false}
         style={`--seat:${colors[i]}`}
       >
-        <svg class="portrait-piece" viewBox="-17 -17 36 38" aria-hidden="true"
-          ><WoodenPiece color={colors[i]} mark={i + 1} /></svg
+        <svg class="portrait-piece" viewBox="-16 -18 32 33" aria-hidden="true"
+          ><FigureSprite color={colors[i]} /></svg
         >
         <strong title={player.name}>{player.name}</strong>
         <span class="player-score"
@@ -1011,8 +1156,9 @@
           aria-label={`${t('meeple')} · ${remaining}`}
         >
           {#each Array(remaining) as _}<svg
-              viewBox="-16 -16 32 34"
-              aria-hidden="true"><path d={meeplePath} fill={colors[i]} /></svg
+              viewBox="-15 -17 30 31"
+              aria-hidden="true"
+              ><FigureSprite color={colors[i]} shadow={false} /></svg
             >{/each}
         </span>
         {#if player.connected === false}<small class="connection-status"
@@ -1080,6 +1226,26 @@
     ></button
   >
   {#if p.phase !== 'setup'}<button
+      class="journal-toggle corner-control"
+      onclick={() => (journal = !journal)}
+      aria-label={t('history')}
+      aria-expanded={journal}
+      title={t('history')}
+      ><svg viewBox="0 0 28 28" aria-hidden="true"
+        ><path
+          d="M8 5h13a2 2 0 0 1 2 2v1h-4M8 5a2 2 0 0 0-2 2v14a2.5 2.5 0 0 1-2.5 2.5H18a2.5 2.5 0 0 0 2.5-2.5V8"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linejoin="round"
+        /><path
+          d="M10 11h7M10 15h7M10 19h4"
+          stroke="#e9c879"
+          stroke-width="1.3"
+          stroke-linecap="round"
+        /></svg
+      ></button
+    ><button
       class="overview-toggle corner-control"
       onclick={() => (overview = true)}
       aria-label={t('board_overview')}
@@ -1224,16 +1390,18 @@
         >
           <strong>{v.name}</strong><span>{p.scores[v.id][0]} {t('points')}</span
           >
-        </p>{/each}<button
-        onclick={() => {
-          journal = true;
-          settings = true;
-        }}>{t('history')}</button
+        </p>{/each}<button onclick={() => (journal = true)}
+        >{t('history')}</button
       >
     </section>
   {:else}
     <div class="turn-hint" aria-live="polite">
-      <span class="turn-line">{name(who)} · {t('turn')} {p.turn}</span>
+      <span class="turn-line"
+        ><span class="medallion" aria-hidden="true">⚜</span>{name(who)} · {t(
+          'turn',
+        )}
+        {p.turn}</span
+      >
       <p>
         {!mine
           ? t('waiting')
@@ -1336,7 +1504,7 @@
                     if (!unavailable) pick(type);
                   }}
                   ><svg viewBox="-16 -18 32 36" aria-hidden="true"
-                    ><WoodenPiece color={ownColor} {type} /></svg
+                    ><FigureSprite color={ownColor} {type} /></svg
                   ></button
                 ><span
                   class="piece-tooltip"
@@ -1367,7 +1535,7 @@
                   if (!unavailable) attachmentPick(kind as 'builder' | 'pig');
                 }}
                 ><svg viewBox="-17 -17 36 36" aria-hidden="true"
-                  ><WoodenPiece color={ownColor} type={kind} /></svg
+                  ><FigureSprite color={ownColor} type={kind} /></svg
                 ></button
               ><span
                 class="piece-tooltip"
@@ -1433,12 +1601,12 @@
       {#if drag.kind === 'tile' && p.current}<svg viewBox="0 0 100 100"
           ><TileArt id={p.current} {rotation} /></svg
         >{:else}<svg viewBox="-16 -18 32 36"
-          ><WoodenPiece color={ownColor} type={drag.kind} /></svg
+          ><FigureSprite color={ownColor} type={drag.kind} /></svg
         >{/if}
     </div>{/if}
 
   <dialog
-    bind:this={overviewDialog}
+    {@attach modal(() => overview)}
     onclose={() => (overview = false)}
     class="overview-dialog"
     aria-labelledby="carc-overview-title"
@@ -1636,7 +1804,7 @@
   </dialog>
 
   <dialog
-    bind:this={guideDialog}
+    {@attach modal(() => guide)}
     onclose={() => (guide = false)}
     class="guide-dialog"
     aria-labelledby="carc-guide-title"
@@ -1700,7 +1868,7 @@
   </dialog>
 
   <dialog
-    bind:this={settingsDialog}
+    {@attach modal(() => settings)}
     onclose={() => (settings = false)}
     class="settings-dialog"
   >
@@ -1714,6 +1882,8 @@
     <div class="settings-grid">
       <button onclick={toggleSound} aria-pressed={sound}
         >{t('sound')} · {sound ? t('on') : t('off')}</button
+      ><button onclick={toggleMotion} aria-pressed={motion}
+        >{t('motion')} · {motion ? t('on') : t('off')}</button
       ><button
         onclick={() => {
           fit();
@@ -1733,29 +1903,9 @@
           settings = false;
           guide = true;
         }}>{t('help')}</button
-      ><button onclick={() => (journal = !journal)} aria-expanded={journal}
-        >{t('history')}</button
       >
     </div>
     {#if settingsContent}{@render settingsContent()}{/if}
-    {#if journal}<section class="journal">
-        <h3>{t('history')}</h3>
-        {#each [...p.events].reverse() as e}<button
-            class="journal-entry"
-            onclick={() => {
-              if (e.target) {
-                selected = e.target;
-                focus(split(e.target).tile);
-              }
-              settings = false;
-            }}
-            ><small>{t('turn')} {e.turn}</small><span
-              >{e.player ? name(e.player) + ' · ' : ''}{t(e.kind)}{e.feature
-                ? ' · ' + t(e.feature)
-                : ''}</span
-            >{#if e.points}<strong>+{e.points}</strong>{/if}</button
-          >{/each}
-      </section>{/if}
     <small class="control-hint">{t('controls')}</small>
   </dialog>
 </div>
@@ -1924,9 +2074,10 @@
     color: #d9b66f;
   }
   .player .portrait-piece {
-    width: 44px;
-    height: 52px;
+    width: 46px;
+    height: 50px;
     grid-row: 1 / 3;
+    filter: drop-shadow(0 2px 2px #0008);
   }
   .player strong {
     overflow: hidden;
@@ -1941,16 +2092,19 @@
   }
   .player-supply {
     position: absolute;
-    bottom: 18px;
+    bottom: 15px;
     right: 10px;
     display: flex;
-    gap: 1px;
-    max-width: 96px;
+    max-width: 104px;
   }
   .player-supply svg {
-    width: 12px;
-    height: 16px;
-    filter: drop-shadow(0 1px 1px #000);
+    flex: none;
+    width: 15px;
+    height: 17px;
+    filter: drop-shadow(0 1px 1px #000a);
+  }
+  .player-supply svg + svg {
+    margin-left: -2px;
   }
   .connection-status {
     position: absolute;
@@ -2006,9 +2160,24 @@
   }
   .turn-line {
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 9px;
     font-size: 15px;
     padding-left: 22px;
     border-left: 1px solid #c9b48430;
+  }
+  .medallion {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid #c9b48470;
+    background: radial-gradient(#4a3a26, #231a10);
+    color: #dcc38e;
+    font-size: 13px;
+    box-shadow: inset 0 1px 0 #fff2c833;
   }
   .turn-hint p {
     font-size: 15px;
@@ -3112,27 +3281,115 @@
     text-align: center;
   }
   .journal {
-    border-top: 1px solid #ead7ab25;
-    margin-top: 20px;
-    padding-top: 12px;
+    position: absolute;
+    z-index: 5;
+    top: 76px;
+    right: 18px;
+    bottom: 240px;
+    width: min(340px, calc(100% - 36px));
+    display: flex;
+    flex-direction: column;
+    padding: 16px 16px 10px;
+    color: #3a2c1b;
+    background: linear-gradient(#fff6dc80, #0000 30%), #ecdcb4;
+    border: 1px solid #b09261;
+    border-radius: 6px;
+    box-shadow:
+      0 12px 28px #0008,
+      inset 0 0 30px #b28d5244;
     font-size: 12px;
-    line-height: 1.7;
+  }
+  .journal header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #a88a5a66;
+    padding-bottom: 8px;
+  }
+  .journal h2 {
+    margin: 0;
+    font:
+      400 19px 'Carcassonne Display',
+      Georgia,
+      serif;
+    color: #3a2c1b;
+  }
+  .journal .close {
+    position: static;
+    color: #5b4527;
+    background: transparent;
+    border: 0;
+    font-size: 20px;
+  }
+  .journal ol {
+    list-style: none;
+    margin: 6px 0 0;
+    padding: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
   .journal-entry {
     display: flex;
-    gap: 12px;
+    align-items: center;
+    gap: 9px;
     width: 100%;
+    padding: 7px 6px;
     text-align: left;
-    font-size: 11px;
+    font: inherit;
+    color: #3a2c1b;
+    background: transparent;
     border: 0;
-    border-bottom: 1px solid #fff1;
-    border-radius: 0;
+    border-bottom: 1px solid #a88a5a40;
+    border-radius: 3px;
   }
   .journal-entry small {
-    opacity: 0.5;
+    flex: none;
+    width: 50px;
+    color: #7a6343;
+    font-size: 10px;
+  }
+  .journal-entry i {
+    flex: none;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px #3a2c1b55;
+  }
+  .journal-entry span {
+    min-width: 0;
   }
   .journal-entry strong {
     margin-left: auto;
+    color: #8a5a12;
+  }
+  .journal-entry .pin {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    margin-left: auto;
+    color: #8d7550;
+    opacity: 0.55;
+  }
+  .journal-entry strong + .pin {
+    margin-left: 0;
+  }
+  .journal-entry.linked {
+    cursor: pointer;
+  }
+  .journal-entry.linked:hover,
+  .journal-entry.linked:focus-visible {
+    background: #fff4d6;
+  }
+  .journal-entry.linked:hover .pin,
+  .journal-entry.linked:focus-visible .pin {
+    opacity: 1;
+    color: #8a5a12;
+  }
+  .journal-empty {
+    color: #7a6343;
+  }
+  .journal-toggle {
+    right: 170px;
   }
   .control-hint {
     display: block;
@@ -3140,6 +3397,15 @@
     opacity: 0.5;
     font-size: 10px;
     line-height: 1.6;
+  }
+  .motion .slot rect {
+    animation: slot-glow 2.4s ease-in-out infinite alternate;
+  }
+  @keyframes slot-glow {
+    to {
+      fill-opacity: 0.2;
+      stroke-dashoffset: -8.6;
+    }
   }
   @keyframes land {
     from {
@@ -3253,6 +3519,15 @@
     }
     .guide-toggle {
       right: 92px;
+    }
+    .journal-toggle {
+      right: 133px;
+    }
+    .journal {
+      top: 64px;
+      right: 10px;
+      bottom: 10px;
+      width: calc(100% - 20px);
     }
     .overview-toggle {
       right: 51px;

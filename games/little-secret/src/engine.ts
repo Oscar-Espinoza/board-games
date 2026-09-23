@@ -96,6 +96,7 @@ export function create(
     roles: {},
     ballots: {},
     rps: {},
+    clues: {},
     clueOrder: [],
     origin: null,
     reactions: [],
@@ -211,6 +212,7 @@ export function rules(packs: Packs) {
           ...n.players.slice(index + 1),
           ...n.players.slice(0, index + 1),
         ].filter((p) => !n.eliminated.includes(p));
+      n.clues = {};
       n.clueOrder = ordered;
       n.speaker = ordered[0]!;
       n.cycle++;
@@ -300,6 +302,7 @@ export function rules(packs: Packs) {
       n.reactions = [];
       n.result = null;
       n.continued = [];
+      n.clues = {};
       n.clueOrder = [];
       n.origin = null;
       n.ballotId = '';
@@ -344,6 +347,15 @@ export function rules(packs: Packs) {
         a.cycle !== s.cycle
       )
         fail();
+      if (s.powers[player] !== 'mime') {
+        if (
+          typeof a.text !== 'string' ||
+          !a.text.trim() ||
+          a.text.trim().length > 80
+        )
+          fail();
+        n.clues[player] = (a.text as string).trim();
+      } else n.clues[player] = '';
       n.clueOrder.shift();
       n.speaker = n.clueOrder[0] ?? null;
       if (!n.speaker) n.phase = 'debate';
@@ -484,6 +496,7 @@ export function view(s: State, player: string): View {
   // Explicit allowlist: never spread canonical state or include content identifiers.
   return structuredClone({
     public: {
+      clues: { ...s.clues },
       players: s.players,
       connectedPlayers: s.connectedPlayers,
       options: s.options,

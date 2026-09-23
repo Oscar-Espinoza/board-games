@@ -1,3 +1,4 @@
+import { seeded } from '@board-games/game-core';
 /** Local-only, conserved fixtures. Never imported by server or catalog metadata. */
 import {
   create,
@@ -27,12 +28,6 @@ export const scenarios = [
   'finish',
 ] as const;
 export type Scenario = (typeof scenarios)[number];
-export function seeded(seed = 492) {
-  return () => {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    return seed / 4294967296;
-  };
-}
 export function inventory(s: State) {
   const total = Object.fromEntries(colors.map((c) => [c, 0])) as Record<
     Color,
@@ -60,7 +55,7 @@ export function fixture(scenario: Scenario = 'start2'): State {
     seats
       .slice(0, scenario === 'start4' ? 4 : scenario === 'start3' ? 3 : 2)
       .map((p) => p.id),
-    seeded(),
+    seeded(492),
   );
   s.turn = 0;
   s.starter = 0;

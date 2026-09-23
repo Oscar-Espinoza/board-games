@@ -51,8 +51,7 @@
     box-sizing: border-box;
     place-items: center;
     color: var(--motif);
-    filter: drop-shadow(1px 2px 1px rgba(0, 5, 9, 0.72))
-      drop-shadow(2px 4px 3px rgba(0, 3, 8, 0.5));
+    filter: drop-shadow(1.5px 3px 2px rgba(0, 4, 8, 0.72));
     vertical-align: middle;
   }
   .tile img {

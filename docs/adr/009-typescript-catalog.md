@@ -22,8 +22,6 @@ Generated seat IDs and browser-held private tokens provide reconnection without 
 
 Before modification, the complete original source/assets tree was copied to `/home/oscar/.local/state/board-games-migration/20260910-212058`, excluding `.git`, `node_modules`, `target`, browser test reports and generated Svelte caches. The sibling did not exist and was created without overwriting an existing project. Preserve that snapshot as migration recovery material outside discovery directories.
 
-Current validation commands and required coverage are in [validation.md](../validation.md). Actual execution results are reported separately; this decision does not claim test completion.
-
 ## Runtime follow-up
 
 [ADR 010](010-bun-runtime.md) replaces the original pnpm package manager and Node runtime with Bun. The authoritative Socket.IO architecture and game boundaries above remain in effect.

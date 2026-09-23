@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { prefersReducedMotion } from 'svelte/motion';
+  import { readJson, write } from '@board-games/shared/ui';
   import { onMount, tick, type Snippet } from 'svelte';
   import { setLocale, type Locale } from '@board-games/shared/runtime';
   import { type view as project, type Choice } from './index.js';
@@ -13,12 +15,13 @@
     type PublicCard,
   } from './cards.js';
   import { presets, validMenu, menuKinds, type Menu } from './menus.js';
-  import { t, cardName, hues } from './labels.js';
+  import { t, cardName } from './labels.js';
   import { EventCursor } from './presentation.js';
   import { tableAudio, passBundles } from './effects.js';
   import Dish from './table/FoodArt.svelte';
   import Card from './Card.svelte';
   import PartyBoard from './table/PartyBoard.svelte';
+  import TableControls from './table/TableControls.svelte';
   import ScorePawn from './table/ScorePawn.svelte';
   import TableDecor from './table/TableDecor.svelte';
   import OpponentSeat from './table/OpponentSeat.svelte';
@@ -38,6 +41,9 @@
     rematch,
     chooseSeat,
     practice = false,
+    practiceAction,
+    practiceActionLabel = '',
+    practiceActionDisabled = false,
   }: {
     view: ReturnType<typeof project>;
     playerId: string;
@@ -52,14 +58,21 @@
     rematch?: () => Promise<void>;
     chooseSeat?: (id: string) => void;
     practice?: boolean;
+    practiceAction?: () => unknown;
+    practiceActionLabel?: string;
+    practiceActionDisabled?: boolean;
   } = $props();
   const pub = $derived(view.public),
     priv = $derived(view.private);
   const own = $derived(pub.players.find((p) => p.id === playerId)!);
   let viewportWidth = $state(1440),
     viewportHeight = $state(900);
-  const rich = $derived(viewportWidth >= 1100 && viewportHeight >= 680);
+  const phoneLayout = $derived(
+    viewportWidth < 700 || (viewportWidth <= 1000 && viewportHeight <= 500),
+  );
   const scale = $derived(Math.min(viewportWidth / 1440, viewportHeight / 900));
+  const stageWidth = $derived(viewportWidth / scale);
+  const stageHeight = $derived(viewportHeight / scale);
   const richSeats = $derived(desktopSeats(pub.players.length - 1));
   const color = (id: string) =>
     pawnColors[pub.players.findIndex((p) => p.id === id) % pawnColors.length];
@@ -101,8 +114,8 @@
   let sound = $state(true),
     volume = $state(0.35),
     motion = $state(true),
-    systemReduced = $state(false),
     loaded = $state(false);
+  const systemReduced = $derived(prefersReducedMotion.current);
   let announcement = $state(''),
     revealCards = $state<{ seat: string; card: PublicCard }[]>([]),
     scoring = $state(false);
@@ -127,15 +140,6 @@
   const label = (key: string, values: Record<string, string | number> = {}) =>
     t(key, values, locale);
   const name = (id: string) => players.find((p) => p.id === id)?.name ?? id;
-  function seatPosition(i: number, n: number) {
-    const angle = n === 1 ? Math.PI / 2 : Math.PI * (i / (n - 1));
-    const top = Math.ceil(n / 2);
-    const shortX =
-      i < top
-        ? ((i + 0.5) * 100) / top
-        : 100 - ((i - top + 0.5) * 100) / (n - top);
-    return `--x:${50 + 40 * Math.cos(angle)}%;--y:${48 - 33 * Math.sin(angle)}%;--short-x:${shortX}%;--short-y:${i < top ? 96 : 170}px;--seat-fraction:${(i + 0.5) / n};--seat-count:${n};`;
-  }
   function toggle(list: string[], id: string) {
     return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
   }
@@ -189,25 +193,11 @@
     opener?.focus();
   }
   onMount(() => {
-    try {
-      const p = JSON.parse(
-        localStorage.getItem('sushi-go-party:preferences') ?? '{}',
-      );
-      sound = p.sound !== false;
-      motion = p.motion !== false;
-      volume =
-        typeof p.volume === 'number'
-          ? Math.max(0, Math.min(1, p.volume))
-          : 0.35;
-    } catch {}
-    const media = matchMedia('(prefers-reduced-motion: reduce)');
-    systemReduced = media.matches;
-    const change = () => {
-      systemReduced = media.matches;
-      clearPresentation();
-      cursor.reset();
-    };
-    media.addEventListener('change', change);
+    const p = readJson('sushi-go-party:preferences');
+    sound = p.sound !== false;
+    motion = p.motion !== false;
+    volume =
+      typeof p.volume === 'number' ? Math.max(0, Math.min(1, p.volume)) : 0.35;
     const resize = () => clearPresentation();
     const visibility = () => {
       hidden = document.hidden;
@@ -219,7 +209,6 @@
     window.addEventListener('resize', resize);
     loaded = true;
     return () => {
-      media.removeEventListener('change', change);
       window.removeEventListener('resize', resize);
       document.removeEventListener('visibilitychange', visibility);
       clearPresentation();
@@ -228,12 +217,9 @@
   });
   $effect(() => {
     if (loaded) {
-      try {
-        localStorage.setItem(
-          'sushi-go-party:preferences',
-          JSON.stringify({ sound, volume, motion }),
-        );
-      } catch {}
+      write('sushi-go-party:preferences', { sound, volume, motion });
+      // Preference or system motion changes cancel in-flight presentation.
+      void systemReduced;
       clearPresentation();
       cursor.reset();
     }
@@ -330,9 +316,12 @@
   bind:this={root}
   class:reduce={!motion || systemReduced}
   class:scoring
-  class:rich
+  class:rich={true}
   style:--table-scale={scale}
-  data-layout={rich ? 'desktop' : 'compact'}
+  style:--table-width={`${stageWidth}px`}
+  style:--table-height={`${stageHeight}px`}
+  style:--phone-board-scale={(viewportWidth - 16) / 840}
+  data-layout={phoneLayout ? 'phone' : 'desktop'}
   role="group"
   aria-label="Sushi Go Party!"
   data-phase={pub.phase}
@@ -340,40 +329,27 @@
   data-turn={pub.turn}
 >
   <div class="table-grain" aria-hidden="true"></div>
-  <button
-    class="corner book"
-    onclick={() => open('guide')}
-    aria-label={label('guide')}
-    ><svg viewBox="0 0 36 32" aria-hidden="true"
-      ><path
-        d="M3 5q8-4 15 0 8-4 15 0v23q-7-4-15 0-8-4-15 0Z"
-        fill="#fff5d9"
-        stroke="#31544b"
-        stroke-width="2"
-      /><path
-        d="M18 5v23M8 11h6m-6 5h6m8-5h6m-6 5h6"
-        stroke="#c58574"
-        stroke-width="2"
-      /></svg
-    ></button
-  >
-  <button
-    class="corner gear"
-    onclick={() => open('settings')}
-    aria-label={label('settings')}>⚙</button
-  >
+
   <span class="table-wordmark">SUSHI GO <b>PARTY!</b></span>
+
   <span class="sr-only" role="status" aria-live="polite">{announcement}</span>
 
+  <TableControls
+    guideLabel={label('guide')}
+    settingsLabel={label('settings')}
+    onguide={() => open('guide')}
+    onsettings={() => open('settings')}
+  />
+
   <div class="table-stage" data-guests={pub.players.length}>
-    {#if rich}
-      <TableDecor
-        notes={[
-          label('table_note_one'),
-          label('table_note_two'),
-          label('table_note_three'),
-        ]}
-      />
+    <TableDecor
+      notes={[
+        label('table_note_one'),
+        label('table_note_two'),
+        label('table_note_three'),
+      ]}
+    />
+    <div class="table-content">
       <PartyBoard
         players={scorePlayers}
         scoreLabel={(n, s) => `${n}: ${label('score', { score: s })}`}
@@ -434,504 +410,453 @@
               d="M1299 452Q1293 495 1242 530"
             /><path d="M1340 758Q1370 830 1270 865" />{/if}</svg
         >{/if}
-    {/if}
 
-    {#each friends as friend, i (friend.id)}
-      <div
-        class="seat"
-        style={rich
-          ? `--seat-x:${richSeats[i].x}px;--seat-y:${richSeats[i].y}px;--seat-w:${richSeats[i].w}px;--seat-h:${richSeats[i].h}px`
-          : seatPosition(i, friends.length)}
-        data-seat={friend.id}
-        class:top-seat={rich && richSeats[i].top}
-      >
-        {#if rich}<OpponentSeat
-            name={name(friend.id)}
-            score={friend.score}
-            color={color(friend.id)}
-            count={friend.count}
-            tableau={friend.tableau}
-            saved={friend.desserts.length}
-            status={revealCards.length
-              ? 'passing'
-              : pub.ready.includes(friend.id) ||
-                  pub.committed.includes(friend.id)
-                ? 'ready'
-                : 'choosing'}
-            top={richSeats[i].top}
-            newlyPlayed={revealCards
-              .filter((r) => r.seat === friend.id)
-              .map((r) => r.card.id)}
-            {locale}
-            onclick={() => open('tray', friend.id)}
-          />{:else}
-          <button
-            class="friend-plate"
-            class:ready={pub.ready.includes(friend.id) ||
-              pub.committed.includes(friend.id)}
-            onclick={() => open('tray', friend.id)}
-            aria-label={`${name(friend.id)} · ${label('score', { score: friend.score })} · ${label('tableau')}`}
+      <div class="opponent-trays">
+        {#each friends as friend, i (friend.id)}
+          <div
+            class="seat"
+            style={`--seat-x:${richSeats[i].x}px;--seat-y:${richSeats[i].y}px;--seat-w:${richSeats[i].w}px;--seat-h:${richSeats[i].h}px`}
+            data-seat={friend.id}
+            class:top-seat={!phoneLayout && richSeats[i].top}
           >
-            <span
-              class="friend-avatar"
-              style={`--guest:${['#db9b8c', '#c3b16e', '#8cacb4', '#b69eb7', '#b7ba8f', '#d2ad86', '#92b5a3'][i]}`}
-              >{name(friend.id).slice(0, 1).toUpperCase()}</span
-            >
-            <span class="friend-name" title={name(friend.id)}
-              >{name(friend.id)}</span
-            ><span class="friend-score">{friend.score} <small>✦</small></span>
-            <span class="friend-foods" aria-hidden="true"
-              >{#each friend.tableau.slice(-3) as card}<span
-                  ><Dish {card} boxed={card.boxed} /></span
-                >{/each}{#if !friend.tableau.length}<span class="plate-line"
-                ></span>{/if}</span
-            >
-            <span class="friend-details"
-              >{pub.committed.includes(friend.id) ||
-              pub.ready.includes(friend.id)
-                ? '✓'
-                : `${friend.count} ▧`} · {friend.desserts.length +
-                friend.tableau.filter(
-                  (c) =>
-                    desserts.includes(c.kind as (typeof desserts)[number]) &&
-                    !c.boxed,
-                ).length} ♡</span
-            >
-          </button>
-        {/if}
+            <OpponentSeat
+              name={name(friend.id)}
+              score={friend.score}
+              color={color(friend.id)}
+              count={friend.count}
+              tableau={friend.tableau}
+              saved={friend.desserts.length}
+              status={revealCards.length
+                ? 'passing'
+                : pub.ready.includes(friend.id) ||
+                    pub.committed.includes(friend.id)
+                  ? 'ready'
+                  : 'choosing'}
+              top={!phoneLayout && richSeats[i].top}
+              newlyPlayed={revealCards
+                .filter((r) => r.seat === friend.id)
+                .map((r) => r.card.id)}
+              {locale}
+              onclick={() => open('tray', friend.id)}
+            />
+          </div>
+        {/each}
       </div>
-    {/each}
 
-    {#if pub.phase === 'setup'}
-      <section class="menu-setup">
-        <div class="setup-platter">
-          <Dish card={face('nigiri', 'salmon')} /><Dish
-            card={face('maki', '3')}
-          /><Dish card={face('dumpling')} />
-        </div>
-        <p class="eyebrow">SUSHI GO PARTY! · {pub.players.length}</p>
-        <h1>{label('menu_title')}</h1>
-        <p>{label('menu_intro')}</p>
-        <div class="presets">
-          {#each Object.entries(presets) as [key, menu]}<button
-              class:chosen={JSON.stringify(menu) === JSON.stringify(pub.menu)}
-              disabled={!allowed || !validMenu(menu, pub.players.length)}
-              title={!validMenu(menu, pub.players.length)
-                ? label('unavailable')
-                : menuKinds(menu)
-                    .map((k) => label(k))
-                    .join(', ')}
-              onclick={() => propose(menu)}
-              ><span class="preset-art"><Dish card={face(menu.roll)} /></span
-              ><span>{label('preset_' + key)}</span></button
-            >{/each}
-        </div>
-        <button
-          class="text-button"
-          onclick={() => {
-            custom = !custom;
-            customMenu = {
-              roll: pub.menu.roll,
-              appetizers: [...pub.menu.appetizers],
-              specials: [...pub.menu.specials],
-              dessert: pub.menu.dessert,
-            };
-          }}
-          aria-expanded={custom}>{label('custom')} {custom ? '−' : '+'}</button
-        >
-        {#if custom}<div class="custom-menu">
-            <label
-              >{label('rolls')}<select bind:value={customMenu.roll}
-                >{#each rolls as k}<option value={k}>{label(k)}</option
-                  >{/each}</select
-              ></label
-            >
-            {#each [0, 1, 2] as i}<label
-                >{label('appetizers')}
-                {i + 1}<select bind:value={customMenu.appetizers[i]}
-                  >{#each appetizers as k}<option
-                      value={k}
-                      disabled={k === 'edamame' && pub.players.length === 2}
-                      >{label(k)}</option
+      {#if pub.phase === 'setup'}
+        <section class="menu-setup">
+          <div class="setup-platter">
+            <Dish card={face('nigiri', 'salmon')} /><Dish
+              card={face('maki', '3')}
+            /><Dish card={face('dumpling')} />
+          </div>
+          <p class="eyebrow">SUSHI GO PARTY! · {pub.players.length}</p>
+          <h1>{label('menu_title')}</h1>
+          <p>{label('menu_intro')}</p>
+          <div class="presets">
+            {#each Object.entries(presets) as [key, menu]}<button
+                class:chosen={JSON.stringify(menu) === JSON.stringify(pub.menu)}
+                disabled={!allowed || !validMenu(menu, pub.players.length)}
+                title={!validMenu(menu, pub.players.length)
+                  ? label('unavailable')
+                  : menuKinds(menu)
+                      .map((k) => label(k))
+                      .join(', ')}
+                onclick={() => propose(menu)}
+                ><span class="preset-art"><Dish card={face(menu.roll)} /></span
+                ><span>{label('preset_' + key)}</span></button
+              >{/each}
+          </div>
+          <button
+            class="text-button"
+            onclick={() => {
+              custom = !custom;
+              customMenu = {
+                roll: pub.menu.roll,
+                appetizers: [...pub.menu.appetizers],
+                specials: [...pub.menu.specials],
+                dessert: pub.menu.dessert,
+              };
+            }}
+            aria-expanded={custom}
+            >{label('custom')} {custom ? '−' : '+'}</button
+          >
+          {#if custom}<div class="custom-menu">
+              <label
+                >{label('rolls')}<select bind:value={customMenu.roll}
+                  >{#each rolls as k}<option value={k}>{label(k)}</option
                     >{/each}</select
                 ></label
-              >{/each}
-            {#each [0, 1] as i}<label
-                >{label('specials')}
-                {i + 1}<select bind:value={customMenu.specials[i]}
-                  >{#each specials as k}<option
-                      value={k}
-                      disabled={(k === 'spoon' && pub.players.length === 2) ||
-                        ((k === 'menu' || k === 'special_order') &&
-                          pub.players.length >= 7)}>{label(k)}</option
+              >
+              {#each [0, 1, 2] as i}<label
+                  >{label('appetizers')}
+                  {i + 1}<select bind:value={customMenu.appetizers[i]}
+                    >{#each appetizers as k}<option
+                        value={k}
+                        disabled={k === 'edamame' && pub.players.length === 2}
+                        >{label(k)}</option
+                      >{/each}</select
+                  ></label
+                >{/each}
+              {#each [0, 1] as i}<label
+                  >{label('specials')}
+                  {i + 1}<select bind:value={customMenu.specials[i]}
+                    >{#each specials as k}<option
+                        value={k}
+                        disabled={(k === 'spoon' && pub.players.length === 2) ||
+                          ((k === 'menu' || k === 'special_order') &&
+                            pub.players.length >= 7)}>{label(k)}</option
+                      >{/each}</select
+                  ></label
+                >{/each}
+              <label
+                >{label('desserts')}<select bind:value={customMenu.dessert}
+                  >{#each desserts as k}<option value={k}>{label(k)}</option
                     >{/each}</select
                 ></label
+              ><button
+                disabled={!allowed ||
+                  !validMenu(customMenu, pub.players.length)}
+                onclick={() => propose(customMenu)}>{label('propose')}</button
+              >
+            </div>{/if}
+          <div class="menu-strip">
+            {#each menuKinds(pub.menu) as k}<button
+                title={label('rule_' + k)}
+                onclick={() => {
+                  search = label(k);
+                  void open('guide');
+                }}
+                ><span
+                  ><Dish
+                    card={face(
+                      k,
+                      k === 'nigiri'
+                        ? 'salmon'
+                        : k === 'onigiri'
+                          ? 'triangle'
+                          : '',
+                    )}
+                  /></span
+                >{label(k)}</button
               >{/each}
-            <label
-              >{label('desserts')}<select bind:value={customMenu.dessert}
-                >{#each desserts as k}<option value={k}>{label(k)}</option
-                  >{/each}</select
-              ></label
-            ><button
-              disabled={!allowed || !validMenu(customMenu, pub.players.length)}
-              onclick={() => propose(customMenu)}>{label('propose')}</button
-            >
-          </div>{/if}
-        <div class="menu-strip">
-          {#each menuKinds(pub.menu) as k}<button
-              title={label('rule_' + k)}
-              onclick={() => {
-                search = label(k);
-                void open('guide');
-              }}
-              ><span
-                ><Dish
-                  card={face(
-                    k,
-                    k === 'nigiri'
-                      ? 'salmon'
-                      : k === 'onigiri'
-                        ? 'triangle'
-                        : '',
-                  )}
-                /></span
-              >{label(k)}</button
-            >{/each}
-        </div>
-        <button
-          class="primary"
-          data-testid="sgp-ready"
-          disabled={!allowed || pub.ready.includes(playerId)}
-          onclick={ready}
-          >{label(
-            pub.ready.includes(playerId) ? 'ready_wait' : 'menu_ready',
-          )}</button
-        >
-        <p class="ready-count">
-          {label('waiting', {
-            count: pub.ready.length,
-            total: pub.players.length,
-          })}
-        </p>
-      </section>
-    {:else}
-      <div class="table-center">
-        <p class="eyebrow">
-          {label('round_turn', { round: pub.round, turn: pub.turn })}
-        </p>
-        <h1>
-          {pub.phase === 'finished'
-            ? label('finished')
-            : pub.phase === 'round-end'
-              ? label('round_end')
-              : label('current_menu')}
-        </h1>
-        <div class="menu-mini">
-          {#each menuKinds(pub.menu) as k}<button
-              title={`${label(k)}: ${label('rule_' + k)}`}
-              onclick={() => {
-                search = label(k);
-                void open('guide');
-              }}
-              style={`--dish:${hues[k]}`}
-              ><Dish
-                card={face(
-                  k,
-                  k === 'nigiri' ? 'salmon' : k === 'onigiri' ? 'triangle' : '',
-                )}
-              /><span class="sr-only">{label(k)}</span></button
-            >{/each}
-        </div>
-        {#if pub.phase === 'draft'}<p class="ready-count">
+          </div>
+          <button
+            class="primary"
+            data-testid="sgp-ready"
+            disabled={!allowed || pub.ready.includes(playerId)}
+            onclick={ready}
+            >{label(
+              pub.ready.includes(playerId) ? 'ready_wait' : 'menu_ready',
+            )}</button
+          >
+          <p class="ready-count">
             {label('waiting', {
-              count: pub.committed.length,
+              count: pub.ready.length,
               total: pub.players.length,
             })}
-          </p>{/if}
-        {#if pub.prompt && !priv.prompt}<p class="waiting-prompt">
-            {label('prompt_wait', { name: name(pub.prompt.actorId) })}<small
-              >{label('prompt_' + pub.prompt.kind)}</small
-            >
-          </p>{/if}
-        {#if !allowed && pub.connected.length < pub.players.length}<p
-            class="waiting-prompt"
-          >
-            {label('disconnected')}
-          </p>{/if}
-      </div>
+          </p>
+        </section>
+      {:else}
+        <div class="table-center">
+          <p class="eyebrow">
+            {label('round_turn', { round: pub.round, turn: pub.turn })}
+          </p>
+          <h1>
+            {pub.phase === 'finished'
+              ? label('finished')
+              : pub.phase === 'round-end'
+                ? label('round_end')
+                : label('current_menu')}
+          </h1>
 
-      {#if priv.prompt}
-        <section
-          class="decision"
-          aria-label={label('prompt_' + priv.prompt.kind)}
-          data-testid={`sgp-prompt-${priv.prompt.kind}`}
-          data-prompt={priv.prompt.id}
-        >
-          <p class="eyebrow">{name(playerId)}</p>
-          <h2>{label('prompt_' + priv.prompt.kind)}</h2>
-          {#if ['menu', 'chopsticks', 'supplier'].includes(priv.prompt.kind)}<div
-              class="choice-cards"
+          {#if pub.phase === 'draft'}<p class="ready-count">
+              {label('waiting', {
+                count: pub.committed.length,
+                total: pub.players.length,
+              })}
+            </p>{/if}
+          {#if pub.prompt && !priv.prompt}<p class="waiting-prompt">
+              {label('prompt_wait', { name: name(pub.prompt.actorId) })}<small
+                >{label('prompt_' + pub.prompt.kind)}</small
+              >
+            </p>{/if}
+          {#if !allowed && pub.connected.length < pub.players.length}<p
+              class="waiting-prompt"
             >
-              {#each priv.prompt.cards as card}<button
-                  data-handle={card.handle}
-                  disabled={!allowed}
-                  title={label('rule_' + card.kind)}
-                  aria-label={cardName(card, locale)}
-                  onclick={() => resolve({ type: 'card', card: card.handle })}
-                  ><Card {card} {locale} /></button
-                >{/each}
-            </div>
-          {:else if priv.prompt.kind === 'copy' || priv.prompt.kind === 'attach'}<div
-              class="choice-cards"
-            >
-              {#each priv.prompt.targets as card}<button
-                  disabled={!allowed}
-                  aria-label={cardName(card, locale)}
-                  onclick={() =>
-                    resolve(
-                      priv.prompt!.kind === 'copy'
-                        ? { type: 'copy', target: card.id }
-                        : { type: 'attach', wasabi: card.id },
-                    )}><Card {card} {locale} /></button
-                >{/each}
-            </div>
-            {#if priv.prompt.kind === 'attach'}<button
-                onclick={() => resolve({ type: 'attach', wasabi: null })}
-                disabled={!allowed}>{label('no_attach')}</button
-              >{/if}
-          {:else if priv.prompt.kind === 'takeout'}<div class="choice-cards">
-              {#each priv.prompt.targets as card}<button
-                  class:chosen={boxes.includes(card.id)}
-                  aria-pressed={boxes.includes(card.id)}
-                  disabled={!allowed}
-                  aria-label={cardName(card, locale)}
-                  onclick={() => (boxes = toggle(boxes, card.id))}
-                  ><Card {card} {locale} /></button
-                >{/each}
-            </div>
-            <button
-              class="primary"
-              disabled={!allowed}
-              onclick={() => resolve({ type: 'takeout', cards: boxes })}
-              >{label(boxes.length ? 'box_selected' : 'flip_none')}</button
-            >
-          {:else if priv.prompt.kind === 'spoon'}<div class="request-row">
-              <select
-                aria-label={label('ask')}
-                bind:value={requestKind}
-                onchange={() => {
-                  requestVariant = '';
-                  requestPriority = '';
-                }}
-                >{#each priv.prompt.requests as r}<option value={r.kind}
-                    >{label(r.kind)}</option
-                  >{/each}</select
-              ><select
-                aria-label={label('request_any')}
-                bind:value={requestVariant}
-                ><option value="">{label('request_any')}</option
-                >{#each priv.prompt.requests
-                  .find((r) => r.kind === requestKind)
-                  ?.variants.filter(Boolean) ?? [] as v}<option value={v}
-                    >{cardName(
-                      face(
-                        requestKind,
-                        v,
-                        0,
-                        0,
-                        requestKind === 'fruit'
-                          ? v.split('').map(Number)
-                          : [0, 0, 0],
-                      ),
-                      locale,
-                    )}</option
-                  >{/each}</select
-              >{#if priv.prompt.requests.find((r) => r.kind === requestKind)?.priorities.length}<select
-                  aria-label={label('priority', { number: '' })}
-                  bind:value={requestPriority}
-                  ><option value="">{label('request_any')}</option
-                  >{#each priv.prompt.requests.find((r) => r.kind === requestKind)?.priorities ?? [] as n}<option
-                      value={String(n)}
-                      >{label('priority', { number: n })}</option
-                    >{/each}</select
-                >{/if}<button
+              {label('disconnected')}
+            </p>{/if}
+        </div>
+
+        {#if priv.prompt}
+          <section
+            class="decision"
+            aria-label={label('prompt_' + priv.prompt.kind)}
+            data-testid={`sgp-prompt-${priv.prompt.kind}`}
+            data-prompt={priv.prompt.id}
+          >
+            <p class="eyebrow">{name(playerId)}</p>
+            <h2>{label('prompt_' + priv.prompt.kind)}</h2>
+            {#if ['menu', 'chopsticks', 'supplier'].includes(priv.prompt.kind)}<div
+                class="choice-cards"
+              >
+                {#each priv.prompt.cards as card}<button
+                    data-handle={card.handle}
+                    disabled={!allowed}
+                    title={label('rule_' + card.kind)}
+                    aria-label={cardName(card, locale)}
+                    onclick={() => resolve({ type: 'card', card: card.handle })}
+                    ><Card {card} {locale} /></button
+                  >{/each}
+              </div>
+            {:else if priv.prompt.kind === 'copy' || priv.prompt.kind === 'attach'}<div
+                class="choice-cards"
+              >
+                {#each priv.prompt.targets as card}<button
+                    disabled={!allowed}
+                    aria-label={cardName(card, locale)}
+                    onclick={() =>
+                      resolve(
+                        priv.prompt!.kind === 'copy'
+                          ? { type: 'copy', target: card.id }
+                          : { type: 'attach', wasabi: card.id },
+                      )}><Card {card} {locale} /></button
+                  >{/each}
+              </div>
+              {#if priv.prompt.kind === 'attach'}<button
+                  onclick={() => resolve({ type: 'attach', wasabi: null })}
+                  disabled={!allowed}>{label('no_attach')}</button
+                >{/if}
+            {:else if priv.prompt.kind === 'takeout'}<div class="choice-cards">
+                {#each priv.prompt.targets as card}<button
+                    class:chosen={boxes.includes(card.id)}
+                    aria-pressed={boxes.includes(card.id)}
+                    disabled={!allowed}
+                    aria-label={cardName(card, locale)}
+                    onclick={() => (boxes = toggle(boxes, card.id))}
+                    ><Card {card} {locale} /></button
+                  >{/each}
+              </div>
+              <button
                 class="primary"
                 disabled={!allowed}
-                onclick={() =>
-                  resolve({
-                    type: 'request',
-                    kind: requestKind,
-                    ...(requestVariant ? { variant: requestVariant } : {}),
-                    ...(requestPriority
-                      ? { priority: Number(requestPriority) }
-                      : {}),
-                  })}>{label('ask')}</button
+                onclick={() => resolve({ type: 'takeout', cards: boxes })}
+                >{label(boxes.length ? 'box_selected' : 'flip_none')}</button
               >
-            </div>{/if}
-        </section>
-      {/if}
-
-      {#if pub.phase === 'round-end' || pub.phase === 'finished'}
-        <section class="results">
-          <h2>
-            {pub.phase === 'finished'
-              ? label('winners', { names: pub.winners.map(name).join(', ') })
-              : label('receipt')}
-          </h2>
-          <div class="receipts">
-            {#each pub.receipts.filter((r) => r.round === pub.round) as receipt}<details
-                open={receipt.playerId === playerId}
-              >
-                <summary
-                  ><span>{name(receipt.playerId)}</span><strong
-                    >{receipt.total} ✦</strong
-                  ></summary
+            {:else if priv.prompt.kind === 'spoon'}<div class="request-row">
+                <select
+                  aria-label={label('ask')}
+                  bind:value={requestKind}
+                  onchange={() => {
+                    requestVariant = '';
+                    requestPriority = '';
+                  }}
+                  >{#each priv.prompt.requests as r}<option value={r.kind}
+                      >{label(r.kind)}</option
+                    >{/each}</select
+                ><select
+                  aria-label={label('request_any')}
+                  bind:value={requestVariant}
+                  ><option value="">{label('request_any')}</option
+                  >{#each priv.prompt.requests
+                    .find((r) => r.kind === requestKind)
+                    ?.variants.filter(Boolean) ?? [] as v}<option value={v}
+                      >{cardName(
+                        face(
+                          requestKind,
+                          v,
+                          0,
+                          0,
+                          requestKind === 'fruit'
+                            ? v.split('').map(Number)
+                            : [0, 0, 0],
+                        ),
+                        locale,
+                      )}</option
+                    >{/each}</select
+                >{#if priv.prompt.requests.find((r) => r.kind === requestKind)?.priorities.length}<select
+                    aria-label={label('priority', { number: '' })}
+                    bind:value={requestPriority}
+                    ><option value="">{label('request_any')}</option
+                    >{#each priv.prompt.requests.find((r) => r.kind === requestKind)?.priorities ?? [] as n}<option
+                        value={String(n)}
+                        >{label('priority', { number: n })}</option
+                      >{/each}</select
+                  >{/if}<button
+                  class="primary"
+                  disabled={!allowed}
+                  onclick={() =>
+                    resolve({
+                      type: 'request',
+                      kind: requestKind,
+                      ...(requestVariant ? { variant: requestVariant } : {}),
+                      ...(requestPriority
+                        ? { priority: Number(requestPriority) }
+                        : {}),
+                    })}>{label('ask')}</button
                 >
-                <p>
-                  {label('round_delta', {
-                    points: receipt.delta,
-                    immediate: receipt.immediate,
-                  })}
-                </p>
-                {#each receipt.groups as g}<div class="score-line">
-                    <span>{label(g.kind)}</span><strong
-                      >{g.amount > 0 ? '+' : ''}{g.amount}</strong
-                    >
-                  </div>{/each}
-              </details>{/each}
-          </div>
-          {#if pub.phase === 'round-end'}<button
-              class="primary"
-              data-testid="sgp-ready"
-              disabled={!allowed || pub.ready.includes(playerId)}
-              onclick={ready}
-              >{label(
-                pub.ready.includes(playerId) ? 'ready_wait' : 'next_round',
-              )}</button
-            >{:else if canRematch && rematch}<button
-              class="primary"
-              onclick={() => rematch?.()}>{label('rematch')}</button
-            >{/if}
-        </section>
-      {/if}
+              </div>{/if}
+          </section>
+        {/if}
 
-      <section
-        class="own-area"
-        data-seat={playerId}
-        aria-label={label('plate')}
-      >
-        <div class="own-label">
-          {#if rich}<ScorePawn color={color(playerId)} />{/if}
-          <span>{name(playerId)} <small>{label('you')}</small></span><strong
-            >{own.score} ✦</strong
-          >{#if rich}<span class="own-hand-count"
-              >{label('hand_count', { count: own.count })}</span
-            >{/if}<button
-            class="dessert-badge"
-            aria-label={label('saved', { count: own.desserts.length })}
-            onclick={() => open('tray', playerId)}
-            >{rich
-              ? `♡ ${own.desserts.length}`
-              : `${label('saved', { count: own.desserts.length })} ♡`}</button
-          >
-        </div>
-        {#if rich}<span class="own-caption">{label('table_my_dishes')}</span
+        {#if pub.phase === 'round-end' || pub.phase === 'finished'}
+          <section class="results">
+            <h2>
+              {pub.phase === 'finished'
+                ? label('winners', { names: pub.winners.map(name).join(', ') })
+                : label('receipt')}
+            </h2>
+            <div class="receipts">
+              {#each pub.receipts.filter((r) => r.round === pub.round) as receipt}<details
+                  open={receipt.playerId === playerId}
+                >
+                  <summary
+                    ><span>{name(receipt.playerId)}</span><strong
+                      >{receipt.total} ✦</strong
+                    ></summary
+                  >
+                  <p>
+                    {label('round_delta', {
+                      points: receipt.delta,
+                      immediate: receipt.immediate,
+                    })}
+                  </p>
+                  {#each receipt.groups as g}<div class="score-line">
+                      <span>{label(g.kind)}</span><strong
+                        >{g.amount > 0 ? '+' : ''}{g.amount}</strong
+                      >
+                    </div>{/each}
+                </details>{/each}
+            </div>
+            {#if pub.phase === 'round-end'}<button
+                class="primary"
+                data-testid="sgp-ready"
+                disabled={!allowed || pub.ready.includes(playerId)}
+                onclick={ready}
+                >{label(
+                  pub.ready.includes(playerId) ? 'ready_wait' : 'next_round',
+                )}</button
+              >{:else if canRematch && rematch}<button
+                class="primary"
+                onclick={() => rematch?.()}>{label('rematch')}</button
+              >{/if}
+          </section>
+        {/if}
+
+        {#if practiceAction}<button
+            class="practice-action rich-practice-action"
+            disabled={practiceActionDisabled}
+            onclick={practiceAction}
+            data-testid="sgp-practice-others">{practiceActionLabel}</button
           >{/if}
-        <div class="own-plate" class:empty={!own.tableau.length}>
-          {#if !own.tableau.length}<p>
-              {label('empty_plate')}
-            </p>{/if}{#each own.tableau as card (card.id)}<button
-              class:wasabi-linked={card.wasabi}
-              class:score-hit={scoredCards.includes(card.id)}
-              class:settling={revealCards.some((r) => r.card.id === card.id)}
-              title={`${cardName(card, locale)}: ${label('rule_' + card.kind)}`}
-              aria-label={cardName(card, locale)}
-              onclick={() => {
-                search = label(card.kind);
-                void open('guide');
-              }}><Card {card} {locale} small /></button
-            >{/each}
-        </div>
-      </section>
-      {#if pub.phase === 'draft'}
-        <section class="hand-area" aria-label={label('hand')}>
-          {#if selectedCard && !priv.committed}<div class="selection-details">
-              <span>{label('rule_' + selectedCard.kind)}</span
-              >{#if priv.legalUtensils.length}<div class="utensil-choices">
-                  <b>{label('utensils')}</b
-                  >{#each priv.legalUtensils as id}{@const utensil =
-                      own.tableau.find((c) => c.id === id)!}<button
-                      class:chosen={armed.includes(id)}
-                      aria-pressed={armed.includes(id)}
-                      onclick={() => (armed = toggle(armed, id))}
-                      >{label(utensil.kind)} {utensil.priority}</button
-                    >{/each}
-                </div>{/if}
-              {#if selectedCard.kind === 'special_order'}<div
-                  class="copy-choices"
-                >
-                  {#if priv.copyTargets.length}<label
-                      >{label('copy_target')}<select bind:value={copyTarget}
-                        ><option value="">{label('copy_target')}</option
-                        >{#each priv.copyTargets as c}<option value={c.id}
-                            >{cardName(c, locale)}{c.boxed
-                              ? ` · ${label('boxed')}`
-                              : ''}</option
-                          >{/each}</select
-                      ></label
-                    >{#if copyTarget}<span class="ghost-copy"
-                        ><Dish
-                          card={priv.copyTargets.find(
-                            (c) => c.id === copyTarget,
-                          )!}
-                        /><span>{label('copy_preview')}</span></span
-                      >{/if}{:else}<span>{label('copy_first')}</span>{/if}
-                </div>{/if}
-            </div>{/if}
-          <div class="hand" data-testid="sgp-hand">
-            {#each priv.hand as card, i (card.handle)}<button
-                style:--card-angle={`${(i - (priv.hand.length - 1) / 2) * 2.3}deg`}
-                style:--card-rise={`${Math.min(12, Math.abs(i - (priv.hand.length - 1) / 2) * 5)}px`}
-                style:--hand-overlap={`${priv.hand.length > 6 ? (562 - priv.hand.length * 90) / (priv.hand.length - 1) : 0}px`}
-                data-handle={card.handle}
-                class:selected={selection === card.handle}
-                class:committed={priv.committed?.card === card.handle}
-                disabled={!allowed || !!priv.committed}
-                aria-pressed={selection === card.handle}
-                aria-label={`${cardName(card, locale)}: ${label('rule_' + card.kind)}`}
-                onclick={() => {
-                  selection = card.handle;
-                  copyTarget = '';
-                }}><Card {card} {locale} /></button
-              >{/each}
-          </div>
-          <div class="confirmation">
-            <span
-              >{label(
-                priv.committed ? 'locked' : selectedCard ? 'keep' : 'select',
-              )}</span
+        <section
+          class="own-area"
+          data-seat={playerId}
+          aria-label={label('plate')}
+        >
+          <div class="own-label">
+            <ScorePawn color={color(playerId)} />
+            <span>{name(playerId)} <small>{label('you')}</small></span><strong
+              >{own.score} ✦</strong
+            ><span class="own-hand-count"
+              >{label('hand_count', { count: own.count })}</span
             ><button
-              class="primary"
-              data-testid="sgp-keep"
-              disabled={!allowed ||
-                !selectedCard ||
-                !!priv.committed ||
-                (selectedCard.kind === 'special_order' &&
-                  priv.copyTargets.length > 0 &&
-                  !copyTarget)}
-              onclick={keep}>{priv.committed ? '✓' : label('keep')}</button
+              class="dessert-badge"
+              aria-label={label('saved', { count: own.desserts.length })}
+              onclick={() => open('tray', playerId)}
+              >♡ {own.desserts.length}</button
             >
           </div>
+          <span class="own-caption">{label('table_my_dishes')}</span>
+          <div class="own-plate" class:empty={!own.tableau.length}>
+            {#if !own.tableau.length}<p>
+                {label('empty_plate')}
+              </p>{/if}{#each own.tableau as card (card.id)}<button
+                class:wasabi-linked={card.wasabi}
+                class:score-hit={scoredCards.includes(card.id)}
+                class:settling={revealCards.some((r) => r.card.id === card.id)}
+                title={`${cardName(card, locale)}: ${label('rule_' + card.kind)}`}
+                aria-label={cardName(card, locale)}
+                onclick={() => {
+                  search = label(card.kind);
+                  void open('guide');
+                }}><Card {card} {locale} small /></button
+              >{/each}
+          </div>
         </section>
+        {#if pub.phase === 'draft'}
+          <section class="hand-area" aria-label={label('hand')}>
+            {#if selectedCard && !priv.committed}<div class="selection-details">
+                <span>{label('rule_' + selectedCard.kind)}</span
+                >{#if priv.legalUtensils.length}<div class="utensil-choices">
+                    <b>{label('utensils')}</b
+                    >{#each priv.legalUtensils as id}{@const utensil =
+                        own.tableau.find((c) => c.id === id)!}<button
+                        class:chosen={armed.includes(id)}
+                        aria-pressed={armed.includes(id)}
+                        onclick={() => (armed = toggle(armed, id))}
+                        >{label(utensil.kind)} {utensil.priority}</button
+                      >{/each}
+                  </div>{/if}
+                {#if selectedCard.kind === 'special_order'}<div
+                    class="copy-choices"
+                  >
+                    {#if priv.copyTargets.length}<label
+                        >{label('copy_target')}<select bind:value={copyTarget}
+                          ><option value="">{label('copy_target')}</option
+                          >{#each priv.copyTargets as c}<option value={c.id}
+                              >{cardName(c, locale)}{c.boxed
+                                ? ` · ${label('boxed')}`
+                                : ''}</option
+                            >{/each}</select
+                        ></label
+                      >{#if copyTarget}<span class="ghost-copy"
+                          ><Dish
+                            card={priv.copyTargets.find(
+                              (c) => c.id === copyTarget,
+                            )!}
+                          /><span>{label('copy_preview')}</span></span
+                        >{/if}{:else}<span>{label('copy_first')}</span>{/if}
+                  </div>{/if}
+              </div>{/if}
+            <div class="hand" data-testid="sgp-hand">
+              {#each priv.hand as card, i (card.handle)}<button
+                  style:--card-angle={`${(i - (priv.hand.length - 1) / 2) * 2.3}deg`}
+                  style:--card-rise={`${Math.min(12, Math.abs(i - (priv.hand.length - 1) / 2) * 5)}px`}
+                  style:--hand-overlap={`${priv.hand.length > 6 ? (562 - priv.hand.length * 90) / (priv.hand.length - 1) : 0}px`}
+                  data-handle={card.handle}
+                  class:selected={selection === card.handle}
+                  class:committed={priv.committed?.card === card.handle}
+                  disabled={!allowed || !!priv.committed}
+                  aria-pressed={selection === card.handle}
+                  aria-label={`${cardName(card, locale)}: ${label('rule_' + card.kind)}`}
+                  onclick={() => {
+                    selection = card.handle;
+                    copyTarget = '';
+                  }}><Card {card} {locale} /></button
+                >{/each}
+            </div>
+            <div class="confirmation">
+              <span
+                >{label(
+                  priv.committed ? 'locked' : selectedCard ? 'keep' : 'select',
+                )}</span
+              ><button
+                class="primary"
+                data-testid="sgp-keep"
+                disabled={!allowed ||
+                  !selectedCard ||
+                  !!priv.committed ||
+                  (selectedCard.kind === 'special_order' &&
+                    priv.copyTargets.length > 0 &&
+                    !copyTarget)}
+                onclick={keep}>{priv.committed ? '✓' : label('keep')}</button
+              >
+            </div>
+          </section>
+        {/if}
       {/if}
-    {/if}
-    {#each rich ? [] : revealCards as reveal, i}<div
-        class="reveal-card"
-        style={`--rx:${20 + (i * 60) / Math.max(1, revealCards.length - 1)}%`}
-        aria-hidden="true"
-      >
-        <Card card={reveal.card} {locale} /><span>{name(reveal.seat)}</span>
-      </div>{/each}
+    </div>
   </div>
 </div>
 
@@ -1044,7 +969,9 @@
 
 <style>
   :global(body:has(.sushi-table)) {
-    background: #bed9cb;
+    background:
+      radial-gradient(ellipse at 49% 51%, #8fb69b66, transparent 65%),
+      radial-gradient(ellipse at 7% 20%, #173f3333, transparent 35%), #578c79;
   }
   .sushi-table {
     --ink: #284b43;
@@ -1054,11 +981,13 @@
     height: 100dvh;
     min-height: 570px;
     overflow: hidden;
-    background: #bed9cb;
+    background:
+      radial-gradient(ellipse at 49% 51%, #8fb69b66, transparent 65%),
+      radial-gradient(ellipse at 7% 20%, #173f3333, transparent 35%), #578c79;
     color: var(--ink);
     font-family: ui-rounded, 'Trebuchet MS', system-ui, sans-serif;
-    border: 10px solid #31544b;
-    border-radius: 22px;
+    border: 0;
+    border-radius: 0;
     box-sizing: border-box;
   }
   .table-grain {
@@ -1111,29 +1040,7 @@
     min-height: 48px;
     padding: 10px 24px;
   }
-  .corner {
-    position: absolute;
-    z-index: 12;
-    top: max(12px, env(safe-area-inset-top));
-    width: 48px;
-    height: 48px;
-    padding: 8px;
-    border-radius: 50%;
-    background: #e9eed7;
-    box-shadow: 0 3px 0 #31544b20;
-  }
-  .book {
-    left: 14px;
-  }
-  .gear {
-    right: 14px;
-    font-size: 27px;
-    line-height: 1;
-  }
-  .book svg {
-    width: 100%;
-    height: 100%;
-  }
+
   .table-wordmark {
     position: absolute;
     top: 20px;
@@ -1147,6 +1054,26 @@
   .table-wordmark b {
     color: #b55e51;
   }
+  .practice-action {
+    border: 1px solid #728f78;
+    border-radius: 12px;
+    background: #e9efd9;
+    color: #31544b;
+    font-size: 10px;
+    font-weight: 700;
+    min-height: 44px;
+    padding: 7px 10px;
+    box-shadow: 0 3px 0 #31544b18;
+  }
+
+  .rich-practice-action {
+    position: absolute;
+    z-index: 6;
+    left: 1053px;
+    top: 846px;
+    width: 180px;
+    font-size: 13px;
+  }
   .seat {
     position: absolute;
     left: var(--x);
@@ -1155,89 +1082,7 @@
     width: 148px;
     z-index: 2;
   }
-  .friend-plate {
-    position: relative;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    grid-template-rows: auto 53px auto;
-    width: 100%;
-    padding: 11px 12px 7px;
-    background: #fbf4df;
-    border: 3px solid #e8e1c7;
-    border-radius: 45%;
-    box-shadow:
-      0 3px 0 #31544b15,
-      0 5px 10px #31544b10;
-    overflow: visible;
-    min-height: 98px;
-  }
-  .friend-avatar {
-    position: absolute;
-    left: 50%;
-    top: -21px;
-    transform: translateX(-50%);
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    background: var(--guest);
-    border: 3px solid #fff5e0;
-    display: grid;
-    place-items: center;
-    font-size: 13px;
-    font-weight: 800;
-  }
-  .friend-name {
-    font-size: 12px;
-    font-weight: 800;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    text-align: left;
-    padding-top: 5px;
-    max-width: 98px;
-  }
-  .friend-score {
-    font-size: 17px;
-    padding-top: 2px;
-  }
-  .friend-score small {
-    font-size: 11px;
-    color: #c37d50;
-  }
-  .friend-foods {
-    grid-column: 1/-1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .friend-foods > span {
-    width: 43px;
-    height: 45px;
-  }
-  .friend-details {
-    grid-column: 1/-1;
-    font-size: 10px;
-    color: #60766a;
-  }
-  .plate-line {
-    border: 1px solid #d8d9bd;
-    border-radius: 50%;
-  }
-  .ready {
-    border-color: #7da693;
-  }
-  .ready .friend-avatar:after {
-    content: '✓';
-    position: absolute;
-    right: -12px;
-    bottom: -4px;
-    background: #315f4d;
-    color: #fff5dd;
-    border-radius: 50%;
-    width: 17px;
-    height: 17px;
-    font-size: 10px;
-  }
+
   .table-center {
     position: absolute;
     top: 32%;
@@ -1245,6 +1090,11 @@
     transform: translateX(-50%);
     text-align: center;
     width: min(480px, 62%);
+  }
+  .sushi-table:not(.rich) .table-center,
+  .sushi-table:not(.rich) .own-label {
+    color: #fff4dc;
+    text-shadow: 0 1px 1px #24463d88;
   }
   .eyebrow {
     font-size: 10px;
@@ -1268,21 +1118,7 @@
   p {
     line-height: 1.45;
   }
-  .menu-mini {
-    display: flex;
-    justify-content: center;
-    gap: 4px;
-  }
-  .menu-mini button {
-    flex-shrink: 0;
-    width: 44px;
-    height: 44px;
-    min-height: 44px;
-    padding: 3px;
-    background: #fff5dc80;
-    border-bottom: 3px solid var(--dish);
-    border-radius: 50%;
-  }
+
   .ready-count {
     font-size: 11px;
     font-weight: 700;
@@ -1366,8 +1202,7 @@
     outline: 3px solid #e1b650;
     outline-offset: 2px;
   }
-  .scoring .own-label strong,
-  .scoring .friend-score {
+  .scoring .own-label strong {
     animation: score-counter 550ms ease;
   }
   @keyframes score-counter {
@@ -1672,23 +1507,6 @@
   .sushi-table[data-phase='finished'] .own-area {
     bottom: 10px;
   }
-  .reveal-card {
-    position: absolute;
-    z-index: 10;
-    left: var(--rx);
-    top: 40%;
-    transform: translate(-50%, -50%);
-    animation: reveal 720ms both;
-    pointer-events: none;
-  }
-  .reveal-card > span {
-    display: block;
-    text-align: center;
-    font-size: 10px;
-    background: #f9f0d6;
-    border-radius: 8px;
-    margin-top: 4px;
-  }
   .scoring .own-plate {
     animation: score-glow 550ms ease;
   }
@@ -1794,14 +1612,6 @@
   .practice-seats h3 {
     width: 100%;
   }
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-  }
   .reduce * {
     animation: none !important;
     transition: none !important;
@@ -1832,10 +1642,7 @@
     .seat {
       width: 174px;
     }
-    .friend-plate {
-      grid-template-rows: auto 60px auto;
-      min-height: 115px;
-    }
+
     .table-center {
       top: 29%;
     }
@@ -1845,47 +1652,12 @@
     .own-plate {
       min-height: 110px;
     }
-    .friend-name {
-      font-size: 14px;
-      max-width: 118px;
-    }
-    .friend-foods > span {
-      width: 48px;
-      height: 52px;
-    }
   }
   @media (max-width: 1000px) {
-    .sushi-table {
-      border-width: 6px;
-      border-radius: 15px;
-    }
     .seat {
       width: 116px;
     }
-    .friend-plate {
-      padding: 10px 8px 5px;
-      grid-template-rows: auto 35px auto;
-      min-height: 79px;
-    }
-    .friend-name {
-      max-width: 75px;
-      font-size: 10px;
-    }
-    .friend-score {
-      font-size: 14px;
-    }
-    .friend-foods > span {
-      width: 32px;
-      height: 34px;
-    }
-    .friend-avatar {
-      width: 26px;
-      height: 26px;
-      top: -19px;
-    }
-    .friend-details {
-      font-size: 9px;
-    }
+
     .own-area {
       width: 92%;
       bottom: 252px;
@@ -1906,16 +1678,7 @@
     .table-center h1 {
       font-size: 25px;
     }
-    .menu-mini {
-      gap: 2px;
-    }
-    .menu-mini button {
-      flex-shrink: 0;
-      width: 44px;
-      height: 44px;
-      min-height: 44px;
-      padding: 2px;
-    }
+
     .menu-setup {
       width: 83%;
       padding: 16px;
@@ -1939,19 +1702,8 @@
   @media (max-width: 500px) {
     .sushi-table {
       min-height: 600px;
-      border-width: 4px;
     }
-    .corner {
-      width: 42px;
-      height: 42px;
-      top: 10px;
-    }
-    .book {
-      left: 8px;
-    }
-    .gear {
-      right: 8px;
-    }
+
     .table-wordmark {
       top: 23px;
       font-size: 10px;
@@ -1961,37 +1713,10 @@
       width: 88px;
       top: calc(var(--y) * 0.82 + 24px);
     }
-    .friend-plate {
-      padding: 7px 5px 4px;
-      grid-template-rows: auto 29px auto;
-      min-height: 65px;
-      border-width: 2px;
-    }
-    .friend-name {
-      font-size: 9px;
-      max-width: 52px;
-      padding-top: 3px;
-    }
-    .friend-score {
-      font-size: 12px;
-    }
-    .friend-avatar {
-      width: 22px;
-      height: 22px;
-      top: -17px;
-      font-size: 10px;
-      border-width: 2px;
-    }
-    .friend-foods > span {
-      width: 26px;
-      height: 27px;
-    }
-    .friend-details {
-      font-size: 8px;
-    }
+
     .table-center {
       top: 30%;
-      width: 79%;
+      width: 60%;
     }
     .table-center h1 {
       font-size: 21px;
@@ -2004,17 +1729,7 @@
     .ready-count {
       font-size: 10px;
     }
-    .menu-mini {
-      max-width: 210px;
-      flex-wrap: wrap;
-      margin-inline: auto;
-    }
-    .menu-mini button {
-      flex-shrink: 0;
-      width: 44px;
-      height: 44px;
-      min-height: 44px;
-    }
+
     .own-area {
       bottom: 246px;
       width: 96%;
@@ -2153,9 +1868,6 @@
     .tray-cards > div {
       max-width: 135px;
     }
-    .reveal-card {
-      top: 39%;
-    }
     .copy-choices select {
       margin-left: 0;
       max-width: 100%;
@@ -2170,9 +1882,7 @@
       top: var(--short-y);
       width: 72px;
     }
-    .friend-avatar {
-      display: none;
-    }
+
     .table-center {
       top: 207px;
       width: 94%;
@@ -2187,12 +1897,6 @@
     .table-center .ready-count {
       display: none;
     }
-    .menu-mini {
-      max-width: none;
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      justify-content: flex-start;
-    }
   }
   @media (max-height: 700px) and (min-width: 650px) {
     .sushi-table {
@@ -2202,14 +1906,7 @@
       width: 105px;
       top: calc(var(--y) * 0.6 + 12px);
     }
-    .friend-plate {
-      grid-template-rows: auto 28px auto;
-      min-height: 63px;
-    }
-    .friend-foods > span {
-      width: 30px;
-      height: 30px;
-    }
+
     .table-center {
       top: 23%;
       left: 26%;
@@ -2272,6 +1969,8 @@
       max-height: 160px;
     }
   }
+  @media (max-width: 1099px), (max-height: 679px) {
+  }
   @media (max-height: 500px) and (min-width: 650px) {
     .sushi-table {
       min-height: 0;
@@ -2282,25 +1981,7 @@
       left: calc(64px + (100% - 128px) * var(--seat-fraction));
       top: 86px;
     }
-    .friend-plate {
-      grid-template-rows: auto 25px auto;
-      min-height: 57px;
-      padding: 5px;
-    }
-    .friend-name {
-      font-size: 9px;
-      max-width: 49px;
-    }
-    .friend-score {
-      font-size: 12px;
-    }
-    .friend-avatar {
-      display: none;
-    }
-    .friend-foods > span {
-      width: 25px;
-      height: 27px;
-    }
+
     .table-center {
       top: 32%;
       left: 21%;
@@ -2309,21 +1990,7 @@
     .table-center h1 {
       font-size: 21px;
     }
-    .menu-mini {
-      max-width: none;
-      width: 100%;
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      justify-content: flex-start;
-      margin: auto;
-    }
 
-    .menu-mini button {
-      flex-shrink: 0;
-      width: 44px;
-      height: 44px;
-      min-height: 44px;
-    }
     .own-area {
       bottom: 16px;
       left: 21%;

@@ -1,3 +1,4 @@
+import { createAudio } from '@board-games/shared/ui';
 import { movements, type UnoView } from './presentation.js';
 
 export function cardMotion(
@@ -197,84 +198,42 @@ export function cardMotion(
 
 /** Short, quiet filtered-paper sound. No music, external assets or continuous audio. */
 export function cardAudio() {
-  let context: AudioContext | undefined;
+  const audio = createAudio();
   let enabled = true;
   let last = -Infinity;
-  const sources = new Set<AudioBufferSourceNode>();
-  function stop() {
-    for (const source of sources) {
-      try {
-        source.stop();
-      } catch {}
-    }
-    sources.clear();
-  }
   return {
     setEnabled(value: boolean) {
       enabled = value;
-      if (!value) stop();
+      if (!value) audio.stop();
     },
     unlock() {
-      if (!enabled) return;
-      try {
-        const Context =
-          window.AudioContext ??
-          (window as unknown as { webkitAudioContext?: typeof AudioContext })
-            .webkitAudioContext;
-        if (!Context) return;
-        context ??= new Context();
-        if (context.state === 'suspended')
-          void context.resume().catch(() => {});
-      } catch {
-        /* Sound is optional and never affects game actions. */
-      }
+      if (enabled) void audio.unlock();
     },
     play() {
-      if (
-        !enabled ||
-        context?.state !== 'running' ||
-        context.currentTime - last < 0.08
-      )
-        return;
-      try {
-        const ctx = context,
-          time = ctx.currentTime;
-        last = time;
-        const buffer = ctx.createBuffer(
-          1,
-          Math.ceil(ctx.sampleRate * 0.18),
-          ctx.sampleRate,
-        );
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-        const source = ctx.createBufferSource(),
-          filter = ctx.createBiquadFilter(),
-          gain = ctx.createGain();
-        source.buffer = buffer;
-        filter.type = 'bandpass';
-        filter.Q.value = 0.6;
-        filter.frequency.setValueAtTime(1300, time);
-        filter.frequency.exponentialRampToValueAtTime(380, time + 0.18);
-        gain.gain.setValueAtTime(0, time);
-        gain.gain.linearRampToValueAtTime(0.045, time + 0.025);
-        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.18);
-        source.connect(filter).connect(gain).connect(ctx.destination);
-        sources.add(source);
-        source.onended = () => {
-          sources.delete(source);
-          source.disconnect();
-          filter.disconnect();
-          gain.disconnect();
-        };
-        source.start(time);
-        source.stop(time + 0.19);
-      } catch {
-        /* Restricted or unavailable audio leaves play unaffected. */
-      }
+      const now = performance.now() / 1000;
+      if (!enabled || !audio.ready || now - last < 0.08) return;
+      last = now;
+      audio.noise({
+        duration: 0.18,
+        volume: 0.045,
+        frequency: 1300,
+        sweep: 380,
+        attack: 0.025,
+      });
     },
-    dispose() {
-      stop();
-      if (context) void context.close().catch(() => {});
+    /** Bright two-note call when someone says UNO. */
+    call() {
+      if (!enabled || !audio.ready) return;
+      audio.tone({ from: 660, duration: 0.12, volume: 0.05, type: 'triangle' });
+      audio.tone({
+        delay: 0.1,
+        from: 880,
+        to: 990,
+        duration: 0.22,
+        volume: 0.05,
+        type: 'triangle',
+      });
     },
+    dispose: audio.close,
   };
 }

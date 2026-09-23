@@ -1,3 +1,4 @@
+import { seeded } from '@board-games/game-core';
 /** Local practice only; never imported by multiplayer initialization. No bots. */
 import { placements } from './features.js';
 import { modules } from './tiles.js';
@@ -7,12 +8,6 @@ export const seats = ['Rose', 'Azure', 'Amber'].map((name, i) => ({
   name,
   connected: true,
 }));
-export function seeded(seed: number) {
-  return () => {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    return seed / 4294967296;
-  };
-}
 export const scenarios = [
   'short',
   'match',

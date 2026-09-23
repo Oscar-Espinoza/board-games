@@ -27,11 +27,8 @@ uses a horizontal scrollable player strip and compact tray. Piece supply expands
 on request and becomes directly available during deployment. The table itself
 never scrolls; dialogs, setup and long choices retain their own scrolling.
 
-The shared production tile renderer also supplies lazy catalog lessons and the
-isolated `/practice/carcassonne/artwork` inventory (138 designs, four rotations).
+The shared production tile renderer also supplies lazy catalog lessons.
 `/practice/carcassonne?scenario=table` is a deterministic six-seat, 29-tile playable
-review fixture. Neither route changes production decks or eager catalog metadata.
+review fixture. It never changes production decks or eager catalog metadata.
 
-See [rules and controls](../games/carcassonne.md) and the
-[validation record](../validation.md). Automated WebKit coverage is not physical
-Safari/iOS validation or an independent audit against printed tile geometry.
+See [rules and controls](../games/carcassonne.md).

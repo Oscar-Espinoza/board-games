@@ -15,8 +15,6 @@ practice round with three computer opponents. Bots receive only their own
 projected hand and legal choices, declare UNO, and pause while you disconnect.
 Reconnect and rematch use the same room infrastructure as multiplayer.
 
-Run `bun test games/uno/src/index.test.ts` from the repository root.
-
 ## Table presentation
 
 The table fills the viewport, with each viewer at the south seat. Two players sit

@@ -26,7 +26,7 @@ No standalone expansion was verified in that research. Here, the expanded experi
 | 8       | 5         | 2            | 1          |
 | 9       | 5         | 3            | 1          |
 
-Disciples share a password and Infiltrators share a related alternative. Neither knows their faction or teammates. The Journalist knows their role and receives no password. A volunteer starts the mission. Living players give a one-word clue in fixed seat order, debate, then vote. They may not say their password or repeat another person's clue. Players enforce spoken clue legality using external voice or in-person conversation. With powers, everyone must also see one another through external video or in person. The app does not record or judge speech.
+Disciples share a password and Infiltrators share a related alternative. Neither knows their faction or teammates. The Journalist knows their role and receives no password. A volunteer starts the mission. Living players give a one-word clue in fixed seat order, debate, then vote. They may not say their password or repeat another person's clue. Players enforce spoken clue legality using external voice or in-person conversation. With powers, everyone must also see one another through external video or in person. The app does not record or judge speech. Speakers also type their clue into the public clue slip; Mime confirms the performance without text.
 
 The most-voted player is eliminated and reveals their role. Ties use a living Sage, or rock–paper–scissors. An eliminated Journalist gets one guess of the Disciples' password. A correct guess ends the mission immediately and awards only that Journalist three points. Otherwise play continues after applicable reactions, starting left of the original voting victim and skipping eliminated seats.
 
@@ -79,8 +79,28 @@ Rules and settings live in corner controls. English/Spanish Paraglide messages i
 
 `/practice/little-secret` uses the real rules with deterministic local fixtures and a separate 20-pair teaching pack. It offers three-player play, Journalist success/failure, six public powers, weighted/Sage voting, multiplayer RPS, Revenant targeting the Journalist, nine seats and shared victory. Settings allow switching the viewed seat and resetting scenarios; the suggested seat advances but every action remains manual. It creates no room or bots and stores no game state.
 
-## Validation and manual acceptance
-
-See [validation records](../validation.md) for commands and actual results. Rules tests cover all seat distributions, commitments, ties, reactions, scoring, content, projections and complete minimum/maximum matches. Socket tests inspect serialized snapshots and synchronization replies, including actor forgery, races, duplicate IDs, reconnect, host transfer and replacement. Browser tests exercise the guide, practice, independent seats, language changes, envelope concealment and responsive layouts.
+## Manual acceptance
 
 Structural content tests cannot establish good gameplay vocabulary. Fluent Spanish review, human ambiguity/difficulty review of both packs, a real group voice/video playtest, and physical Safari/iOS validation remain manual acceptance checks until performed.
+
+## Digital clue slips and tabletop
+
+Speakers now submit their spoken clue as text (1–80 trimmed characters). Accepted
+clues appear publicly below initial tokens for the current cycle and remain through
+voting and reactions; a new cycle or mission clears them. Semantic legality stays
+socially enforced. Elder players can enter two words; Mime players confirm their
+performance without entering text. Secret factions and incomplete ballots remain
+recipient-private.
+
+The tabletop uses a locally bundled 182 KB WebP photographic desk, teal felt,
+brass initial tokens and live paper labels. No portrait images are used. Compact
+screens use a vertically scrolling two-column seat layout, with actions before
+seats and peripheral scenery omitted. Mission and match outcomes use authoritative
+results, including combined intruder rewards, rather than the reference artwork's
+fixed round counts.
+
+See [ADR 023](../adr/023-little-secret-table.md) for the clue contract and presentation boundaries.
+
+## Invariants
+
+Spanish classic 3–9 player rules with the pinned seven-type power set ([ADR 014](../adr/014-little-secret.md)). Production words stay server-only; practice uses its own pack. Living password-holders never receive their faction; pending Journalist/Revenant actors never receive solutions. Reveal ballots and RPS only after all commitments; retry only unchanged, uncommitted readiness, continuation, ballots and RPS. Clue text (1–80 trimmed units; Mime confirms without text) is public for the current cycle only; only accepted public ballots open review, reconnects never replay it ([ADR 023](../adr/023-little-secret-table.md)).

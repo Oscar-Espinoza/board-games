@@ -3,7 +3,12 @@
   let { resource }: { resource: number } = $props();
 </script>
 
-<img src={resourceArtwork[resource]} alt="" class="resource-art" />
+<img
+  decoding="async"
+  src={resourceArtwork[resource]}
+  alt=""
+  class="resource-art"
+/>
 
 <style>
   .resource-art {

@@ -1,0 +1,106 @@
+<script lang="ts">
+  import type { Public, Role } from '../types.js';
+  import { m } from '@board-games/shared/messages';
+  import PlayerToken from './PlayerToken.svelte';
+  let {
+    state,
+    players,
+  }: { state: Public; players: { id: string; name: string }[] } = $props();
+  const awarded = $derived(
+    players.filter(
+      (p) =>
+        state.result &&
+        (state.result.winners.length
+          ? state.result.winners.includes(p.id)
+          : state.result.points[p.id] > 0),
+    ),
+  );
+  const factions = $derived([
+    ...new Set(awarded.map((p) => state.result!.roles[p.id])),
+  ]);
+</script>
+
+<div class="outcome" data-testid="ls-outcome">
+  <div class="emblems" aria-hidden="true">
+    {#each factions as faction}<span
+        class:infiltrator={faction === 'infiltrator'}
+        >{faction === 'disciple'
+          ? '✦'
+          : faction === 'journalist'
+            ? '✒'
+            : '◈'}</span
+      >{/each}
+  </div>
+  <h3>
+    {state.result!.winners.length
+      ? m.ls_winners()
+      : factions.map((f) => m[`ls_${f as Role}`]()).join(' + ')}
+  </h3>
+  <div class="honorees">
+    {#each awarded as p}<div>
+        <PlayerToken
+          name={p.name}
+          seat={players.findIndex((other) => other.id === p.id) + 1}
+          active
+        /><strong>{p.name}</strong>
+      </div>{/each}
+  </div>
+  <p class="outcome-caption">{m[`ls_reason_${state.result!.reason}`]()}</p>
+</div>
+
+<style>
+  .outcome {
+    text-align: center;
+  }
+  .emblems {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+  }
+  .emblems span {
+    font: 28px Georgia;
+    color: #b18742;
+    border: double 5px #af8647;
+    border-radius: 50%;
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+  }
+  .emblems .infiltrator {
+    color: #96362b;
+    border-color: #96362b;
+  }
+  h3 {
+    font:
+      24px 'Secret Hand',
+      cursive;
+    margin: 8px 0;
+    border-bottom: 2px solid #9d4131;
+  }
+  .honorees {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 18px 12px;
+  }
+  .honorees > div {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    max-width: 110px;
+    --token-size: 42px;
+  }
+  .honorees strong {
+    font:
+      16px 'Secret Hand',
+      cursive;
+    overflow-wrap: anywhere;
+  }
+  .outcome-caption {
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 10px 0 0;
+  }
+</style>

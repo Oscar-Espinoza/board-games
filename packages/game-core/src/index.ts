@@ -39,3 +39,4 @@ export type Player = {
   bot?: boolean;
 };
 export type GameView = { public: unknown; private: unknown };
+export * from './random.js';

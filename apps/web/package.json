@@ -23,10 +23,10 @@
     "@sveltejs/adapter-static": "3.0.10",
     "@sveltejs/kit": "2.70.3",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
-    "svelte": "5.57.0",
+    "svelte": "5.57.1",
     "svelte-check": "^4.3.0",
     "vite": "8.3.0",
-    "@inlang/paraglide-js": "2.25.1",
+    "@inlang/paraglide-js": "2.25.4",
     "typescript": "^5.9.0"
   }
 }

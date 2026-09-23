@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import type { Component } from 'svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { catalog } from '@board-games/shared';
   import { gameClients } from '$lib/games';
   import Rulebook from '$lib/catalog/Rulebook.svelte';
+  import type { GameId } from '$lib/catalog/types';
   import {
     session,
     resume,
@@ -37,6 +38,7 @@
         'sushi-go-party',
         'little-secret',
         'catan',
+        'uno',
       ].includes(room?.gameId ?? ''),
   );
   const metadata = $derived(catalog.find((game) => game.id === room?.gameId));
@@ -44,19 +46,25 @@
     try {
       name = localStorage.getItem('board-games:name') ?? '';
     } catch {}
-    if (!room) resume(page.params.id);
   });
+  // Runs again when navigating straight from one room link to another.
   $effect(() => {
-    const id = room?.gameId;
-    if (id && id in gameClients) {
-      gameClients[id as keyof typeof gameClients]()
-        .then((module) => {
-          Board = module.default;
-        })
-        .catch((error) => {
-          loadingError = error.message;
-        });
-    }
+    const id = page.params.id;
+    if (id && untrack(() => session.room?.id) !== id) resume(id);
+  });
+  const gameId = $derived(room?.gameId);
+  $effect(() => {
+    const id = gameId;
+    if (!id || !(id in gameClients)) return;
+    let current = true;
+    gameClients[id as keyof typeof gameClients]()
+      .then((module) => {
+        if (current) Board = module.default;
+      })
+      .catch((error) => {
+        if (current) loadingError = error.message;
+      });
+    return () => (current = false);
   });
   function errorText() {
     if (session.errorCode === 'STALE_REVISION') return m.action_stale();
@@ -195,7 +203,7 @@
               room.hostId === room.playerId}
             rematch={start}
             >{#snippet rulesContent()}<Rulebook
-                game="catan"
+                game={room.gameId as GameId}
               />{/snippet}{#snippet settingsContent()}{#if room.gameId === 'catan'}
                 <p>{room.id}</p>
                 {#if room.status === 'finished' && room.hostId === room.playerId}<button

@@ -1,3 +1,4 @@
+import { seeded } from '@board-games/game-core';
 /** Local fixtures and a small independent pack. Never imported by room creation. */
 import { rules } from './engine.js';
 import type { Packs, State, Power } from './types.js';
@@ -66,12 +67,6 @@ const pack = (lang: 'en' | 'es'): Packs['en'] =>
   }));
 const packs: Packs = { en: pack('en'), es: pack('es') };
 export const practiceRules = rules(packs);
-export function seeded(seed: number) {
-  return () => {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    return seed / 4294967296;
-  };
-}
 export function practice(
   scenario: Scenario = 'basic',
   language: 'en' | 'es' = 'en',
@@ -103,6 +98,7 @@ export function practice(
     while (state.phase === 'clues')
       send(state.speaker!, {
         type: 'clue',
+        text: 'echo',
         mission: state.mission,
         cycle: state.cycle,
       });
@@ -152,6 +148,7 @@ export function practice(
     while (state.phase === 'clues')
       send(state.speaker!, {
         type: 'clue',
+        text: 'echo',
         mission: state.mission,
         cycle: state.cycle,
       });

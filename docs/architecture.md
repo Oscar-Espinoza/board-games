@@ -52,8 +52,7 @@ cannot claim computer seats; outside players cannot join a practice room.
 UNO's browser presentation compares consecutive recipient snapshots and captures
 old/new DOM geometry to animate accepted moves with Web Animations. It never
 receives opponent faces for draws. Resynchronization cancels obsolete effects.
-The viewport table and sound/motion controls remain game-specific. Chrome and Safari are required delivery targets; CI exercises
-Chromium and WebKit, with actual Safari device validation separate.
+The viewport table and sound/motion controls remain game-specific. Chrome and Safari are the delivery targets.
 
 ## Catan island and local sandbox
 
@@ -106,10 +105,12 @@ The painted table combines local WebP scenery/materials with SVG region geometry
 symbols and wooden figures. A single affine ground transform and its inverse own
 camera rendering, pointer hit testing, zoom and focus. The desktop player column
 and bottom tray become a horizontal seat strip and compact supply on small screens.
-`/practice/carcassonne?scenario=table` supplies a deterministic six-seat landscape;
-`/practice/carcassonne/artwork` renders every design in four rotations using the
-production renderer. Both are separate from multiplayer initialization. See
-[ADR 024](adr/024-carcassonne-painted-table.md).
+`/practice/carcassonne?scenario=table` supplies a deterministic six-seat landscape,
+separate from multiplayer initialization. See
+[ADR 024](adr/024-carcassonne-painted-table.md). Standing scenery (walls, towns,
+churches, meadow props) uses the same plane through stacked `lift()` offsets and
+upright sprites in a depth-sorted, non-interactive elevation pass; see
+[ADR 025](adr/025-carcassonne-standing-scenery.md).
 
 ## Azul, Codenames and Sushi Go Party
 
@@ -165,3 +166,10 @@ Little Secret readiness, continuation, ballots and RPS, preserving the original
 action ID and the existing three-attempt limit. Other actions never retry
 automatically. See [ADR 014](adr/014-little-secret.md) and
 [Little Secret rules](games/little-secret.md).
+
+Little Secret's shared room/practice board uses the local desk and paper assets
+beneath live Svelte state. Accepted typed clues are a detached public ledger for
+the current cycle; Mime confirms without text. Desktop perimeter seats become a
+scrolling two-column compact table with actions first. Ballot review is local
+presentation of accepted public events, while outcomes come from authoritative
+results. See [ADR 023](adr/023-little-secret-table.md).

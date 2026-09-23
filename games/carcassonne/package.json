@@ -7,7 +7,6 @@
     "./server": "./src/index.ts",
     "./Board.svelte": "./src/Board.svelte",
     "./TileArt.svelte": "./src/TileArt.svelte",
-    "./TileGallery.svelte": "./src/table/TileGallery.svelte",
     "./practice": "./src/practice.ts"
   },
   "dependencies": {
@@ -15,6 +14,6 @@
     "@board-games/shared": "workspace:*"
   },
   "peerDependencies": {
-    "svelte": "^5.0.0"
+    "svelte": "^5.29.0"
   }
 }

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tiles } from './tiles.js';
   import { cityPath, roadPath } from './art.js';
+  import { bridges, decal } from './table/scenery.js';
   let { id, rotation = 0 }: { id: string; rotation?: number } = $props();
   const uid = $props.id();
   const tile = $derived(tiles[id]);
@@ -8,6 +9,7 @@
   const roads = $derived(tile.regions.filter((r) => r.kind === 'road'));
   const variation = $derived([...id].reduce((n, c) => n + c.charCodeAt(0), 0));
   const art = '/games/carcassonne/';
+  const patch = $derived(decal(id));
 </script>
 
 <g transform={`rotate(${rotation * 90} 50 50)`} data-tile-art={id}>
@@ -34,10 +36,10 @@
       ><image href={`${art}earth.webp`} width="32" height="32" /></pattern
     >
     <linearGradient id={`${uid}-water`} x2="1" y2="1">
-      <stop stop-color="#508985" /><stop
+      <stop stop-color="#3a78ad" /><stop
         offset=".5"
-        stop-color="#78b7c9"
-      /><stop offset="1" stop-color="#487c8d" />
+        stop-color="#6aaedb"
+      /><stop offset="1" stop-color="#346c9c" />
     </linearGradient>
     <linearGradient id={`${uid}-edge-light`} x2=".4" y2="1">
       <stop stop-color="#fff4bc" stop-opacity=".5" /><stop
@@ -55,17 +57,25 @@
       height="100"
       transform={`rotate(${(variation % 4) * 90} 50 50)`}
     />
+    {#if patch}<image
+        href={`${art}sprites/${patch.kind}.webp`}
+        x={patch.x - patch.size / 2}
+        y={patch.y - patch.size / 2}
+        width={patch.size}
+        height={patch.size}
+        opacity=".92"
+      />{/if}
     {#each tile.regions.filter((r) => r.kind === 'river') as r}
       <path
         d={roadPath(r)}
-        stroke="#405e35"
+        stroke="#4b5f2c"
         stroke-width="23"
         fill="none"
         stroke-linecap="round"
       />
       <path
         d={roadPath(r)}
-        stroke="#c7b47b"
+        stroke="#d6c38c"
         stroke-width="20"
         fill="none"
         stroke-linecap="round"
@@ -79,11 +89,23 @@
       />
       <path
         d={roadPath(r)}
+        class="flow"
         stroke="#d8ede0"
         stroke-width=".6"
         stroke-dasharray="5 3 2 9"
         fill="none"
         opacity=".75"
+      />
+      <path
+        d={roadPath(r)}
+        class="flow slow"
+        stroke="#eef8f0"
+        stroke-width="1.4"
+        stroke-dasharray="1.5 11 4 17"
+        stroke-linecap="round"
+        fill="none"
+        opacity=".45"
+        transform="translate(2.2 1.4)"
       />
       {#if tile.source || tile.lake}<ellipse
           cx="50"
@@ -126,20 +148,27 @@
     {/each}
     {#each roads as r, i}
       {#if i > 0 && r.ports.length === 2 && roads.some((v) => v !== r && v.ports.length === 2)}
-        <path d={roadPath(r)} stroke="#342d20" stroke-width="11" fill="none" />
+        <path d={roadPath(r)} stroke="#342d20" stroke-width="14" fill="none" />
       {/if}
       <path
         d={roadPath(r)}
-        stroke="#6e6c3b"
-        stroke-width="8"
-        stroke-opacity=".55"
+        stroke="#5d5a2c"
+        stroke-width="12"
+        stroke-opacity=".45"
         fill="none"
       />
-      <path d={roadPath(r)} stroke="#b59f72" stroke-width="7" fill="none" />
+      <path d={roadPath(r)} stroke="#b39a62" stroke-width="10.5" fill="none" />
       <path
         d={roadPath(r)}
         stroke={`url(#${uid}-earth)`}
-        stroke-width="6"
+        stroke-width="9"
+        fill="none"
+      />
+      <path
+        d={roadPath(r)}
+        stroke="#c99e58"
+        stroke-width="9"
+        stroke-opacity=".5"
         fill="none"
       />
       <path
@@ -169,6 +198,47 @@
           />
         </g>{/if}
     {/each}
+    {#each bridges(id) as b}<g
+        transform={`translate(${b.x} ${b.y}) rotate(${b.angle})`}
+        class="bridge"
+      >
+        <rect
+          x="-11"
+          y="-5.4"
+          width="22"
+          height="10.8"
+          rx="1.5"
+          fill="#1d2a22"
+          opacity=".35"
+          transform="translate(.8 1.2)"
+        />
+        <rect
+          x="-11"
+          y="-4.6"
+          width="22"
+          height="9.2"
+          rx="1.2"
+          fill="#b7a98a"
+        />
+        <rect
+          x="-10"
+          y="-3.2"
+          width="20"
+          height="6.4"
+          fill={`url(#${uid}-earth)`}
+        />
+        <path
+          d="M-10.5-4.2H10.5M-10.5 4.2H10.5"
+          stroke="#e5dcc2"
+          stroke-width="1.5"
+        />
+        <path
+          d="M-10.5-4.2H10.5M-10.5 4.2H10.5"
+          stroke="#7c705a"
+          stroke-width="1.5"
+          stroke-dasharray=".6 1.6"
+        />
+      </g>{/each}
     {#if roads.some((r) => r.ports.length === 1) && !tile.ferry}
       <circle
         cx="50"
@@ -326,3 +396,22 @@
     stroke-width="1.4"
   />
 </g>
+
+<style>
+  :global(.motion) .flow {
+    animation: flow 3.2s linear infinite;
+  }
+  :global(.motion) .flow.slow {
+    animation-duration: 5.4s;
+  }
+  @keyframes flow {
+    to {
+      stroke-dashoffset: -38;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .flow {
+      animation: none !important;
+    }
+  }
+</style>

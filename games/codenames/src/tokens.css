@@ -54,8 +54,7 @@ body:has(.cn-table) .site-header {
   --cn-glass-filter: blur(2px) saturate(120%) brightness(0.8);
   --cn-glass-border: 1px solid rgba(255, 255, 255, 0.07);
   --cn-glass-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    0 4px 12px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   --cn-team-shadow:
     inset 0 1px 0 #fff1dd20, inset 0 -1px 0 #08040266, 0 2px 3px #08040266,
     0 6px 12px #08040240;
@@ -139,17 +138,6 @@ body:has(.cn-table) .site-header {
   select:focus-visible {
     outline: 3px solid var(--cn-focus);
     outline-offset: 3px;
-  }
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-    border: 0;
   }
   .glass {
     background: var(--cn-glass);

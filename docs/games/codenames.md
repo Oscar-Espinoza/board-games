@@ -70,7 +70,10 @@ initialization and eager catalog metadata never import these fixtures.
 
 [ADR 019](../adr/019-codenames-table-turns.md) supersedes the relevant voice-only
 clauses of [ADR 018](../adr/018-codenames-voice-table.md). See the
-[accepted design](../codenames-redesign/README.md) and
-[validation/evidence](../evidence/codenames/table-redesign/README.md).
+[accepted design](../codenames-redesign/README.md).
 Classic rules: [CGE English](https://filemanager.czechgames.com/storage/files/codenames/rules/CN%20rulebook%20EN%2030.pdf)
 and [CGE Spanish](https://filemanager.czechgames.com/storage/files/codenames/rules/CN%20rulebook%20ES%2007.pdf).
+
+## Invariants
+
+Setup, clue, guessing and finished phases with authoritative active team, clue, guess budget and public history. Only the active spymaster clues; only active-team operatives guess or end the turn. Keep mandatory first guesses, immediate wins, unanimous setup readiness and recipient-private keys in actual payloads ([ADR 019](../adr/019-codenames-table-turns.md)). Never retry clues, guesses or end-turn; only still-valid readiness retries coded stale errors (same action ID, at most three attempts). Bundled WebP materials are Codenames-only; text stays Svelte/CSS.

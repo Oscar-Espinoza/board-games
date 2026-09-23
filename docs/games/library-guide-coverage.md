@@ -62,16 +62,6 @@ book while refresh is pending cancels that navigation. No reading history is sto
   city, cathedral, inn, mage/witch, field and production examples use the pure rules.
 - `scripts/three-games-library.test.ts` checks all three new guide structures,
   unique lesson IDs, distinct frame captions and matching English/Spanish keys.
-- Existing UNO tests cover penalties, catches, drawing, final wilds and empty stock.
-  Existing Catan tests cover costs, shortages, seven, trading, development, awards
-  and paired opportunities. Existing Carcassonne tests cover 3.1 builder/pig behavior,
-  messages, gold and module interactions.
-- `tests/e2e/library.spec.ts` walks every scenario and verifies lazy-loading
-  boundaries, recovery, stale imports, focus, desktop/mobile layouts and touch.
-
-- `tests/e2e/three-games-library.spec.ts` covers the six-cover composition at
-  desktop, tablet and phone sizes, all three new illustrated books in both
-  languages, focus restoration and local practice links.
 
 No gameplay rule was changed to accommodate a lesson. The existing Carcassonne
 caveats about independent tabletop topology review still apply.

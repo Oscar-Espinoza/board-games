@@ -1,3 +1,4 @@
+import { shuffle } from '@board-games/game-core';
 import type { GameDefinition } from '@board-games/game-core';
 
 export const colors = ['blue', 'yellow', 'red', 'black', 'white'] as const;
@@ -86,12 +87,6 @@ const emptyBoard = (): Board => ({
   floorLoss: 0,
   bonus: { rows: 0, columns: 0, colors: 0 },
 });
-function shuffle(a: Color[], random: () => number) {
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-}
 export function refill(s: State, random: () => number) {
   s.factories = Array.from({ length: s.players.length * 2 + 1 }, () => []);
   for (let f = 0; f < s.factories.length; f++)

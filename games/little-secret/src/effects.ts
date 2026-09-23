@@ -1,71 +1,27 @@
+import { createAudio } from '@board-games/shared/ui';
 /** Public feedback only. No context is created before an explicit user gesture. */
 export function soundEffects() {
-  let context: AudioContext | null = null;
-  const sources = new Set<OscillatorNode>();
+  const audio = createAudio();
+  const cues = {
+    clue: [900, 300, 0.09, 'triangle'],
+    reveal: [150, 75, 0.16, 'sine'],
+    handoff: [220, 280, 0.16, 'triangle'],
+    finish: [440, 660, 0.28, 'sine'],
+  } as const;
   return {
-    async unlock() {
-      try {
-        context ??= new AudioContext();
-        if (context.state === 'suspended') await context.resume();
-      } catch {}
+    unlock: audio.unlock,
+    play(volume: number, cue: keyof typeof cues) {
+      const [from, to, duration, type] = cues[cue];
+      audio.tone({
+        from,
+        to,
+        duration,
+        type,
+        volume: Math.min(1, Math.max(0, volume)) * 0.08,
+        attack: 0.015,
+      });
     },
-    play(volume: number, cue: 'clue' | 'reveal' | 'handoff' | 'finish') {
-      try {
-        if (!context || context.state !== 'running') return;
-        const oscillator = context.createOscillator(),
-          gain = context.createGain();
-        // Brief original cues depend only on accepted public event types.
-        const [start, end, duration] = {
-          clue: [900, 300, 0.09],
-          reveal: [150, 75, 0.16],
-          handoff: [220, 280, 0.16],
-          finish: [440, 660, 0.28],
-        }[cue];
-        oscillator.type =
-          cue === 'clue' || cue === 'handoff' ? 'triangle' : 'sine';
-        oscillator.frequency.setValueAtTime(start!, context.currentTime);
-        oscillator.frequency.exponentialRampToValueAtTime(
-          end!,
-          context.currentTime + duration!,
-        );
-        gain.gain.setValueAtTime(0, context.currentTime);
-        gain.gain.linearRampToValueAtTime(
-          Math.min(1, Math.max(0, volume)) * 0.08,
-          context.currentTime + 0.015,
-        );
-        gain.gain.exponentialRampToValueAtTime(
-          0.0001,
-          context.currentTime + duration!,
-        );
-        oscillator.connect(gain);
-        gain.connect(context.destination);
-        sources.add(oscillator);
-        oscillator.onended = () => {
-          sources.delete(oscillator);
-          oscillator.disconnect();
-          gain.disconnect();
-        };
-        oscillator.start();
-        oscillator.stop(context.currentTime + duration! + 0.02);
-      } catch {}
-    },
-    cancel() {
-      for (const source of sources) {
-        try {
-          source.stop();
-        } catch {}
-      }
-      sources.clear();
-    },
-    dispose() {
-      for (const source of sources) {
-        try {
-          source.stop();
-        } catch {}
-      }
-      sources.clear();
-      void context?.close().catch(() => {});
-      context = null;
-    },
+    cancel: audio.stop,
+    dispose: audio.close,
   };
 }
