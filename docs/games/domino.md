@@ -115,9 +115,11 @@ with their jagged pixel edges. The 8-bit chunk never imports three.js.
   frames: idle, think (their turn), raise and slam (a play), knock (a pass, the
   Venezuelan table knock) and cheer (a won hand); the winning pair cheers when a hand
   ends. Side sheets are full-body and seated on a
-  wooden chair, and nothing overlaps the table: side players sit beside it with their knees just short
-  of the edge and only their arms reach over the rail; the partner (front sheets stop
-  at the waist) sits behind the far rail, drawn before the table so it hides his waist.
+  wooden chair, and they pull up to the table: forearms rest on the rail and the
+  knees tuck 5 px under its edge, where only what's above the forearms is drawn (a
+  slamming hand may reach past the knees), with a floor shadow under each chair. The
+  partner (front sheets stop at the waist) sits behind the far rail, drawn before the
+  table so it hides his waist.
 - Juice, all off with reduced motion: played tiles arc from the player's hand to their
   pose with a drop shadow, a hard slam adds a pixel dust puff, an 80 ms hit-stop and a
   stepped screen shake, jittered neighbours hop, Tidy up glides tiles home one after another along the chain,

@@ -70,8 +70,10 @@ const RACK_Y = 178,
   RACK_SCALE = 2;
 /** Side seats: the table top's height where forearms rest. */
 const SIDE_TABLE_TOP = 16;
-/** A side sheet's left edge: the knees stop a pixel short of the table. */
-const sideX = (fit: { knees: number }) => -TABLE_W / 2 - 2 - fit.knees;
+/** How far the knees tuck under the rail's edge, in logical pixels. */
+const TUCK = 5;
+/** A side sheet's left edge: pulled in until the knees tuck under the table. */
+const sideX = (fit: { knees: number }) => -TABLE_W / 2 + TUCK - fit.knees;
 /** The partner sits behind the far rail, which hides his waist. */
 const PARTNER_BOTTOM = -TABLE_H / 2 + 6;
 const FRAMES = { idle: 0, think: 1, raise: 2, slam: 3, knock: 4, cheer: 5 };
@@ -581,12 +583,24 @@ export function createPixelTable(
         fh,
       );
     } else {
-      // Seated beside the table, knees just short of it; only the arms reach over the rail.
+      // Pulled up to the table: forearms on the rail, knees tucked under its
+      // edge. Past the edge only what's above the forearms shows (a slamming
+      // hand may reach further down, beyond the knees).
       const fit = fits[`${who}-side`];
       if (!fit) return ctx.restore();
       const x = sideX(fit),
-        y = SIDE_TABLE_TOP - fit.hand;
+        y = SIDE_TABLE_TOP - fit.hand,
+        edge = -TABLE_W / 2;
       if (seat === 1) ctx.scale(-1, 1);
+      // A soft floor shadow under the chair grounds them.
+      ctx.fillStyle = 'rgb(10 5 8 / 0.35)';
+      ctx.fillRect(x + 4, y + fh - 4, fit.knees - 2, 5);
+      ctx.fillRect(x + 8, y + fh + 1, fit.knees - 10, 2);
+      ctx.beginPath();
+      ctx.rect(-1000, -1000, 1000 + edge, 2000);
+      ctx.rect(edge, -1000, 1000, 1000 + SIDE_TABLE_TOP + 2);
+      ctx.rect(edge + TUCK + 1, SIDE_TABLE_TOP + 2, 1000, 18);
+      ctx.clip();
       ctx.drawImage(img, frame * fw, 0, fw, fh, x + slam, y, fw, fh);
     }
     ctx.restore();
