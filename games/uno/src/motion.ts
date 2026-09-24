@@ -5,6 +5,8 @@ export function cardMotion(
   root: HTMLElement,
   playerId: string,
   sound: () => void,
+  /** The 8-bit skin flies cards flat, in stepped frames. */
+  pixel: () => boolean = () => false,
 ) {
   let previous: UnoView | undefined;
   let generation = 0;
@@ -38,7 +40,8 @@ export function cardMotion(
     const toScale = target.classList.contains('seat-cards')
       ? Math.min(to.width / width, to.height / height)
       : target.offsetWidth / width;
-    const endRotation = target.classList.contains('discard') ? 5 : 0;
+    const flat = pixel();
+    const endRotation = !flat && target.classList.contains('discard') ? 5 : 0;
     const clone = face.cloneNode(true) as HTMLElement;
     clone.removeAttribute('id');
     clone.removeAttribute('data-card');
@@ -73,7 +76,7 @@ export function cardMotion(
         width: `${target.offsetWidth}px`,
         height: `${target.offsetHeight}px`,
         margin: '0',
-        transform: 'rotate(5deg)',
+        transform: flat ? 'none' : 'rotate(5deg)',
         visibility: 'visible',
         pointerEvents: 'none',
         zIndex: '99',
@@ -84,21 +87,32 @@ export function cardMotion(
     if (conceal) target.style.visibility = 'hidden';
     const dx = to.left + to.width / 2 - (from.left + from.width / 2),
       dy = to.top + to.height / 2 - (from.top + from.height / 2);
+    const midScale = (fromScale + toScale) / 2;
     const animation = clone.animate(
-      [
-        { transform: `translate(0,0) rotate(0deg) scale(${fromScale})` },
-        {
-          transform: `translate(${dx * 0.45}px,${dy * 0.45 - 28}px) rotate(${kind === 'play' ? -8 : 7}deg) scale(${(fromScale + toScale) / 2})`,
-          offset: 0.45,
-        },
-        {
-          transform: `translate(${dx}px,${dy}px) rotate(${endRotation}deg) scale(${toScale})`,
-        },
-      ],
+      flat
+        ? // Arcade hop: a higher arc, no spin, drawn in stepped frames.
+          [
+            { transform: `translate(0,0) scale(${fromScale})` },
+            {
+              transform: `translate(${dx * 0.5}px,${dy * 0.5 - 56}px) scale(${midScale * 1.08})`,
+              offset: 0.5,
+            },
+            { transform: `translate(${dx}px,${dy}px) scale(${toScale})` },
+          ]
+        : [
+            { transform: `translate(0,0) rotate(0deg) scale(${fromScale})` },
+            {
+              transform: `translate(${dx * 0.45}px,${dy * 0.45 - 28}px) rotate(${kind === 'play' ? -8 : 7}deg) scale(${midScale})`,
+              offset: 0.45,
+            },
+            {
+              transform: `translate(${dx}px,${dy}px) rotate(${endRotation}deg) scale(${toScale})`,
+            },
+          ],
       {
-        duration: 480,
+        duration: flat ? 400 : 480,
         delay,
-        easing: 'cubic-bezier(.2,.65,.3,1)',
+        easing: flat ? 'steps(8, jump-end)' : 'cubic-bezier(.2,.65,.3,1)',
         fill: 'both',
       },
     );
@@ -202,6 +216,11 @@ export function cardAudio() {
   let enabled = true;
   let last = -Infinity;
   return {
+    /** The shared Web Audio voice, for the 8-bit chiptune pack. */
+    audio,
+    get enabled() {
+      return enabled;
+    },
     setEnabled(value: boolean) {
       enabled = value;
       if (!value) audio.stop();

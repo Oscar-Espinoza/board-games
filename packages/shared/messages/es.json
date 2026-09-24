@@ -1807,5 +1807,8 @@
   "cn_jev_locked": "Bloqueado hasta la próxima partida",
   "cn_skin": "Estilo de mesa",
   "cn_skin_classic": "Clásico",
-  "cn_skin_pixel": "8 bits"
+  "cn_skin_pixel": "8 bits",
+  "uno_you_win": "¡Ganaste!",
+  "uno_game_over": "Fin del juego",
+  "uno_view_table": "Ver la mesa"
 }
