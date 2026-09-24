@@ -1,0 +1,1060 @@
+/* 8-bit sushi bar skin. Loaded only when the viewer's skin is `pixel`; it restyles the
+   classic table without changing its layout. Hard edges only: borders and shadows in
+   multiples of --px, no radius, blur, filter, rotation or gradients on chrome. */
+@import '@board-games/shared/ui/pixel.css';
+
+.sgp-pixel {
+  --sgp-ink: var(--px-ink);
+  --sgp-paper: #fbf1da;
+  --sgp-paper-edge: #e3cc9f;
+  --sgp-wood: #6b3f22;
+  --sgp-wood-dark: #3f2414;
+  --sgp-wood-edge: #9a6536;
+  --sgp-noren: #2d3f73;
+  --sgp-noren-edge: #5a72b8;
+  --sgp-red: #c8453a;
+  --sgp-red-dark: #7a2019;
+  --sgp-gold: var(--px-gold);
+  --sgp-cream: #fff4dc;
+  font-family: var(--px-font);
+  font-size-adjust: ex-height 0.6;
+  letter-spacing: 0.02em;
+}
+
+body:has(.sushi-table.sgp-pixel) {
+  background: #d9a86a;
+}
+
+/* ---------- table ---------- */
+.sushi-table.rich.sgp-pixel[data-layout] {
+  background: url('/games/sushi-go-party/pixel/table.webp') center / 1440px
+    810px repeat #e2b377;
+  image-rendering: pixelated;
+  color: var(--sgp-ink);
+  font-family: var(--px-font);
+}
+.sushi-table.sgp-pixel[data-layout] .table-grain {
+  display: none;
+}
+.sushi-table.sgp-pixel :is(h1, h2, h3) {
+  font-family: var(--px-font);
+  font-weight: 400;
+  letter-spacing: 0.03em;
+}
+.sushi-table.sgp-pixel button {
+  font-family: var(--px-font);
+  border-radius: 0;
+}
+.sushi-table.sgp-pixel button:hover:not(:disabled) {
+  filter: none;
+}
+.sushi-table.sgp-pixel :is(button, select, input, summary):focus-visible {
+  outline: var(--px) solid var(--sgp-ink);
+  outline-offset: var(--px);
+  box-shadow: 0 0 0 calc(var(--px) * 2) var(--sgp-gold);
+}
+.sushi-table.sgp-pixel select,
+.sushi-table.sgp-pixel input {
+  border-radius: 0;
+  border: var(--px) solid var(--sgp-ink);
+  background: var(--sgp-paper);
+  font-family: var(--px-font);
+  color: var(--sgp-ink);
+}
+.sushi-table.sgp-pixel .primary {
+  background: var(--sgp-red);
+  color: var(--sgp-cream);
+  border: var(--px) solid var(--sgp-ink);
+  box-shadow:
+    inset calc(var(--px) * -1) calc(var(--px) * -1) 0 var(--sgp-red-dark),
+    inset var(--px) var(--px) 0 #ff9d85,
+    0 var(--px) 0 var(--sgp-ink);
+  text-shadow: 2px 2px 0 var(--sgp-red-dark);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+}
+.sushi-table.sgp-pixel :is(.menu-setup, .results, .decision) .primary {
+  font-size: 24px;
+  padding: 8px 26px;
+}
+.sushi-table.sgp-pixel .primary:enabled:active {
+  translate: 0 var(--px);
+  box-shadow: inset var(--px) var(--px) 0 var(--sgp-red-dark);
+}
+
+/* Corner book and gear: square wooden keys. */
+.sushi-table.sgp-pixel .board-control {
+  border-radius: 0;
+  border: var(--px) solid var(--sgp-ink);
+  background: var(--sgp-paper);
+  color: var(--sgp-ink);
+  box-shadow:
+    inset calc(var(--px) * -1) calc(var(--px) * -1) 0 var(--sgp-paper-edge),
+    0 var(--px) 0 var(--sgp-ink);
+}
+.sushi-table.sgp-pixel .board-control:hover {
+  filter: none;
+  transform: translateY(calc(var(--px) * -1));
+}
+.sushi-table.sgp-pixel .board-control svg {
+  shape-rendering: crispEdges;
+}
+
+/* ---------- party board: dark wood, belt of plates, paper menu ---------- */
+.sushi-table.sgp-pixel .party-board {
+  filter: none;
+  background: var(--sgp-wood-dark);
+  border: calc(var(--px) + 1px) solid var(--sgp-ink);
+  box-shadow:
+    inset 0 0 0 var(--px) var(--sgp-wood-edge),
+    0 calc(var(--px) * 3) 0 #1a0f0866;
+  box-sizing: border-box;
+}
+.sushi-table.sgp-pixel .party-board .round-pick {
+  top: 64px;
+  height: 32px;
+  border-radius: 0;
+  background: var(--sgp-noren);
+  border: var(--px) solid var(--sgp-ink);
+  box-shadow:
+    inset 0 calc(var(--px) * -1) 0 #1c2a52,
+    inset 0 var(--px) 0 var(--sgp-noren-edge);
+  color: var(--sgp-cream);
+  font-size: 24px;
+  line-height: 26px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-shadow: 2px 2px 0 #111a33;
+}
+.sushi-table.sgp-pixel .party-board .menu-grid {
+  left: 78px;
+  right: 78px;
+  top: 104px;
+  bottom: 88px;
+  gap: 8px;
+}
+.sushi-table.sgp-pixel .party-board .menu-row,
+.sushi-table.sgp-pixel .party-board .menu-row:last-child {
+  margin: 0;
+  gap: 8px;
+}
+.sushi-table.sgp-pixel .party-board .tile-position {
+  transform: none;
+}
+.sushi-table.sgp-pixel .party-board .rule-target {
+  border-radius: 0;
+}
+.sushi-table.sgp-pixel .party-board .rule-target:hover:enabled {
+  filter: none;
+  translate: 0 calc(var(--px) * -1);
+}
+.sgp-pixel .menu-tile {
+  grid-template-rows: 26px minmax(0, 1fr) 34px;
+  padding: 4px 6px 6px;
+  border-radius: 0;
+  background: var(--tile-color);
+  border: var(--px) solid var(--sgp-ink);
+  box-shadow:
+    inset 0 0 0 var(--px) #fff6,
+    inset 0 calc(var(--px) * -2) 0 var(--tile-accent),
+    0 var(--px) 0 var(--sgp-ink);
+  color: var(--sgp-ink);
+}
+.sgp-pixel .menu-tile h2 {
+  font: 400 25px / 26px var(--px-font);
+  letter-spacing: 0.04em;
+}
+.sgp-pixel .menu-tile p {
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 0.95;
+}
+
+/* ---------- seats ---------- */
+.sushi-table.rich.sgp-pixel .table-stage .seat {
+  transform: none;
+}
+.sgp-pixel .friend-plate,
+.sgp-pixel .friend-plate:hover:enabled {
+  border-radius: 0;
+  border: calc(var(--px) + 1px) solid var(--sgp-ink);
+  background: var(--sgp-wood);
+  box-shadow:
+    inset 0 0 0 var(--px) var(--sgp-wood-edge),
+    inset 0 calc(var(--px) * -3) 0 var(--sgp-wood-dark),
+    0 calc(var(--px) * 2) 0 #1a0f0866;
+  color: var(--sgp-cream);
+  filter: none;
+}
+.sgp-pixel .friend-plate:hover:enabled {
+  background: #7a4a28;
+}
+.sgp-pixel .friend-plate .friend-name {
+  font: 400 30px / 30px var(--px-font);
+  text-shadow: 2px 2px 0 var(--sgp-ink);
+}
+.sgp-pixel .friend-plate .friend-score {
+  font-size: 28px;
+  font-weight: 400;
+  text-shadow: 2px 2px 0 var(--sgp-ink);
+}
+.sgp-pixel .friend-plate .star {
+  color: var(--sgp-gold);
+}
+.sgp-pixel .friend-plate .seat-status {
+  border-radius: 0;
+  background: #3f9a4a;
+  border: var(--px) solid var(--sgp-ink);
+  box-shadow: inset 0 calc(var(--px) * -1) 0 #1f5a28;
+  font-size: 16px;
+  font-weight: 400;
+  padding: 3px 9px;
+  letter-spacing: 0.05em;
+}
+.sgp-pixel .friend-plate .seat-status.choosing {
+  background: var(--sgp-red);
+  box-shadow: inset 0 calc(var(--px) * -1) 0 var(--sgp-red-dark);
+}
+.sgp-pixel .friend-plate .count,
+.sgp-pixel .friend-plate .saved {
+  color: #f1d9ad;
+  font-size: 19px;
+}
+.sgp-pixel .friend-plate .dish,
+.sgp-pixel .friend-plate .dish:nth-child(2),
+.sgp-pixel .friend-plate .dish:last-child {
+  transform: none;
+}
+.sgp-pixel .friend-plate .dish:nth-child(2) {
+  translate: 0 calc(var(--px) * -1);
+}
+.sgp-pixel .friend-plate .empty-dish {
+  border-radius: 0;
+  border: var(--px) dashed #f1d9ad66;
+}
+.sgp-pixel .friend-plate:focus-visible {
+  outline: var(--px) solid var(--sgp-gold);
+  outline-offset: var(--px);
+}
+
+/* Hidden hands: red card backs with the emblem sprite. */
+.sgp-pixel .card-back {
+  border-radius: 0;
+  border: var(--px) solid var(--sgp-ink);
+  outline: 0;
+  box-shadow:
+    inset 0 0 0 var(--px) #ef8a6f,
+    inset 0 0 0 calc(var(--px) * 2) var(--sgp-red);
+  transform: none;
+  image-rendering: pixelated;
+  /* The emblem cell is column 2, row 3 of the 8×5 dish sheet. */
+  background:
+    url('/games/sushi-go-party/pixel/dishes.webp') calc(2 / 7 * 100%)
+      calc(3 / 4 * 100%) / 800% 500% no-repeat,
+    var(--sgp-red);
+  background-origin: content-box;
+  padding: 18px 2px;
+  box-sizing: border-box;
+}
+.sgp-pixel .card-back span {
+  visibility: hidden;
+}
+
+/* ---------- cards: paper with a family-coloured frame ---------- */
+.sgp-pixel .food-card {
+  --frame: #b98f58;
+  --frame-dark: #7a5a30;
+  background: var(--sgp-paper);
+  color: var(--sgp-ink);
+  border: var(--px) solid var(--sgp-ink);
+  border-radius: 0;
+  box-shadow:
+    inset 0 0 0 var(--px) var(--frame),
+    inset 0 0 0 calc(var(--px) * 2) var(--sgp-paper),
+    inset 0 calc(var(--px) * -3) 0 var(--frame-dark),
+    0 var(--px) 0 var(--sgp-ink);
+  padding: 9px 8px 8px;
+  font-family: var(--px-font);
+  image-rendering: pixelated;
+}
+.sgp-pixel .food-card[data-family='nigiri'] {
+  --frame: #e0a82e;
+  --frame-dark: #9c6a12;
+}
+.sgp-pixel .food-card[data-family='roll'] {
+  --frame: #2f6b4a;
+  --frame-dark: #173d29;
+}
+.sgp-pixel .food-card[data-family='appetizer'] {
+  --frame: #c8453a;
+  --frame-dark: #7a2019;
+}
+.sgp-pixel .food-card[data-family='special'] {
+  --frame: #2f6fce;
+  --frame-dark: #173a78;
+}
+.sgp-pixel .food-card[data-family='dessert'] {
+  --frame: #d9668f;
+  --frame-dark: #8f2f55;
+}
+.sgp-pixel .food-card[data-family='boxed'] {
+  --frame: #8a7a5c;
+  --frame-dark: #54482f;
+  background: #e2d3b1;
+}
+.sgp-pixel .food-card .pattern {
+  display: none;
+}
+.sgp-pixel .food-card strong {
+  align-self: stretch;
+  min-height: 22px;
+  margin: 0 -1px;
+  padding: 0 2px;
+  background: var(--dish-color);
+  color: var(--sgp-ink);
+  border: 2px solid var(--sgp-ink);
+  box-shadow: inset 0 -2px 0 #0003;
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 1;
+  letter-spacing: 0.03em;
+}
+.sgp-pixel .food-card .variation {
+  font-size: 13px;
+  line-height: 1;
+}
+.sgp-pixel .food-card .scoring {
+  border-radius: 0;
+  background: var(--sgp-ink);
+  color: var(--sgp-gold);
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 19px;
+  letter-spacing: 0.04em;
+}
+.sgp-pixel .food-card .copy {
+  color: var(--frame);
+  text-shadow: 1px 1px 0 var(--sgp-ink);
+}
+.sgp-pixel .food-card.small {
+  background: var(--sgp-paper);
+  padding: 5px;
+  box-shadow:
+    inset 0 0 0 2px var(--frame),
+    inset 0 -4px 0 var(--frame-dark),
+    0 2px 0 var(--sgp-ink);
+  border-width: 2px;
+}
+.sgp-pixel .food-card.small strong {
+  font-size: 11px;
+  min-height: 16px;
+  border-width: 1px;
+}
+.sushi-table.rich.sgp-pixel .hand .food-card strong {
+  font-size: 16px;
+  min-height: 22px;
+}
+.sushi-table.rich.sgp-pixel .hand .variation {
+  font-size: 13px;
+}
+.sushi-table.rich.sgp-pixel .hand .scoring {
+  font-size: 15px;
+}
+.sushi-table.rich.sgp-pixel .hand .illustration {
+  height: 80px;
+}
+
+/* ---------- your tray and hand ---------- */
+.sushi-table.rich.sgp-pixel .table-stage .own-area {
+  border-radius: 0;
+  border: calc(var(--px) + 1px) solid var(--sgp-ink);
+  background: var(--sgp-wood);
+  box-shadow:
+    inset 0 0 0 var(--px) var(--sgp-wood-edge),
+    inset 0 calc(var(--px) * 4) 0 var(--sgp-wood-dark),
+    0 calc(var(--px) * 3) 0 #1a0f0866;
+  color: var(--sgp-cream);
+}
+.sushi-table.rich.sgp-pixel .own-label {
+  font-size: 28px;
+}
+.sushi-table.rich.sgp-pixel .own-label > span,
+.sushi-table.rich.sgp-pixel .own-label strong {
+  font-weight: 400;
+  text-shadow: 2px 2px 0 var(--sgp-ink);
+}
+.sushi-table.rich.sgp-pixel .own-label strong {
+  font-size: 28px;
+  color: var(--sgp-gold);
+}
+.sushi-table.rich.sgp-pixel .own-label small {
+  font-size: 16px;
+  opacity: 1;
+  color: #f1d9ad;
+}
+.sushi-table.rich.sgp-pixel .own-label .own-hand-count {
+  color: #f1d9ad;
+  font-size: 17px;
+}
+.sushi-table.rich.sgp-pixel .own-label .dessert-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 0;
+  border: var(--px) solid var(--sgp-ink);
+  background: var(--sgp-paper);
+  color: var(--sgp-ink);
+  font-size: 20px;
+  box-shadow: 0 var(--px) 0 var(--sgp-ink);
+}
+.sgp-pixel .px-badge-art {
+  display: block;
+  width: 30px;
+  height: 30px;
+}
+.sushi-table.rich.sgp-pixel .own-caption {
+  color: #f1d9ad;
+  font-size: 18px;
+}
+.sushi-table.rich.sgp-pixel .own-plate.empty p {
+  color: #f1d9ad;
+  font-size: 18px;
+  font-style: normal;
+}
+.sushi-table.rich.sgp-pixel .own-plate > button {
+  border-radius: 0;
+}
+.sushi-table.sgp-pixel .score-hit {
+  outline: var(--px) solid var(--sgp-gold);
+  outline-offset: var(--px);
+}
+.sushi-table.sgp-pixel .wasabi-linked {
+  box-shadow: 0 var(--px) 0 #9bd23c !important;
+}
+
+.sushi-table.rich.sgp-pixel .hand > button {
+  transform: translateY(var(--card-rise));
+  border-radius: 0;
+  transition: transform 120ms steps(2, jump-end);
+}
+.sushi-table.rich.sgp-pixel .hand > button:hover:enabled {
+  transform: translateY(-9px);
+}
+.sushi-table.rich.sgp-pixel .hand > button.selected {
+  transform: translateY(-15px);
+}
+.sushi-table.rich.sgp-pixel .hand > button.selected .food-card {
+  background: #fff8e8;
+  border-color: var(--sgp-ink);
+  box-shadow:
+    inset 0 0 0 var(--px) var(--frame),
+    inset 0 0 0 calc(var(--px) * 2) #fff8e8,
+    inset 0 calc(var(--px) * -3) 0 var(--frame-dark),
+    0 0 0 var(--px) var(--sgp-gold),
+    0 0 0 calc(var(--px) * 2) var(--sgp-ink),
+    0 calc(var(--px) * 3) 0 var(--sgp-ink);
+}
+.sushi-table.rich.sgp-pixel .hand > button.committed {
+  filter: none;
+  opacity: 0.8;
+}
+.sushi-table.rich.sgp-pixel .confirmation > span {
+  color: var(--sgp-ink);
+  font-size: 18px;
+  background: var(--sgp-paper);
+  border: var(--px) solid var(--sgp-ink);
+  padding: 4px 6px;
+  box-shadow: 0 var(--px) 0 var(--sgp-ink);
+}
+.sushi-table.rich.sgp-pixel .confirmation .primary {
+  border-radius: 0;
+  border: calc(var(--px) + 1px) solid var(--sgp-ink);
+  background: var(--sgp-red);
+  font-size: 30px;
+  line-height: 0.95;
+  text-shadow: 3px 3px 0 var(--sgp-red-dark);
+  box-shadow:
+    inset calc(var(--px) * -2) calc(var(--px) * -2) 0 var(--sgp-red-dark),
+    inset var(--px) var(--px) 0 #ff9d85,
+    0 calc(var(--px) * 2) 0 var(--sgp-ink);
+}
+.sushi-table.rich.sgp-pixel .confirmation .primary:disabled {
+  opacity: 1;
+  background: #a88f78;
+  text-shadow: 3px 3px 0 #6d5a48;
+  box-shadow:
+    inset calc(var(--px) * -2) calc(var(--px) * -2) 0 #6d5a48,
+    0 calc(var(--px) * 2) 0 var(--sgp-ink);
+}
+.sushi-table.rich.sgp-pixel .table-stage .selection-details,
+.sushi-table.sgp-pixel .waiting-prompt {
+  border-radius: 0;
+  border: var(--px) solid var(--sgp-ink);
+  background: var(--sgp-paper);
+  box-shadow: 0 var(--px) 0 var(--sgp-ink);
+  font-size: 17px;
+}
+.sushi-table.sgp-pixel .utensil-choices button,
+.sushi-table.sgp-pixel .practice-action,
+.sushi-table.rich.sgp-pixel .rich-practice-action {
+  border-radius: 0;
+  border: var(--px) solid var(--sgp-ink);
+  background: var(--sgp-gold);
+  color: var(--sgp-ink);
+  font-size: 15px;
+  line-height: 1;
+  font-weight: 400;
+  box-shadow:
+    inset calc(var(--px) * -1) calc(var(--px) * -1) 0 #b8862a,
+    inset var(--px) var(--px) 0 #fff3,
+    0 var(--px) 0 var(--sgp-ink);
+}
+.sushi-table.sgp-pixel .chosen {
+  outline: var(--px) solid var(--sgp-ink) !important;
+  box-shadow: 0 0 0 calc(var(--px) * 2) var(--sgp-gold) !important;
+}
+.sushi-table.rich.sgp-pixel .table-stage .table-center {
+  top: 554px;
+}
+.sushi-table.rich.sgp-pixel .table-center .ready-count {
+  display: inline-block;
+  line-height: 1;
+  color: var(--sgp-cream);
+  background: var(--sgp-noren);
+  border: var(--px) solid var(--sgp-ink);
+  padding: 2px 10px;
+  font-size: 17px;
+}
+
+/* Pass notes and arrows: dashed pixel trails, no tilt. */
+.sushi-table.rich.sgp-pixel .passing-note {
+  transform: none;
+  font-style: normal;
+  color: var(--sgp-cream);
+  font-size: 26px;
+  line-height: 1;
+  text-shadow:
+    3px 3px 0 var(--sgp-ink),
+    -1px -1px 0 var(--sgp-ink);
+}
+.sushi-table.rich.sgp-pixel .table-stage:not([data-guests='5']) .passing-note {
+  display: none;
+}
+.sushi-table.rich.sgp-pixel .passing-arrows > path {
+  stroke: var(--sgp-red);
+  stroke-width: 6;
+  stroke-linecap: butt;
+  stroke-dasharray: 12 9;
+  opacity: 1;
+}
+.sushi-table.rich.sgp-pixel .passing-arrows marker path {
+  fill: var(--sgp-red);
+}
+.sushi-table.sgp-pixel.passing .passing-arrows > path {
+  animation: px-trail 720ms steps(6) both;
+}
+@keyframes px-trail {
+  to {
+    stroke-dashoffset: -42;
+  }
+}
+
+/* ---------- menu picker ---------- */
+.sushi-table.rich.sgp-pixel .table-stage .menu-setup,
+.sushi-table.sgp-pixel .decision,
+.sushi-table.sgp-pixel .results {
+  border-radius: 0;
+  border: calc(var(--px) + 1px) solid var(--sgp-ink);
+  background: var(--sgp-paper);
+  box-shadow:
+    inset 0 0 0 var(--px) var(--sgp-red),
+    inset 0 0 0 calc(var(--px) * 2) var(--sgp-paper),
+    inset 0 0 0 calc(var(--px) * 3) var(--sgp-paper-edge),
+    0 calc(var(--px) * 3) 0 #1a0f0888;
+  scrollbar-color: var(--sgp-wood) var(--sgp-paper-edge);
+}
+.sushi-table.sgp-pixel .menu-setup h1 {
+  font-size: 50px;
+  letter-spacing: 0.02em;
+  text-shadow: 3px 3px 0 var(--sgp-paper-edge);
+}
+.sushi-table.sgp-pixel .menu-setup > p:not(.eyebrow):not(.ready-count) {
+  font-size: 19px;
+}
+.sushi-table.sgp-pixel .eyebrow {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--sgp-red);
+}
+.sushi-table.sgp-pixel .setup-platter {
+  height: 76px;
+}
+.sushi-table.sgp-pixel .setup-platter .food-art {
+  width: 84px;
+}
+.sushi-table.sgp-pixel .presets button {
+  border-radius: 0;
+  border: var(--px) solid var(--sgp-ink);
+  background: #fff8e8;
+  box-shadow:
+    inset calc(var(--px) * -1) calc(var(--px) * -1) 0 var(--sgp-paper-edge),
+    0 var(--px) 0 var(--sgp-ink);
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1;
+}
+.sushi-table.sgp-pixel .presets button:enabled:hover {
+  background: #fff1c9;
+  translate: 0 calc(var(--px) * -1);
+}
+.sushi-table.sgp-pixel .presets button.chosen {
+  background: var(--sgp-gold);
+  outline: 0 !important;
+  box-shadow:
+    inset calc(var(--px) * -1) calc(var(--px) * -1) 0 #b8862a,
+    0 0 0 var(--px) var(--sgp-ink),
+    0 calc(var(--px) * 2) 0 var(--sgp-ink) !important;
+}
+.sushi-table.sgp-pixel .preset-art {
+  width: 40px;
+  height: 40px;
+}
+.sushi-table.sgp-pixel .text-button {
+  font-size: 18px;
+  text-decoration: none;
+  border-bottom: var(--px) solid currentColor;
+  min-height: 0;
+  padding: 2px 4px;
+}
+.sushi-table.sgp-pixel .menu-strip button {
+  border-radius: 0;
+  background: #f1e2bf;
+  border: 2px solid var(--sgp-paper-edge);
+  font-size: 14px;
+  line-height: 1;
+}
+.sushi-table.sgp-pixel .menu-strip button > span {
+  width: 52px;
+  height: 46px;
+}
+.sushi-table.sgp-pixel .custom-menu {
+  font-size: 15px;
+}
+.sushi-table.sgp-pixel .ready-count {
+  font-size: 17px;
+  font-weight: 400;
+}
+.sgp-pixel .px-chef {
+  position: absolute;
+  display: block;
+  width: 120px;
+  height: 176px;
+  background: url('/games/sushi-go-party/pixel/chef.webp') center / contain
+    no-repeat;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.sushi-table.rich.sgp-pixel .table-stage .menu-setup {
+  bottom: 40px;
+}
+.sushi-table.sgp-pixel .menu-setup .px-chef {
+  left: 22px;
+  bottom: 18px;
+  width: 96px;
+  height: 141px;
+}
+.sushi-table.sgp-pixel .ghost-copy .food-art {
+  width: 40px;
+  height: 35px;
+}
+.sushi-table.sgp-pixel .results .px-chef-win {
+  position: sticky;
+  display: block;
+  bottom: 0;
+  margin: -110px 0 0 auto;
+  width: 90px;
+  height: 132px;
+  animation: px-hop 900ms steps(2, jump-none) infinite;
+}
+@keyframes px-hop {
+  50% {
+    translate: 0 -6px;
+  }
+}
+
+/* ---------- prompts and round receipts ---------- */
+.sushi-table.rich.sgp-pixel .table-stage .results {
+  top: 150px;
+  bottom: 70px;
+  width: 780px;
+  z-index: 8;
+}
+.sgp-pixel .px-podium {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.sgp-pixel .px-podium li {
+  display: grid;
+  grid-template-columns: 34px 30px minmax(0, 1fr) auto 90px;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 12px;
+  background: #fff8e8;
+  border: var(--px) solid var(--sgp-ink);
+  box-shadow: 0 var(--px) 0 var(--sgp-ink);
+  font-size: 24px;
+  text-align: left;
+  animation: px-drop 360ms var(--d) steps(3, jump-end) both;
+}
+.sgp-pixel .px-podium li.winner {
+  background: var(--sgp-gold);
+  box-shadow:
+    inset 0 calc(var(--px) * -2) 0 #b8862a,
+    0 var(--px) 0 var(--sgp-ink);
+  font-size: 28px;
+}
+.sgp-pixel .px-podium .pawn {
+  width: 28px;
+  height: 38px;
+}
+.sgp-pixel .px-rank {
+  font-weight: 400;
+  color: var(--sgp-red-dark);
+}
+.sgp-pixel .px-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sgp-pixel .px-dessert-count {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 20px;
+}
+.sgp-pixel .px-dessert-count > :first-child {
+  width: 30px;
+  height: 30px;
+}
+.sgp-pixel .px-podium strong {
+  font-weight: 400;
+  text-align: right;
+}
+@keyframes px-drop {
+  from {
+    opacity: 0;
+    translate: 0 -12px;
+  }
+}
+.sushi-table.sgp-pixel .decision h2,
+.sushi-table.sgp-pixel .results h2 {
+  font-size: 34px;
+  color: var(--sgp-red-dark);
+}
+.sushi-table.sgp-pixel .receipts details {
+  border-radius: 0;
+  background: #fff8e8;
+  border: var(--px) solid var(--sgp-ink);
+  box-shadow: 0 var(--px) 0 var(--sgp-ink);
+}
+.sushi-table.sgp-pixel .receipts summary {
+  font-size: 22px;
+}
+.sushi-table.sgp-pixel .receipts summary strong {
+  font-weight: 400;
+  color: var(--sgp-ink);
+  background: var(--sgp-gold);
+  border: 2px solid var(--sgp-ink);
+  padding: 0 6px;
+}
+.sushi-table.sgp-pixel .receipts p {
+  font-size: 15px;
+}
+.sushi-table.sgp-pixel .score-line {
+  align-items: center;
+  font-size: 18px;
+  line-height: 1.3;
+}
+.sushi-table.sgp-pixel .score-line strong {
+  font-weight: 400;
+  min-width: 30px;
+  text-align: right;
+}
+.sgp-pixel .px-ticks {
+  display: flex;
+  flex: 1;
+  gap: 2px;
+  margin: 0 4px;
+}
+.sgp-pixel .px-ticks i {
+  width: 6px;
+  height: 9px;
+  background: #3f9a4a;
+  box-shadow: 0 2px 0 var(--sgp-ink);
+  animation: px-tick 1ms var(--d) steps(1) both;
+}
+.sgp-pixel .px-ticks.minus i {
+  background: var(--sgp-red);
+}
+@keyframes px-tick {
+  from {
+    opacity: 0;
+  }
+}
+.sgp-pixel .px-desserts {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 2px dashed var(--sgp-paper-edge);
+}
+.sgp-pixel .px-desserts span {
+  display: flex;
+  align-items: center;
+  font-size: 17px;
+}
+.sgp-pixel .px-desserts span > :first-child {
+  width: 30px;
+  height: 30px;
+}
+
+/* ---------- motion: steps only ---------- */
+.sushi-table.rich.sgp-pixel .own-plate .settling,
+.sgp-pixel .friend-plate .settling {
+  animation: px-settle 480ms steps(4, jump-end) both;
+}
+@keyframes px-settle {
+  from {
+    transform: translateY(-15px);
+  }
+  to {
+    transform: none;
+  }
+}
+.sushi-table.sgp-pixel.scoring .own-label strong {
+  animation: px-blink 540ms steps(1) both;
+}
+@keyframes px-blink {
+  25%,
+  75% {
+    color: var(--sgp-cream);
+  }
+  50% {
+    color: var(--sgp-gold);
+  }
+}
+.sushi-table.sgp-pixel.scoring .own-plate {
+  animation: px-flash 540ms steps(1) both;
+}
+@keyframes px-flash {
+  33% {
+    box-shadow: 0 0 0 var(--px) var(--sgp-gold);
+  }
+  66% {
+    box-shadow: none;
+  }
+}
+.sushi-passing-bundle.px-bundle {
+  border-radius: 0 !important;
+  border: 3px solid #1a0f08 !important;
+  background:
+    url('/games/sushi-go-party/pixel/dishes.webp') calc(2 / 7 * 100%)
+      calc(3 / 4 * 100%) / 800% 500% no-repeat content-box,
+    #c8453a !important;
+  padding: 10px 2px;
+  box-sizing: border-box;
+  box-shadow:
+    inset 0 0 0 3px #ef8a6f,
+    3px 3px 0 #1a0f08,
+    6px 6px 0 #c8453a,
+    9px 9px 0 #1a0f08 !important;
+  image-rendering: pixelated;
+}
+.sushi-table.sgp-pixel.reduce .px-podium li,
+.sushi-table.sgp-pixel.reduce .px-chef-win,
+.sushi-table.sgp-pixel.reduce .px-ticks i,
+.sushi-table.sgp-pixel.reduce .passing-arrows > path {
+  animation: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sgp-pixel .px-chef-win,
+  .sgp-pixel .px-podium li,
+  .sgp-pixel .px-ticks i,
+  .sgp-pixel .passing-arrows > path,
+  .sgp-pixel .settling {
+    animation: none !important;
+  }
+}
+
+/* ---------- dialogs ---------- */
+body:has(.sushi-table) .sushi-dialog.sgp-pixel {
+  font-family: var(--px-font);
+  color: var(--sgp-ink);
+  background: var(--sgp-paper);
+  border: calc(var(--px) + 1px) solid var(--sgp-ink);
+  border-radius: 0;
+  box-shadow:
+    inset 0 0 0 var(--px) var(--sgp-red),
+    inset 0 0 0 calc(var(--px) * 2) var(--sgp-paper),
+    0 calc(var(--px) * 3) 0 #000a;
+  font-size: 18px;
+  &::backdrop {
+    background: #1a0f08a6;
+    backdrop-filter: none;
+  }
+  h2,
+  h3 {
+    font-family: var(--px-font);
+    font-weight: 400;
+  }
+  h2 {
+    font-size: 36px;
+    color: var(--sgp-red-dark);
+  }
+  button,
+  input,
+  select {
+    font-family: var(--px-font);
+    border-radius: 0;
+  }
+  button {
+    border: var(--px) solid var(--sgp-ink);
+    background: var(--sgp-gold);
+    color: var(--sgp-ink);
+    box-shadow: 0 var(--px) 0 var(--sgp-ink);
+  }
+  input,
+  select {
+    border: var(--px) solid var(--sgp-ink);
+    background: #fff8e8;
+  }
+  .dialog-close {
+    background: var(--sgp-paper);
+  }
+  .guide-intro {
+    border-radius: 0;
+    background: #f1e2bf;
+    border: 2px solid var(--sgp-paper-edge);
+  }
+  .guide-intro p,
+  .dish-guide p {
+    font-size: 17px;
+  }
+  .dish-guide h3 {
+    font-size: 24px;
+  }
+  .dish-guide small {
+    font-size: 14px;
+  }
+  .dish-guide article {
+    border-bottom: 2px dashed var(--sgp-paper-edge);
+  }
+  .setting,
+  .skin-choice {
+    border-bottom: 2px dashed var(--sgp-paper-edge);
+  }
+  .setting input[type='checkbox'],
+  .setting input[type='range'],
+  .skin-choice input {
+    accent-color: var(--sgp-red);
+  }
+  .tray-cards p {
+    font-size: 15px;
+  }
+  .practice-controls {
+    color: var(--sgp-ink);
+  }
+}
+
+/* ---------- phones ---------- */
+@media (max-width: 699px), (max-width: 1000px) and (max-height: 500px) {
+  .sushi-table.rich.sgp-pixel[data-layout] {
+    background-size: 960px 540px;
+  }
+  .sushi-table.rich.sgp-pixel .table-stage .own-area {
+    border-radius: 0;
+  }
+  .sushi-table.rich.sgp-pixel .own-label,
+  .sushi-table.rich.sgp-pixel .own-label strong {
+    font-size: 22px;
+  }
+  .sushi-table.rich.sgp-pixel .table-stage .hand-area {
+    border-radius: 0;
+    background: var(--sgp-wood-dark);
+    border: var(--px) solid var(--sgp-ink);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--sgp-wood-edge),
+      0 calc(var(--px) * -1) 0 #1a0f0855;
+  }
+  .sushi-table.rich.sgp-pixel .hand > button,
+  .sushi-table.rich.sgp-pixel .hand > button:hover:enabled {
+    transform: none;
+  }
+  .sushi-table.rich.sgp-pixel .hand > button.selected {
+    transform: translateY(-6px);
+  }
+  .sushi-table.rich.sgp-pixel .confirmation > span {
+    color: var(--sgp-cream);
+    background: none;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+  .sushi-table.rich.sgp-pixel .confirmation .primary {
+    border-radius: 0;
+    font-size: 24px;
+  }
+  .sushi-table.sgp-pixel .menu-setup .px-chef {
+    display: none;
+  }
+  .sushi-table.rich.sgp-pixel .table-stage .results,
+  .sushi-table.rich.sgp-pixel .table-stage .menu-setup,
+  .sushi-table.rich.sgp-pixel .table-stage .table-center {
+    top: auto;
+    bottom: auto;
+    width: 100%;
+  }
+  .sgp-pixel .px-podium li {
+    grid-template-columns: 22px 24px minmax(0, 1fr) auto 64px;
+    gap: 6px;
+    font-size: 20px;
+  }
+  .sushi-table.sgp-pixel .menu-setup h1 {
+    font-size: 34px;
+  }
+  .sushi-table.sgp-pixel .menu-setup > p:not(.eyebrow):not(.ready-count) {
+    font-size: 16px;
+  }
+  .sushi-table.sgp-pixel .decision h2,
+  .sushi-table.sgp-pixel .results h2 {
+    font-size: 26px;
+  }
+  .sushi-table.sgp-pixel .receipts summary {
+    font-size: 17px;
+  }
+  .sushi-table.sgp-pixel .receipts summary strong {
+    padding: 0 3px;
+    white-space: nowrap;
+  }
+  .sushi-table.sgp-pixel .receipts p,
+  .sushi-table.sgp-pixel .score-line {
+    font-size: 14px;
+  }
+  .sgp-pixel .px-ticks i {
+    width: 4px;
+    height: 7px;
+  }
+  .sushi-table.rich.sgp-pixel .own-label .own-hand-count {
+    font-size: 14px;
+  }
+  .sushi-table.sgp-pixel .presets button {
+    font-size: 15px;
+  }
+  .sushi-table.sgp-pixel :is(.menu-setup, .results, .decision) .primary {
+    font-size: 20px;
+    padding: 8px 14px;
+  }
+}

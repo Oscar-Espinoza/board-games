@@ -1,5 +1,7 @@
 <script lang="ts">
   import Dish from '../Dish.svelte';
+  import PixelDish from '../pixel/PixelDish.svelte';
+  import { usePixel } from '../pixel/context.js';
   import type { Face } from '../cards.js';
   let {
     card,
@@ -11,10 +13,11 @@
     boxed?: boolean;
   } = $props();
   const id = $props.id();
+  const pixel = usePixel();
 </script>
 
-<div class="food-art" class:trio>
-  {#if boxed}<Dish
+<div class="food-art" class:trio class:px-art={pixel()}>
+  {#if pixel()}<PixelDish {card} {trio} {boxed} />{:else if boxed}<Dish
       {card}
       boxed
     />{:else if ['tempura', 'dumpling', 'pudding', 'wasabi', 'chopsticks', 'maki'].includes(card.kind)}
@@ -354,6 +357,9 @@
     width: 100%;
     height: 100%;
     filter: drop-shadow(0 3px 1px #6e594522);
+  }
+  .food-art.px-art {
+    filter: none;
   }
   svg {
     display: block;

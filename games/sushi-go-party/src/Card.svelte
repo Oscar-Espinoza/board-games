@@ -2,7 +2,7 @@
   import Dish from './table/FoodArt.svelte';
   import { menu } from './table/data.js';
   import { t, variation, hues, patterns } from './labels.js';
-  import type { Face } from './cards.js';
+  import { rolls, specials, desserts, type Face } from './cards.js';
   import type { Locale } from '@board-games/shared/runtime';
   let {
     card,
@@ -13,12 +13,27 @@
     locale?: Locale;
     small?: boolean;
   } = $props();
+  /** Menu family, used by the 8-bit skin for its card frames. */
+  const family = $derived(
+    card.boxed
+      ? 'boxed'
+      : card.kind === 'nigiri' || card.kind === 'wasabi'
+        ? 'nigiri'
+        : (rolls as readonly string[]).includes(card.kind)
+          ? 'roll'
+          : (desserts as readonly string[]).includes(card.kind)
+            ? 'dessert'
+            : (specials as readonly string[]).includes(card.kind)
+              ? 'special'
+              : 'appetizer',
+  );
 </script>
 
 <div
   class="food-card"
   class:small
   class:boxed={card.boxed}
+  data-family={family}
   style={`--dish-color:${card.boxed ? '#c4b69a' : (menu.find((tile) => tile.kind === card.kind)?.accent ?? hues[card.color])}`}
 >
   <span class="pattern" aria-hidden="true"
