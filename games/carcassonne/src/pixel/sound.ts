@@ -1,6 +1,5 @@
 import { createAudio } from '@board-games/shared/ui';
-// Local copy of the shared kit's ZzFX builder (not exported by @board-games/shared).
-import { buildSamples } from './zzfx-core.js';
+import { buildSamples } from '@board-games/shared/ui/pixel';
 import type { Event } from '../index.js';
 
 // ZzFX parameter lists (https://killedbyapixel.github.io/ZzFX/), built once and cached.

@@ -1,6 +1,8 @@
 import type { Audio } from '../audio.js';
 import { buildSamples } from './zzfx-core.js';
 
+export { buildSamples };
+
 /** ZzFX parameter lists (design new ones at https://killedbyapixel.github.io/ZzFX/). */
 export const chiptune = {
   click: [0.6, 0.05, 537, 0.02, 0.02, 0.08, 1, 1.6, -7, 5],

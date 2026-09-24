@@ -32,7 +32,7 @@ unchanged.
 - **Sound** (`pixel/sound.ts`): ZzFX cues for drawing, rotating, previews, placing tiles
   and meeples, returns, building, gold, goods, flights, ferries, magic, messages and robbers.
   Square-wave arpeggios play for scores, final scoring and extra turns, and a short fanfare
-  for the win. It uses a local copy of the kit's ZzFX builder (`pixel/zzfx-core.js`).
+  for the win. It uses the kit's ZzFX builder (`buildSamples`).
 - Reduced motion turns off every stepped animation. The Ambient motion setting still controls
   the table's idle motion.
 
