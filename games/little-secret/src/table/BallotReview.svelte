@@ -2,6 +2,9 @@
   import { m } from '@board-games/shared/messages';
   import type { Event } from '../types.js';
   import PlayerToken from './PlayerToken.svelte';
+  import { usePixel } from '../pixel/context.js';
+  import Sprite from '../pixel/Sprite.svelte';
+  const pixel = usePixel();
   let {
     ballot,
     players,
@@ -17,7 +20,8 @@
   );
 </script>
 
-<div class="ballot-review" data-testid="ls-ballot-review">
+<div class="ballot-review" class:px={pixel()} data-testid="ls-ballot-review">
+  {#if pixel()}<Sprite sheet="icons" frame="ballot" scale={2} />{/if}
   <h3>{suspects.length > 1 ? m.ls_table_tied() : m.ls_table_suspect()}</h3>
   <div class="suspects">
     {#each suspects as p}<div class="suspect">

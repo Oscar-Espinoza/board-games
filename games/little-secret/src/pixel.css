@@ -1,0 +1,962 @@
+/* Little Secret 8-bit skin. Loaded only when the viewer's skin is `pixel`; overrides the
+   classic look without changing rules or layout slots. Hard edges only: borders and
+   shadows are multiples of --px, no radius, blur, rotation, filters or gradients.
+   Motion uses steps() and stops under `.still` (table or system reduced motion). */
+@import '@board-games/shared/ui/pixel.css';
+
+.ls-pixel {
+  --ls-ink: var(--px-ink);
+  --ls-paper: #efdcb2;
+  --ls-paper-hi: #fff4d6;
+  --ls-paper-lo: #c9a56c;
+  --ls-folder: #d7b16f;
+  --ls-folder-hi: #ecd097;
+  --ls-felt: #123330;
+  --ls-brass: #d6a647;
+  --ls-red: #b73a2e;
+  --ls-red-hi: #de6a52;
+  --ls-teal: #1f5a52;
+  --ls-cream: #fff2d6;
+  --ls-shadow: #000000a0;
+  /* Jersey 10 is small for its em box; match the classic x-height. */
+  font-size-adjust: ex-height 0.56;
+  font-synthesis: none;
+  letter-spacing: 0.02em;
+}
+.ls-pixel,
+.ls-pixel *:not(.px-x, .px-bubble) {
+  font-family: var(--px-font) !important;
+  font-style: normal !important;
+}
+
+/* ---------- table ---------- */
+.ls-table.ls-pixel {
+  color: var(--ls-cream);
+  background: #1a100a url('/games/little-secret/pixel/table.webp') center /
+    cover no-repeat;
+  image-rendering: pixelated;
+}
+.ls-table.ls-pixel ::selection {
+  background: var(--px-gold);
+  color: var(--ls-ink);
+}
+.ls-table.ls-pixel .corners button {
+  width: 48px;
+  height: 48px;
+  border-radius: 0;
+  border: var(--px) solid var(--ls-ink);
+  background: var(--px-wood);
+  color: var(--px-gold);
+  font-size: 28px;
+  line-height: 1;
+  box-shadow:
+    inset 0 0 0 var(--px) var(--px-wood-edge),
+    0 var(--px) 0 var(--ls-ink);
+}
+.ls-table.ls-pixel .corners button:hover {
+  background: #6d4228;
+  translate: 0 calc(var(--px) * -1);
+}
+.ls-table.ls-pixel .corners button:active {
+  translate: 0 var(--px);
+  box-shadow: inset 0 0 0 var(--px) var(--px-wood-edge);
+}
+
+/* ---------- brand ---------- */
+.ls-table.ls-pixel .brand-note {
+  transform: none;
+  top: 88px;
+}
+.ls-table.ls-pixel h1 {
+  font-size: clamp(20px, 1.9vw, 30px);
+  font-weight: 400;
+}
+.ls-table.ls-pixel .brand-line {
+  gap: var(--px);
+  margin: 6px 0;
+}
+.ls-table.ls-pixel .brand-line b {
+  transform: none;
+  font-weight: 400;
+  min-width: 1.05em;
+  padding: 2px 3px 0;
+  line-height: 1;
+  color: var(--ls-ink);
+  background: var(--ls-paper);
+  border: var(--px) solid var(--ls-ink);
+  box-shadow:
+    inset 0 calc(var(--px) * -1) 0 var(--ls-paper-lo),
+    0 var(--px) 0 var(--ls-ink);
+}
+.ls-table.ls-pixel .brand-line b:nth-child(odd) {
+  translate: 0 calc(var(--px) * -1);
+}
+.ls-table.ls-pixel .brand-line b:nth-child(3n) {
+  background: var(--ls-red);
+  color: var(--ls-cream);
+  box-shadow:
+    inset 0 calc(var(--px) * -1) 0 var(--px-red-dark),
+    0 var(--px) 0 var(--ls-ink);
+}
+.ls-table.ls-pixel .brand-line b:nth-child(4n + 2) {
+  background: var(--px-gold);
+}
+.ls-table.ls-pixel .brand-note p {
+  font-size: 18px;
+  line-height: 1.1;
+  color: var(--ls-cream);
+  text-shadow:
+    var(--px) var(--px) 0 var(--ls-ink),
+    0 var(--px) 0 var(--ls-ink);
+}
+.ls-table.ls-pixel .brand-cat {
+  display: block;
+  margin: 4px auto 0;
+  width: max-content;
+  animation: ls-breathe 2.4s steps(1, jump-end) infinite;
+}
+
+/* ---------- paper, reusable ---------- */
+.ls-table.ls-pixel .paper {
+  filter: none;
+  color: var(--ls-ink);
+  background: var(--ls-paper) url('/games/little-secret/pixel/paper.webp') 0 0 /
+    192px;
+  border: calc(var(--px) + 1px) solid var(--ls-ink);
+  box-shadow:
+    inset 0 0 0 var(--px) var(--ls-paper-hi),
+    inset 0 calc(var(--px) * -2) 0 var(--px) var(--ls-paper-lo),
+    0 calc(var(--px) * 2) 0 var(--ls-shadow);
+}
+.ls-table.ls-pixel .paper::before,
+.ls-table.ls-pixel .paper::after {
+  display: none;
+}
+.ls-table.ls-pixel .paper-content {
+  padding: 20px 22px;
+}
+/* The classic masking tape becomes a brass clip. */
+.ls-table.ls-pixel .taped .paper-content::before {
+  width: 84px;
+  height: 21px;
+  top: -18px;
+  left: calc(50% - 42px);
+  transform: none;
+  clip-path: none;
+  background: var(--ls-brass);
+  border: var(--px) solid var(--ls-ink);
+  box-shadow:
+    inset 0 var(--px) 0 #f6d98a,
+    inset 0 calc(var(--px) * -1) 0 #8d6420;
+  z-index: 2;
+}
+
+/* Phase banner: wooden plaque with gold lettering. */
+.ls-table.ls-pixel .phase-banner {
+  transform: translateX(-50%);
+  top: 16px;
+}
+.ls-table.ls-pixel .phase-banner .paper {
+  color: var(--ls-cream);
+  background: var(--px-wood);
+  border-color: var(--ls-ink);
+  box-shadow:
+    inset 0 0 0 var(--px) var(--px-wood-edge),
+    inset 0 0 0 calc(var(--px) * 2) var(--px-wood-dark),
+    0 calc(var(--px) * 2) 0 var(--ls-shadow);
+}
+.ls-table.ls-pixel .banner .paper-content {
+  padding: 8px 28px 10px;
+}
+.ls-table.ls-pixel .phase-banner h2 {
+  font-size: 34px;
+  line-height: 1;
+  color: var(--px-gold);
+  text-shadow: var(--px) var(--px) 0 var(--ls-ink);
+  letter-spacing: 0.04em;
+}
+.ls-table.ls-pixel .phase-banner span {
+  font-size: 16px;
+  color: #e8cf9c;
+}
+
+/* ---------- seats ---------- */
+.ls-table.ls-pixel .seat {
+  gap: 3px;
+}
+/* Revealed roles are stamped across the bottom of the portrait. */
+.ls-table.ls-pixel .seat > .role-stamp {
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--token-size) - 22px);
+  left: 50%;
+  translate: -50% 0;
+  white-space: nowrap;
+}
+.ls-table.ls-pixel .action-scroll {
+  max-height: calc((100dvh - 152px) * 0.5 - 48px);
+}
+.ls-table.ls-pixel .player-token.px,
+.ls-pixel .player-token.px {
+  aspect-ratio: 52 / 48;
+  width: calc(var(--token-size, 86px) * 1.08);
+  border-radius: 0;
+  border: var(--px) solid var(--ls-ink);
+  background: #2a1a10;
+  box-shadow:
+    inset 0 0 0 var(--px) var(--px-wood-edge),
+    0 var(--px) 0 var(--ls-ink);
+  outline: none;
+  filter: none;
+  overflow: visible;
+}
+.ls-pixel .player-token.px > .ls-sprite {
+  position: absolute;
+  inset: var(--px);
+  width: auto;
+  height: auto;
+}
+.ls-pixel .player-token.px small {
+  bottom: calc(var(--px) * -2);
+  left: calc(var(--px) * -2);
+  padding: 1px 4px 0;
+  font-size: 14px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: var(--ls-ink);
+  background: var(--ls-paper);
+  border: 2px solid var(--ls-ink);
+}
+.ls-pixel .player-token.px.lit {
+  outline: none;
+  border-color: var(--ls-ink);
+  box-shadow:
+    inset 0 0 0 var(--px) var(--px-gold),
+    0 0 0 var(--px) var(--px-gold),
+    0 calc(var(--px) * 2) 0 var(--ls-ink);
+}
+.ls-pixel .player-token.px.muted {
+  filter: none;
+  box-shadow:
+    inset 0 0 0 var(--px) #5a4a3c,
+    0 var(--px) 0 var(--ls-ink);
+}
+.ls-table.ls-pixel .seat-choice {
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
+  min-height: 0;
+  background: transparent;
+  cursor: crosshair;
+}
+.ls-table.ls-pixel .seat-choice:hover:enabled {
+  translate: 0 calc(var(--px) * -1);
+  background: transparent;
+}
+/* A bobbing arrow points at the speaker; a red one at the chosen suspect. */
+.ls-table.ls-pixel .seat.active .seat-top::before,
+.ls-table.ls-pixel .seat.selected .seat-top::before {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  left: calc(50% - 9px);
+  top: -24px;
+  width: 18px;
+  height: 15px;
+  background: var(--px-gold);
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% 33%,
+    83% 33%,
+    83% 67%,
+    67% 67%,
+    67% 100%,
+    33% 100%,
+    33% 67%,
+    17% 67%,
+    17% 33%,
+    0 33%
+  );
+  animation: ls-bob 0.7s steps(2, jump-none) infinite;
+}
+.ls-table.ls-pixel .seat.selected .seat-top::before {
+  background: var(--ls-red-hi);
+}
+.ls-table.ls-pixel .seat.selected .player-token.px {
+  box-shadow:
+    inset 0 0 0 var(--px) var(--ls-red-hi),
+    0 0 0 var(--px) var(--ls-red),
+    0 calc(var(--px) * 2) 0 var(--ls-ink);
+}
+.ls-table.ls-pixel .power-badge {
+  width: auto;
+  height: auto;
+  right: -26px;
+  bottom: -6px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: 0 var(--px) 0 var(--ls-ink);
+}
+.ls-table.ls-pixel .name-slip,
+.ls-table.ls-pixel .clue-slip {
+  transform: none;
+}
+.ls-table.ls-pixel .name-slip .paper {
+  background: var(--px-wood-dark);
+  color: var(--ls-cream);
+  box-shadow:
+    inset 0 0 0 var(--px) var(--px-wood),
+    0 var(--px) 0 var(--ls-shadow);
+}
+.ls-table.ls-pixel .slip .paper-content {
+  padding: 3px 8px 2px;
+}
+.ls-table.ls-pixel .name-slip strong {
+  font-size: 22px;
+  line-height: 1.1;
+  letter-spacing: 0.03em;
+}
+/* Clue slips are speech bubbles with a stepped tail up to the speaker. */
+.ls-table.ls-pixel .clue-slip {
+  position: relative;
+  margin-top: 7px;
+}
+.ls-table.ls-pixel .clue-slip::before,
+.ls-table.ls-pixel .clue-slip::after {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  left: calc(50% - 9px);
+  width: 18px;
+  height: 12px;
+}
+.ls-table.ls-pixel .clue-slip::before {
+  top: -8px;
+  background: var(--ls-ink);
+  clip-path: polygon(
+    6px 0,
+    12px 0,
+    12px 3px,
+    15px 3px,
+    15px 6px,
+    18px 6px,
+    18px 12px,
+    0 12px,
+    0 6px,
+    3px 6px,
+    3px 3px,
+    6px 3px
+  );
+}
+.ls-table.ls-pixel .clue-slip::after {
+  top: -4px;
+  background: var(--ls-cream);
+  clip-path: polygon(
+    6px 0,
+    12px 0,
+    12px 3px,
+    15px 3px,
+    15px 12px,
+    3px 12px,
+    3px 3px,
+    6px 3px
+  );
+}
+.ls-table.ls-pixel .clue-slip .paper {
+  background: var(--ls-cream);
+  box-shadow:
+    inset 0 calc(var(--px) * -1) 0 #e2cfa6,
+    0 var(--px) 0 var(--ls-shadow);
+}
+.ls-table.ls-pixel .clue-strip {
+  font-size: 24px;
+  line-height: 1.05;
+  max-height: 2.2em;
+  color: var(--ls-ink);
+}
+.ls-table.ls-pixel .seat-score {
+  position: absolute;
+  z-index: 2;
+  top: -12px;
+  right: calc(50% - var(--token-size) * 0.54 - 12px);
+  padding: 1px 5px 0;
+  font-size: 16px;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--ls-ink);
+  background: var(--px-gold);
+  border: 2px solid var(--ls-ink);
+  box-shadow: 0 2px 0 var(--ls-ink);
+}
+.ls-table.ls-pixel .role-stamp,
+.ls-table.ls-pixel .status-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px 0 2px;
+  font-size: 17px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ls-red);
+  background: var(--ls-cream);
+  border: var(--px) solid var(--ls-red);
+  box-shadow: 0 var(--px) 0 var(--ls-ink);
+}
+.ls-table.ls-pixel .role-stamp .ls-sprite {
+  margin: -6px 0 -6px -2px;
+}
+.ls-table.ls-pixel .status-stamp {
+  padding-left: 6px;
+  color: #5b5048;
+  border-color: #5b5048;
+}
+.ls-table.ls-pixel .role-stamp.drop {
+  animation: ls-stamp 0.36s steps(4, jump-end) both;
+}
+.ls-table.ls-pixel .commit-mark {
+  z-index: 2;
+  top: -10px;
+  left: -8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 0;
+  font: 18px/1 system-ui !important;
+  color: var(--ls-cream);
+  background: var(--px-green);
+  border: var(--px) solid var(--ls-ink);
+  box-shadow: inset 0 calc(var(--px) * -1) 0 #2a6b32;
+  animation: ls-pop 0.24s steps(3, jump-end) both;
+}
+.ls-table.ls-pixel .out .name-slip {
+  opacity: 0.8;
+}
+.ls-table.ls-pixel .out .name-slip strong {
+  text-decoration: line-through var(--ls-red-hi) 3px;
+}
+
+/* ---------- action area: a clipboard ---------- */
+.ls-table.ls-pixel .action-area > .paper {
+  padding: 8px;
+  background: var(--px-wood);
+  box-shadow:
+    inset 0 0 0 var(--px) var(--px-wood-edge),
+    0 calc(var(--px) * 2) 0 var(--ls-shadow);
+}
+.ls-table.ls-pixel .action-area > .paper > .paper-content {
+  padding: 22px 18px 16px;
+  background: var(--ls-paper) url('/games/little-secret/pixel/paper.webp') 0 0 /
+    192px;
+  border: var(--px) solid var(--ls-ink);
+  box-shadow:
+    inset 0 0 0 var(--px) var(--ls-paper-hi),
+    inset 0 calc(var(--px) * -2) 0 var(--px) var(--ls-paper-lo);
+}
+.ls-table.ls-pixel .action-area p {
+  font-size: 20px;
+  line-height: 1.15;
+}
+.ls-table.ls-pixel .action-area label {
+  display: block;
+  font-size: 19px;
+}
+.ls-table.ls-pixel .action-area .check {
+  display: flex;
+}
+.ls-table.ls-pixel .speaker-label span {
+  font-size: 17px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ls-red);
+}
+.ls-table.ls-pixel .speaker-label strong {
+  font-size: 40px;
+  line-height: 1;
+  font-weight: 400;
+}
+.ls-pixel input:not([type='checkbox'], [type='radio']),
+.ls-pixel select {
+  box-sizing: border-box;
+  min-height: 48px;
+  padding: 6px 10px 4px;
+  font-size: 26px;
+  color: var(--ls-ink);
+  background: var(--ls-cream);
+  border: var(--px) solid var(--ls-ink);
+  border-radius: 0;
+  box-shadow: inset 0 var(--px) 0 #c9b28a;
+  outline: none;
+}
+.ls-pixel input::placeholder {
+  color: #8f7a5a;
+}
+.ls-pixel input[type='checkbox'],
+.ls-pixel input[type='radio'] {
+  accent-color: var(--ls-red);
+  width: 22px;
+  height: 22px;
+}
+.ls-table.ls-pixel button:not(:where(.seat-choice, .corners button)),
+.ls-dialog.ls-pixel button {
+  min-height: 46px;
+  padding: 4px 12px 2px;
+  font-size: 21px;
+  line-height: 1;
+  color: var(--ls-ink);
+  background: #dcc08a;
+  border: var(--px) solid var(--ls-ink);
+  border-radius: 0;
+  box-shadow:
+    inset calc(var(--px) * -1) calc(var(--px) * -1) 0 #0000003d,
+    inset var(--px) var(--px) 0 #ffffff66,
+    0 var(--px) 0 var(--ls-ink);
+  cursor: pointer;
+}
+.ls-table.ls-pixel
+  button:not(:where(.seat-choice, .corners button)):hover:enabled,
+.ls-dialog.ls-pixel button:hover:enabled {
+  background: #ead19d;
+}
+.ls-table.ls-pixel
+  button:not(:where(.seat-choice, .corners button)):active:enabled,
+.ls-dialog.ls-pixel button:active:enabled {
+  translate: 0 var(--px);
+  box-shadow: inset var(--px) var(--px) 0 #0000003d;
+}
+.ls-table.ls-pixel button.primary {
+  min-height: 52px;
+  font-size: 25px;
+  letter-spacing: 0.04em;
+  color: var(--ls-cream);
+  background: var(--ls-red);
+  border-color: var(--ls-ink);
+  text-shadow: 2px 2px 0 var(--px-red-dark);
+  box-shadow:
+    inset calc(var(--px) * -1) calc(var(--px) * -1) 0 var(--px-red-dark),
+    inset var(--px) var(--px) 0 var(--ls-red-hi),
+    0 var(--px) 0 var(--ls-ink);
+}
+.ls-table.ls-pixel button.primary:hover:enabled {
+  background: #c9493a;
+}
+.ls-table.ls-pixel button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  box-shadow: none;
+}
+.ls-table.ls-pixel .symbols button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px 4px;
+}
+.ls-table.ls-pixel .symbols button[aria-pressed='true'] {
+  color: var(--ls-cream);
+  background: var(--ls-teal);
+  box-shadow:
+    inset var(--px) var(--px) 0 #00000055,
+    0 0 0 var(--px) var(--px-gold);
+}
+
+/* The envelope: tap the sealed sprite, the letter slides out. */
+.ls-table.ls-pixel .envelope {
+  border-top: var(--px) dashed var(--ls-paper-lo);
+}
+.ls-table.ls-pixel .envelope > button {
+  min-height: 72px;
+  padding: 4px 10px 4px 14px;
+  font-size: 22px;
+  background: #e7d3a6;
+}
+.ls-table.ls-pixel .envelope > button[aria-expanded='false'] .ls-sprite {
+  animation: ls-wiggle 2.2s steps(1, jump-end) infinite;
+}
+.ls-table.ls-pixel .letter {
+  position: relative;
+  margin-top: 10px;
+  padding: 10px 14px 12px;
+  color: var(--ls-ink);
+  background: var(--ls-cream);
+  border: var(--px) solid var(--ls-ink);
+  box-shadow:
+    inset 0 calc(var(--px) * -1) 0 #e0caa0,
+    0 var(--px) 0 var(--ls-ink);
+  text-align: center;
+  animation: ls-slide 0.3s steps(3, jump-end) both;
+}
+.ls-table.ls-pixel .letter h3 {
+  margin: 0 0 4px;
+  font-size: 17px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #7c5b35;
+}
+.ls-table.ls-pixel .password {
+  font-size: 46px;
+  line-height: 1.05;
+  color: var(--ls-red);
+  letter-spacing: 0.04em;
+  text-shadow: 2px 2px 0 #e7c9a3;
+}
+.ls-table.ls-pixel .letter h4 {
+  margin: 12px 0 2px;
+  font-size: 19px;
+  font-weight: 400;
+}
+.ls-table.ls-pixel .letter p,
+.ls-table.ls-pixel .letter ul {
+  font-size: 19px;
+  text-align: left;
+}
+
+/* ---------- side sheet: a manila case folder ---------- */
+.ls-table.ls-pixel > .side-sheet {
+  transform: translateY(-50%);
+}
+.ls-table.ls-pixel .side-sheet .paper {
+  background: var(--ls-folder);
+  box-shadow:
+    inset 0 0 0 var(--px) var(--ls-folder-hi),
+    inset 0 calc(var(--px) * -2) 0 var(--px) #b48f52,
+    0 calc(var(--px) * 2) 0 var(--ls-shadow);
+}
+.ls-table.ls-pixel .side-sheet .paper::after {
+  display: block;
+  content: '';
+  position: absolute;
+  inset: auto auto 100% calc(var(--px) * 4);
+  width: 42%;
+  height: 16px;
+  background: var(--ls-folder);
+  border: calc(var(--px) + 1px) solid var(--ls-ink);
+  border-bottom: 0;
+  box-shadow: inset 0 var(--px) 0 var(--ls-folder-hi);
+  clip-path: none;
+  transform: none;
+  filter: none;
+  z-index: 0;
+}
+.ls-table.ls-pixel .side-sheet .taped .paper-content::before {
+  display: none;
+}
+.ls-table.ls-pixel .side-sheet h2 {
+  font-size: 32px;
+  font-weight: 400;
+  line-height: 1;
+  border-bottom: var(--px) solid #8a6a3a;
+}
+.ls-table.ls-pixel .side-sheet h3 {
+  font-size: 22px;
+  font-weight: 400;
+}
+.ls-table.ls-pixel .side-sheet p {
+  font-size: 18px;
+  line-height: 1.2;
+}
+.ls-table.ls-pixel .side-sheet .handwritten {
+  font-size: 22px;
+  line-height: 1.2;
+}
+.ls-table.ls-pixel .side-sheet .stamp {
+  font-weight: 400;
+  color: var(--ls-red);
+  border-bottom: var(--px) solid var(--ls-red);
+}
+.ls-table.ls-pixel .side-sheet .count {
+  font-size: 64px;
+  line-height: 1;
+  color: var(--ls-red);
+}
+.ls-table.ls-pixel .side-sheet .count span {
+  font-size: 30px;
+}
+.ls-table.ls-pixel .side-sheet li,
+.ls-table.ls-pixel .side-sheet .case-count,
+.ls-table.ls-pixel .side-sheet dt {
+  font-size: 18px;
+}
+.ls-table.ls-pixel .side-sheet .last-ballot li {
+  font-size: 20px;
+}
+.ls-table.ls-pixel .side-sheet .last-ballot,
+.ls-table.ls-pixel .side-sheet .case-count,
+.ls-table.ls-pixel .side-sheet .history {
+  border-top: var(--px) solid #8a6a3a;
+}
+.ls-table.ls-pixel .side-sheet .commitments li,
+.ls-table.ls-pixel .side-sheet .score-list li {
+  border-bottom: 2px solid #a98449;
+}
+.ls-table.ls-pixel .side-sheet .solution dd,
+.ls-table.ls-pixel .side-sheet .score-list strong {
+  font-size: 24px;
+}
+.ls-table.ls-pixel .side-sheet .score-list small {
+  font-size: 16px;
+}
+.ls-table.ls-pixel .side-sheet .score-list li > span {
+  font-size: 17px;
+}
+.ls-table.ls-pixel .side-sheet .score-list b {
+  font-weight: 400;
+  font-size: 22px;
+  background: var(--ls-cream);
+  border: var(--px) solid var(--ls-ink);
+}
+.ls-table.ls-pixel .side-sheet .history summary {
+  font-size: 18px;
+}
+
+/* ---------- vote reveal and results ---------- */
+.ls-pixel .ballot-review.px h3,
+.ls-pixel .outcome.px h3 {
+  display: block;
+  width: fit-content;
+  margin: 8px auto 16px;
+  padding: 4px 14px 2px;
+  font-size: 32px;
+  font-weight: 400;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ls-red);
+  background: var(--ls-cream);
+  border: var(--px) solid var(--ls-red);
+  box-shadow:
+    inset 0 0 0 2px var(--ls-cream),
+    inset 0 0 0 4px var(--ls-red);
+  animation: ls-stamp 0.4s steps(4, jump-end) both;
+}
+.ls-pixel .ballot-review.px .suspect strong {
+  font-size: 26px;
+}
+.ls-pixel .ballot-review.px .suspect span {
+  font-size: 22px;
+  color: var(--ls-red);
+}
+.ls-pixel .ballot-review.px .primary,
+.ls-pixel .outcome.px ~ .primary {
+  font-size: 24px;
+}
+.ls-pixel .ballot-review.px .suspect {
+  --token-size: 96px;
+}
+.ls-pixel .px-scene {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ls-pixel .px-scene .ls-sprite:first-child {
+  animation: ls-drop 0.4s steps(4, jump-end) both;
+}
+.ls-pixel .outcome.px .honorees > div {
+  --token-size: 52px;
+}
+.ls-pixel .outcome.px .honorees strong {
+  font-size: 22px;
+}
+.ls-pixel .outcome.px .outcome-caption {
+  font-size: 19px;
+  line-height: 1.2;
+}
+.ls-table.ls-pixel .notice {
+  top: 76px;
+  font-size: 20px;
+  color: var(--ls-cream);
+  background: var(--ls-red);
+  border: var(--px) solid var(--ls-ink);
+  box-shadow: 0 var(--px) 0 var(--ls-ink);
+}
+.ls-table.ls-pixel .px-confetti {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  overflow: hidden;
+  pointer-events: none;
+}
+.ls-table.ls-pixel .px-confetti i {
+  position: absolute;
+  top: -12px;
+  left: var(--x);
+  width: 9px;
+  height: 9px;
+  background: var(--c);
+  box-shadow: 3px 3px 0 var(--ls-ink);
+  animation: ls-fall var(--t) steps(14, jump-end) var(--d) 3 both;
+}
+
+/* ---------- focus ---------- */
+.ls-pixel :is(button, input, select, summary, [tabindex]):focus-visible {
+  outline: var(--px) solid var(--px-gold);
+  outline-offset: var(--px);
+}
+
+/* ---------- dialog ---------- */
+.ls-dialog.ls-pixel {
+  color: var(--ls-ink);
+  background: var(--ls-paper) url('/games/little-secret/pixel/paper.webp') 0 0 /
+    192px;
+  border: calc(var(--px) + 1px) solid var(--ls-ink);
+  border-radius: 0;
+  box-shadow:
+    inset 0 0 0 var(--px) var(--ls-paper-hi),
+    0 calc(var(--px) * 3) 0 #000a;
+  image-rendering: pixelated;
+}
+.ls-dialog.ls-pixel::backdrop {
+  background: #0a1614c8;
+}
+.ls-dialog.ls-pixel .dialog-head {
+  margin: -24px -24px 18px;
+  padding: 10px 14px 8px 24px;
+  background: var(--px-wood);
+  border-bottom: calc(var(--px) + 1px) solid var(--ls-ink);
+  box-shadow: inset 0 calc(var(--px) * -1) 0 var(--px-wood-edge);
+}
+.ls-dialog.ls-pixel .dialog-head h2 {
+  font-size: 34px;
+  color: var(--px-gold);
+  text-shadow: var(--px) var(--px) 0 var(--ls-ink);
+}
+.ls-dialog.ls-pixel .settings,
+.ls-dialog.ls-pixel .settings :is(label, legend, a, button) {
+  font-size: 22px;
+}
+.ls-dialog.ls-pixel .skin-choice {
+  border: var(--px) solid var(--ls-ink);
+  border-radius: 0;
+  background: #f6e7c8;
+}
+.ls-dialog.ls-pixel a {
+  color: var(--px-blue-dark);
+}
+
+/* ---------- compact / phone ---------- */
+@media (max-width: 1099px), (max-height: 699px) {
+  /* Zoom past the rails so only felt sits behind the scrolling column. */
+  .ls-table.ls-pixel {
+    background: #123330 url('/games/little-secret/pixel/table.webp') center /
+      max(100vw, 260vh) auto no-repeat;
+  }
+  .ls-table.ls-pixel .action-scroll {
+    max-height: none;
+  }
+  .ls-table.ls-pixel .brand-note {
+    top: auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 4px 12px;
+  }
+  .ls-table.ls-pixel .brand-note h1 {
+    font-size: clamp(20px, 3vw, 30px);
+    gap: 8px;
+  }
+  .ls-table.ls-pixel .brand-note p {
+    width: 100%;
+    text-align: center;
+  }
+  .ls-table.ls-pixel .brand-cat {
+    display: none;
+  }
+  .ls-table.ls-pixel .phase-banner {
+    transform: none;
+  }
+  .ls-table.ls-pixel .phase-banner h2 {
+    font-size: 32px;
+  }
+  .ls-table.ls-pixel > .side-sheet {
+    transform: none;
+  }
+  .ls-table.ls-pixel .seats {
+    gap: 34px 18px;
+  }
+  .ls-table.ls-pixel .seat,
+  .ls-table.ls-pixel.dense .seat {
+    --token-size: 76px;
+  }
+  .ls-dialog.ls-pixel .dialog-head {
+    margin: -18px -18px 16px;
+  }
+}
+
+/* ---------- motion ---------- */
+.ls-pixel.still *,
+.ls-pixel.still *::before,
+.ls-pixel.still *::after {
+  animation: none !important;
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ls-pixel *,
+  .ls-pixel *::before,
+  .ls-pixel *::after {
+    animation: none !important;
+  }
+}
+@keyframes ls-bob {
+  to {
+    translate: 0 calc(var(--px) * 2);
+  }
+}
+@keyframes ls-breathe {
+  50% {
+    translate: 0 calc(var(--px) * -1);
+  }
+}
+@keyframes ls-wiggle {
+  90% {
+    translate: calc(var(--px) * -1) 0;
+  }
+  95% {
+    translate: var(--px) 0;
+  }
+}
+@keyframes ls-stamp {
+  from {
+    opacity: 0;
+    scale: 2.4;
+  }
+  60% {
+    opacity: 1;
+    scale: 0.9;
+  }
+  to {
+    scale: 1;
+  }
+}
+@keyframes ls-drop {
+  from {
+    translate: 0 -60px;
+    opacity: 0;
+  }
+  to {
+    translate: 0 0;
+    opacity: 1;
+  }
+}
+@keyframes ls-pop {
+  from {
+    scale: 0;
+  }
+}
+@keyframes ls-slide {
+  from {
+    translate: 0 -30px;
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+@keyframes ls-fall {
+  to {
+    translate: 0 110vh;
+  }
+}
