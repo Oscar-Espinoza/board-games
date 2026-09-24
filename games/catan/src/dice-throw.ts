@@ -1,3 +1,7 @@
+/** The 8-bit skin's throw length: the same path, replayed at a fixed stepped pace. */
+export const pixelThrowDuration = (strength: number) =>
+  1100 + Math.max(0, Math.min(1, strength)) * 1300;
+
 /** Small cosmetic simulation, independent of the rules and their randomness. */
 export function diceThrow(strength: number, random: () => number) {
   const power = Math.max(0, Math.min(1, strength));
