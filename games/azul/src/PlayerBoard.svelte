@@ -7,7 +7,9 @@
     type Color,
     type Destination,
   } from './index.js';
+  import { getContext } from 'svelte';
   import { railPosition } from './geometry.js';
+  import { skinKey } from './palette.js';
   import Tile from './Tile.svelte';
   import { m } from '@board-games/shared/messages';
   let {
@@ -26,7 +28,10 @@
     interactive = true,
     anchors = true,
     displayedScore = board.score,
+    gains = [],
   }: {
+    /** Freshly tiled wall cells and their points (the 8-bit skin pops them). */
+    gains?: { row: number; column: number; points: number }[];
     fitted?: boolean;
     hiddenLocations?: string[];
     density?: 'full' | 'compact';
@@ -43,6 +48,8 @@
     choose?: (d: Destination) => void;
     highlights?: [number, number][];
   } = $props();
+  const skin = getContext<(() => boolean) | undefined>(skinKey);
+  const pixel = $derived(!!skin?.());
   const location = (suffix: string) =>
     anchors ? `${id}/${suffix}` : undefined;
   const descriptionId = $props.id();
@@ -72,14 +79,14 @@
   aria-hidden={density === 'compact' ? true : undefined}
   aria-label={m.azul_board({ name })}
 >
-  <img
-    decoding="async"
-    class="board-substrate"
-    src="/games/azul/rich/board-blank-v3.webp"
-    alt=""
-    aria-hidden="true"
-    draggable="false"
-  />
+  {#if !pixel}<img
+      decoding="async"
+      class="board-substrate"
+      src="/games/azul/rich/board-blank-v3.webp"
+      alt=""
+      aria-hidden="true"
+      draggable="false"
+    />{/if}
   {#if density === 'compact'}<span
       class="compact-marker"
       data-azul-location={location('marker')}
@@ -93,8 +100,10 @@
         data-azul-location={density === 'full' ? location('marker') : undefined}
         title={m.azul_next()}>①</span
       ></span
-    ><strong
-      >{displayedScore}<small> {m.azul_score({ score: '' })}</small></strong
+    ><strong style:--az-score={pixel ? displayedScore : undefined}
+      ><span class="az-value">{displayedScore}</span><small>
+        {m.azul_score({ score: '' })}</small
+      ></strong
     >
   </header>
   <div class="board-labels">
@@ -155,7 +164,13 @@
               status: occupied ? m.azul_occupied() : m.azul_empty(),
             })}
             data-azul-location={location(`wall/${r}/${c}`)}
-            ><Tile color={wallColors[r][c]} ghost={!occupied} /></span
+            ><Tile
+              color={wallColors[r][c]}
+              ghost={!occupied}
+            />{#if pixel}{#each gains.filter((g) => g.row === r && g.column === c) as gain}<b
+                  class="px-gain"
+                  aria-hidden="true">+{gain.points}</b
+                >{/each}{/if}</span
           >{/each}{/each}
     </div>
   </div>
@@ -193,14 +208,14 @@
     >
   </svelte:element>
   <div class="score-rail" aria-label={m.azul_score({ score: displayedScore })}>
-    <img
-      decoding="async"
-      class="score-substrate"
-      src="/games/azul/rich/score-rail.webp"
-      alt=""
-      aria-hidden="true"
-      draggable="false"
-    />
+    {#if !pixel}<img
+        decoding="async"
+        class="score-substrate"
+        src="/games/azul/rich/score-rail.webp"
+        alt=""
+        aria-hidden="true"
+        draggable="false"
+      />{/if}
     <div class="rail-ticks" aria-hidden="true">
       {#each Array(11) as _, i}<span>{i === 10 ? '100+' : i * 10}</span>{/each}
     </div>
@@ -208,13 +223,13 @@
       class="score-marker"
       style="left:calc(10.4% + {railPosition(displayedScore) * 0.792}%)"
       aria-hidden="true"
-      ><img
-        decoding="async"
-        src="/games/azul/rich/score-marker.webp"
-        alt=""
-        aria-hidden="true"
-        draggable="false"
-      /><b>{displayedScore}</b></span
+      >{#if !pixel}<img
+          decoding="async"
+          src="/games/azul/rich/score-marker.webp"
+          alt=""
+          aria-hidden="true"
+          draggable="false"
+        />{/if}<b>{displayedScore}</b></span
     >
     {#if displayedScore > 100}<span
         class="score-overflow"

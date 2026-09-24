@@ -1,7 +1,9 @@
 import { createAudio } from '@board-games/shared/ui';
 import { mount, unmount, flushSync } from 'svelte';
 import Tile from './Tile.svelte';
-import type { Presentation, PresentationStep } from './presentation.js';
+import { skinKey } from './palette.js';
+import type { Flight, Presentation, PresentationStep } from './presentation.js';
+import type { PixelSounds } from './pixel/sound.js';
 export type Bounds = Map<string, DOMRect>;
 export function measure(root: HTMLElement): Bounds {
   const map: Bounds = new Map();
@@ -16,13 +18,56 @@ export function measure(root: HTMLElement): Bounds {
 export function ceramicAudio() {
   const audio = createAudio();
   let enabled = true,
-    volume = 0.25;
+    volume = 0.25,
+    chip: PixelSounds | null = null;
+  const stop = () => {
+    chip?.stop();
+    audio.stop();
+  };
   return {
+    /** The shared Web Audio instance, for building the 8-bit pack. */
+    raw: audio,
     unlock: () => void audio.unlock(),
     configure(sound: boolean, level: number) {
       enabled = sound;
       volume = level;
-      if (!sound) audio.stop();
+      chip?.setLevel(level);
+      if (!sound) stop();
+    },
+    /** The 8-bit skin's chiptune pack; null restores the ceramic clicks. */
+    set pixel(pack: PixelSounds | null) {
+      chip?.stop();
+      chip = pack;
+      chip?.setLevel(volume);
+    },
+    /** Runs an 8-bit cue; the classic skin keeps its restrained cues only. */
+    chip(run: (pack: PixelSounds) => void) {
+      if (enabled && !document.hidden && chip) run(chip);
+    },
+    /** 8-bit cues for a whole presentation; false leaves it to `play`. */
+    flights(list: Flight[]) {
+      if (!chip) return false;
+      if (!enabled || document.hidden) return true;
+      const pack = chip,
+        at = (f: Flight, end = false) => (f.at + (end ? f.duration : 0)) / 1000,
+        draft = list.find((f) => f.sound === 'tile'),
+        marker = list.find((f) => f.sound === 'marker'),
+        // Overflow and direct floor drafts, not the round-end sweep off the floor.
+        floor = list.find(
+          (f) =>
+            f.color !== 'marker' &&
+            f.to.includes('/floor/') &&
+            !/\/(pattern|floor)\//.test(f.from),
+        ),
+        deal = list.find((f) => f.from === 'bag' || f.from === 'discard');
+      if (draft) {
+        pack.pick(at(draft));
+        if (!draft.to.includes('/floor/')) pack.place(at(draft, true));
+      }
+      if (marker) pack.marker(at(marker, true));
+      if (floor) pack.floor(at(floor, true));
+      if (deal) pack.round(at(deal));
+      return true;
     },
     play(kind: 'tile' | 'marker' | 'score', delay = 0) {
       if (!enabled || document.hidden) return;
@@ -35,11 +80,15 @@ export function ceramicAudio() {
         attack: 0.003,
       });
     },
-    stop: audio.stop,
-    close: audio.close,
+    stop,
+    close() {
+      chip?.stop();
+      audio.close();
+    },
   };
 }
-export function tileFlights() {
+/** `pixel` reports the viewer's skin when a flight starts. */
+export function tileFlights(pixel: () => boolean = () => false) {
   const active = new Set<{
     node: HTMLElement;
     animation: Animation;
@@ -72,6 +121,8 @@ export function tileFlights() {
     sound: ReturnType<typeof ceramicAudio>,
   ) {
     cancel();
+    const chiptune = sound.flights(plan.flights),
+      eightBit = pixel();
     const locate = (map: Bounds, id: string) =>
       map.get(id) ??
       (id.startsWith('center/')
@@ -89,7 +140,7 @@ export function tileFlights() {
         ex = end.x + (end.width - endSize) / 2,
         ey = end.y + (end.height - endSize) / 2;
       const node = document.createElement('span');
-      node.className = 'azul-flight';
+      node.className = eightBit ? 'azul-flight az-pixel' : 'azul-flight';
       node.setAttribute('aria-hidden', 'true');
       node.dataset.from = flight.from;
       node.dataset.to = flight.to;
@@ -108,6 +159,7 @@ export function tileFlights() {
       const tile = mount(Tile, {
         target: node,
         props: { color: flight.color },
+        context: new Map([[skinKey, () => eightBit]]),
       });
       flushSync();
       document.body.append(node);
@@ -124,7 +176,8 @@ export function tileFlights() {
           duration: flight.duration,
           delay: flight.at,
           fill: 'both',
-          easing: 'cubic-bezier(.2,.7,.2,1)',
+          // 8-bit tiles hop between positions like sprites in a 16-bit game.
+          easing: eightBit ? 'steps(6, jump-end)' : 'cubic-bezier(.2,.7,.2,1)',
         },
       );
       const item = { node, animation, tile };
@@ -134,7 +187,7 @@ export function tileFlights() {
         node.remove();
         active.delete(item);
       };
-      if (flight.sound) sound.play(flight.sound, flight.at / 1000);
+      if (flight.sound && !chiptune) sound.play(flight.sound, flight.at / 1000);
     }
     for (const entry of plan.steps) later(() => step(entry), entry.at);
     later(done, plan.duration);

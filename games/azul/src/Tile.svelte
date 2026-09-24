@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { palette, richTileArtwork } from './palette.js';
+  import { getContext } from 'svelte';
+  import { palette, richTileArtwork, skinKey } from './palette.js';
   import type { Color } from './index.js';
   import { m } from '@board-games/shared/messages';
   let {
@@ -7,6 +8,7 @@
     ghost = false,
     location,
   }: { color: Color | 'marker'; ghost?: boolean; location?: string } = $props();
+  const pixel = getContext<(() => boolean) | undefined>(skinKey);
   const labels = {
     blue: m.azul_blue,
     yellow: m.azul_yellow,
@@ -17,30 +19,37 @@
   };
 </script>
 
-<span
-  class="tile {color}"
-  class:ghost
-  style="--glaze:{palette[color].glaze};--motif:{palette[color].motif}"
-  data-azul-location={location}
-  role="img"
-  aria-label={labels[color]()}
->
-  {#if color === 'marker'}<svg viewBox="0 0 40 40" aria-hidden="true"
-      ><text
-        x="20"
-        y="29"
-        text-anchor="middle"
-        fill="currentColor"
-        font-size="28"
-        font-family="Georgia">1</text
-      ></svg
-    >{:else}<img
-      src={richTileArtwork[color]}
-      alt=""
-      aria-hidden="true"
-      draggable="false"
-    />{/if}
-</span>
+{#if pixel?.()}<span
+    class="px-tile px-{color}"
+    class:px-ghost={ghost}
+    data-azul-location={location}
+    role="img"
+    aria-label={labels[color]()}
+    >{#if color === 'marker'}<b aria-hidden="true">1</b>{/if}</span
+  >{:else}<span
+    class="tile {color}"
+    class:ghost
+    style="--glaze:{palette[color].glaze};--motif:{palette[color].motif}"
+    data-azul-location={location}
+    role="img"
+    aria-label={labels[color]()}
+  >
+    {#if color === 'marker'}<svg viewBox="0 0 40 40" aria-hidden="true"
+        ><text
+          x="20"
+          y="29"
+          text-anchor="middle"
+          fill="currentColor"
+          font-size="28"
+          font-family="Georgia">1</text
+        ></svg
+      >{:else}<img
+        src={richTileArtwork[color]}
+        alt=""
+        aria-hidden="true"
+        draggable="false"
+      />{/if}
+  </span>{/if}
 
 <style>
   .tile {

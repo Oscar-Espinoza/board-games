@@ -16,3 +16,16 @@ export const richTileArtwork = {
   black: '/games/azul/rich/tile-black.webp',
   white: '/games/azul/rich/tile-white.webp',
 } as const;
+
+/** Svelte context key: a getter that is true while the 8-bit skin is showing. */
+export const skinKey = Symbol('azul-skin');
+
+/** 8-bit sprite sheets (games/azul/scripts, docs/azul-pixel.md). */
+export const pixelTileOrder = [
+  'blue',
+  'yellow',
+  'red',
+  'black',
+  'white',
+  'marker',
+] as const;
