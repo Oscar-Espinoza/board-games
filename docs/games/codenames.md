@@ -1,6 +1,6 @@
 # Codenames
 
-4–8 friends form two teams, each with exactly one spymaster and at least one
+4–12 friends form two teams, each with exactly one spymaster and at least one
 operative. Everyone chooses a role and confirms versioned readiness. Role changes
 clear consent; absent seats prevent the deal. The fixed board language is English
 or Spanish. A random starting team receives 9 agents; the other 8, plus 7 civilians
@@ -77,3 +77,5 @@ and [CGE Spanish](https://filemanager.czechgames.com/storage/files/codenames/rul
 ## Invariants
 
 Setup, clue, guessing and finished phases with authoritative active team, clue, guess budget and public history. Only the active spymaster clues; only active-team operatives guess or end the turn. Keep mandatory first guesses, immediate wins, unanimous setup readiness and recipient-private keys in actual payloads ([ADR 019](../adr/019-codenames-table-turns.md)). Never retry clues, guesses or end-turn; only still-valid readiness retries coded stale errors (same action ID, at most three attempts). Bundled WebP materials are Codenames-only; text stays Svelte/CSS.
+
+The 8-bit skin ([codenames-pixel](../codenames-pixel.md)) is a per-viewer look only; it never changes rules, payloads or other players' views.

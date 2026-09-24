@@ -1,0 +1,8 @@
+{
+  "name": "@board-games/jev-lab",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./codenames": "./src/codenames/live.ts"
+  }
+}

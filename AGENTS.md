@@ -28,7 +28,9 @@ Side project — move fast: no tests. Validate with `bun run check` and `bun run
 | Sushi Go Party                                      | [docs/games/sushi-go-party.md](docs/games/sushi-go-party.md), [redesign](docs/sushi-go-party-redesign.md) |
 | Little Secret                                       | [docs/games/little-secret.md](docs/games/little-secret.md)                                                |
 | Dominó                                              | [docs/games/domino.md](docs/games/domino.md)                                                              |
+| Jev Codenames guesser lab (`bun run lab:codenames`) | [docs/jev/working-with-jev.md](docs/jev/working-with-jev.md)                                              |
 | Catalog lessons                                     | [docs/games/library-guide-coverage.md](docs/games/library-guide-coverage.md)                              |
 | Home page themes (8-bit store)                      | [docs/pixel-store.md](docs/pixel-store.md)                                                                |
+| 8-bit kit (tech choice, pixel skins)                | [docs/pixel-kit.md](docs/pixel-kit.md), [Codenames skin](docs/codenames-pixel.md)                         |
 | Decisions (ADRs)                                    | [docs/adr/](docs/adr/)                                                                                    |
 | Zombies (separate repo)                             | `../zombies-game` — don't add its deps here                                                               |

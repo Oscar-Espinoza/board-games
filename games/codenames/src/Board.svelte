@@ -5,12 +5,12 @@
   import Icon from './Icon.svelte';
   import './tokens.css';
   import wood from './table/wood.webp';
-  import foliage from './table/foliage.webp';
-  import mug from './table/mug.webp';
-  import coaster from './table/coaster.webp';
-  import notepad from './table/notepad.webp';
-  import books from './table/books.webp';
   import { eventGate, readJson, write } from '@board-games/shared/ui';
+  import {
+    gameSkin,
+    setGameSkin,
+    type Skin,
+  } from '@board-games/shared/ui/pixel';
   import { prefersReducedMotion } from 'svelte/motion';
   import { soundEffects } from './effects.js';
   let {
@@ -27,11 +27,14 @@
     rematch = async () => {},
     errorCode = null,
     roomId,
-    maxPlayers = 8,
+    maxPlayers = 12,
     onInvite,
     copied = false,
     practice = false,
+    note = '',
   }: {
+    /** Short status line shown with the turn controls (e.g. a bot's last move). */
+    note?: string;
     roomId?: string;
     maxPlayers?: number;
     onInvite?: () => Promise<void>;
@@ -107,11 +110,11 @@
     volume = $state(0.5),
     reduced = $state(false),
     mounted = $state(false),
-    showKey = $state(true),
     enlarged = $state(false),
     narrow = $state(window.innerWidth < 1024),
     clueWord = $state(''),
-    clueCount = $state<string>('2');
+    clueCount = $state<string>('2'),
+    layout = $state<'left' | 'center' | 'right'>('center');
   const canClue = $derived(
     s.phase === 'clue' &&
       mine?.role === 'spymaster' &&
@@ -146,6 +149,22 @@
       (event, i, sequence) => event.sequence === sequence && event.index === i,
     ),
     audio = soundEffects();
+  /** Viewer-only look; the 8-bit stylesheet loads the first time it is chosen. */
+  let skin = $state<Skin>(gameSkin('codenames')),
+    pixelReady = $state(false);
+  $effect(() => {
+    if (skin === 'pixel' && !pixelReady)
+      void import('./pixel.css').then(() => (pixelReady = true));
+  });
+  const pixel = $derived(skin === 'pixel' && pixelReady);
+  /** Agent card art that covers a revealed word, like the physical game: two looks
+   * per team and for bystanders, stable per card, drawn for the current skin. */
+  const cardArt = (identity: Identity, index: number) =>
+    `/games/codenames/cards/${pixel ? 'pixel' : 'classic'}/${
+      identity === 'assassin'
+        ? 'assassin'
+        : `${identity === 'civilian' ? 'bystander' : identity}-${index % 2 ? 'b' : 'a'}`
+    }.webp`;
   const animations = new Set<Animation>();
   function stopEffects() {
     for (const animation of animations) animation.cancel();
@@ -230,12 +249,13 @@
     frames: Keyframe[],
     duration: number,
     delay = 0,
+    easing = 'ease-out',
   ) {
     if (!element || reduced || systemReduced) return;
     const animation = element.animate(frames, {
       duration,
       delay,
-      easing: 'ease-out',
+      easing,
     });
     animations.add(animation);
     animation.onfinish = () => animations.delete(animation);
@@ -304,12 +324,37 @@
         if (event.type === 'cardRevealed') {
           const card = root?.querySelector(`[data-card="${event.card}"]`);
           animate(
+            card?.querySelector('.cover') ?? null,
+            [
+              {
+                transform: 'translate(-6%, -55%) rotate(-9deg) scale(1.18)',
+                opacity: 0,
+                boxShadow: '0 22px 26px #0006',
+              },
+              {
+                transform: 'translate(0, 3%) rotate(1.5deg) scale(0.98)',
+                opacity: 1,
+                boxShadow: '0 1px 2px #0006',
+                offset: 0.72,
+              },
+              {
+                transform: 'none',
+                opacity: 1,
+                boxShadow: '0 2px 5px #0005',
+              },
+            ],
+            pixel ? 360 : 460,
+            0,
+            pixel ? 'steps(4, jump-end)' : 'cubic-bezier(.25,.8,.3,1)',
+          );
+          animate(
             card,
             [
-              { transform: 'perspective(600px) rotateX(85deg)', opacity: 0.3 },
-              { transform: 'perspective(600px) rotateX(0)', opacity: 1 },
+              { translate: '0 0' },
+              { translate: '0 2px', offset: 0.72 },
+              { translate: '0 0' },
             ],
-            300,
+            460,
           );
         }
       }
@@ -318,7 +363,7 @@
         : accepted.some((e) => e.type === 'cardRevealed')
           ? 'reveal'
           : null;
-      if (sound && cue) audio.play(volume, cue);
+      if (sound && cue) audio.play(volume, cue, pixel);
     });
   });
   $effect(() => {
@@ -329,7 +374,12 @@
   const systemReduced = $derived(prefersReducedMotion.current);
   $effect(() => {
     if (mounted) {
-      write('codenames:preferences', { sound, volume, reduced, showKey });
+      write('codenames:preferences', {
+        sound,
+        volume,
+        reduced,
+        layout,
+      });
       if (!sound) audio.cancel();
     }
   });
@@ -339,7 +389,7 @@
     if (typeof p.volume === 'number' && Number.isFinite(p.volume))
       volume = Math.min(1, Math.max(0, p.volume));
     reduced = p.reduced === true;
-    showKey = p.showKey !== false;
+    if (p.layout === 'left' || p.layout === 'right') layout = p.layout;
     narrow = window.innerWidth < 1024;
     const textObserver = new ResizeObserver(([entry]) => {
       enlarged = (entry?.contentRect.width ?? 16) > 22;
@@ -380,9 +430,9 @@
   });
 </script>
 
-{#snippet roster()}
+{#snippet roster(only: Team | null = null)}
   <div class="player-list">
-    {#each ['red', 'blue', 'unassigned'] as team}
+    {#each only ? [only] : ['red', 'blue', 'unassigned'] as team}
       <ul>
         {#each players.filter((p) => (s.assignments[p.id]?.team ?? 'unassigned') === team) as p}
           <li>
@@ -406,15 +456,8 @@
 {#snippet keyPanel()}
   <div class="key-heading">
     <h3><Icon name="key" /> {m.cn_spymaster_mode()}</h3>
-    <button
-      class="switch"
-      role="switch"
-      aria-label={m.cn_spymaster_mode()}
-      aria-checked={showKey}
-      onclick={() => (showKey = !showKey)}><span></span></button
-    >
   </div>
-  {#if showKey && key}<div class="key-body">
+  {#if key}<div class="key-body">
       <div class="mini-key" aria-label={m.cn_spymaster_mode()}>
         {#each key as identity, index}<span
             class="key-cell {identity}"
@@ -428,9 +471,11 @@
       </p>
     </div>{/if}
 {/snippet}
-{#snippet history()}
+{#snippet history(only: Team | null = null)}
   <div class="history-list">
-    {#each [...s.clueHistory].reverse() as record (record.turn)}
+    {#each [...s.clueHistory]
+      .reverse()
+      .filter((r) => !only || r.team === only) as record (record.turn)}
       <article class="history-entry">
         <div class="history-title">
           <span class="team-dot {record.team}" aria-hidden="true"></span><b
@@ -457,11 +502,135 @@
     {:else}<p class="empty">{m.cn_history_empty()}</p>{/each}
   </div>
 {/snippet}
+{#snippet teamStatus(team: Team)}
+  <section class="team-status {team}">
+    <h2>{teamLabel(team)}</h2>
+    <div>
+      {#if team === 'red'}<Icon name="agents" />{/if}<strong
+        >{s.remaining[team]}</strong
+      >{#if team === 'blue'}<Icon name="agents" />{/if}
+    </div>
+    <p>{m.cn_agents_remaining()}</p>
+  </section>
+{/snippet}
+{#snippet turnBanner()}
+  <div class="turn-banner glass">
+    <div class="turn-meta">
+      <span class="round-label">{m.cn_round({ turn: s.turn })}</span><strong
+        aria-label={s.result
+          ? m.cn_winner({ team: teamLabel(s.result.team) })
+          : m.cn_team_turn({ team: teamLabel(s.activeTeam) })}
+        class="turn-pill {s.result?.team ?? s.activeTeam}"
+        >{s.result
+          ? m.cn_winner({ team: teamLabel(s.result.team) })
+          : narrow || enlarged
+            ? teamLabel(s.activeTeam)
+            : m.cn_team_turn({ team: teamLabel(s.activeTeam) })}</strong
+      >
+    </div>
+    <div class="action-bar">
+      {#if canClue}<button
+          class="give-clue"
+          {disabled}
+          onclick={(e) => open('clue', e.currentTarget)}
+          >{m.cn_give_clue()}</button
+        >
+      {:else if s.phase === 'clue'}<p>
+          {m.cn_wait_clue({ team: teamLabel(s.activeTeam) })}
+        </p>
+      {:else if s.phase === 'guessing' && s.clue}<p class="active-clue">
+          <b
+            >{s.clue.word} · {s.clue.count === 'unlimited'
+              ? '∞'
+              : s.clue.count}</b
+          ><span>{guessesLeft}</span>
+        </p>
+        {#if guessing}<button
+            disabled={disabled || s.used < 1}
+            title={s.used < 1 ? m.cn_end_turn_first() : undefined}
+            aria-describedby={s.used < 1 ? 'cn-first-guess' : undefined}
+            onclick={() => act({ type: 'endTurn' })}>{m.cn_end_turn()}</button
+          >{#if s.used < 1}<small id="cn-first-guess"
+              >{m.cn_end_turn_first()}</small
+            >{/if}{/if}
+      {:else if s.result}<button
+          onclick={(e) => open('result', e.currentTarget)}
+          >{m.cn_finished()}</button
+        >{/if}
+      {#if note}<small class="table-note" aria-live="polite">{note}</small>{/if}
+    </div>
+  </div>
+{/snippet}
+{#snippet board()}
+  <div class="board-area">
+    <main
+      class="word-grid"
+      aria-label={m.cn_title()}
+      aria-describedby="cn-guess-reason"
+    >
+      {#each s.board as card}
+        {@const identity = card.identity ?? view.private.key?.[card.index]}
+        <button
+          class="dossier {identity ?? 'unknown'}"
+          class:revealed={card.revealed}
+          class:key={!!identity && !card.revealed}
+          class:selected={selected === card.index}
+          data-card={card.index}
+          data-identity={identity}
+          title={card.revealed ? card.word : undefined}
+          disabled={disabled || !guessing || card.revealed}
+          aria-label={`${card.word}${identity ? ` · ${identityLabel(identity)} · ${card.revealed ? m.cn_revealed() : m.cn_unrevealed()}` : ''}`}
+          aria-pressed={selected === card.index}
+          onclick={(e) => choose(card.index, e.currentTarget)}
+        >
+          <strong class:long={card.word.length >= 10}>{card.word}</strong>
+          {#if card.revealed && card.identity}<span
+              class="cover {card.identity}"
+              aria-hidden="true"
+              ><img
+                class="cover-art"
+                src={cardArt(card.identity, card.index)}
+                alt=""
+                decoding="async"
+                draggable="false"
+              /></span
+            >{/if}
+        </button>
+      {/each}
+    </main>
+  </div>
+{/snippet}
+{#snippet historySection(team: Team | null)}
+  <section class="history-panel glass" aria-label={m.cn_clue_history()}>
+    <header>
+      <h2>{m.cn_clue_history()}</h2>
+      {#if !team}<small>{m.cn_round({ turn: s.turn })}</small>{/if}
+    </header>
+    {@render history(team)}
+  </section>
+{/snippet}
+{#snippet playersSection(team: Team | null)}
+  <section class="players-panel glass">
+    <h2>
+      {m.cn_players_count({
+        count: team
+          ? players.filter((p) => s.assignments[p.id]?.team === team).length
+          : players.length,
+      })}
+    </h2>
+    {@render roster(team)}
+  </section>
+{/snippet}
 <section
   data-phase={s.phase}
   data-active-team={s.activeTeam}
+  data-layout={layout}
   class="cn-table cn-table-tokens"
-  style:--cn-wood-image={`url("${wood}")`}
+  class:px-tokens={pixel}
+  class:cn-pixel={pixel}
+  style:--cn-wood-image={pixel
+    ? 'url("/games/codenames/pixel/table.webp")'
+    : `url("${wood}")`}
   class:reduced={reduced || systemReduced}
   class:enlarged
   class:compact={narrow || enlarged}
@@ -469,91 +638,49 @@
   aria-label={m.cn_title()}
 >
   <span class="text-measure" aria-hidden="true"></span>
-  <!-- Compact layouts hide props; not rendering them skips ~330 KB of downloads. -->
-  {#if !narrow}
-    <div class="props" aria-hidden="true">
-      <img class="prop foliage" src={foliage} alt="" /><img
-        class="prop coaster"
-        src={coaster}
-        alt=""
-      /><img class="prop mug" src={mug} alt="" /><img
-        class="prop notepad"
-        src={notepad}
-        alt=""
-      /><img class="prop books" src={books} alt="" />
-    </div>
-  {/if}
-  <header class="table-header glass">
-    <div class="brand">
-      <Icon name="logo" />
-      <h1>{m.cn_title()}</h1>
-    </div>
-    <nav class="main-nav" aria-label={m.cn_title()}>
-      <span aria-current="page">{m.cn_nav_play()}</span><button
-        onclick={(e) => open('rules', e.currentTarget)}>{m.cn_nav_how()}</button
-      ><button onclick={(e) => open('about', e.currentTarget)}
-        >{m.cn_nav_about()}</button
-      >
-    </nav>
-    <div class="room-meta">
-      {#if practice}<span>{m.cn_practice()}</span>{:else if roomId}<button
-          class="invite"
-          disabled={!onInvite}
-          onclick={() => void onInvite?.()}
-          aria-label={copied ? m.copied() : m.invite()}
-          ><span>{m.cn_room({ room: roomId })}</span><Icon
-            name="invite"
-          /></button
-        >{/if}
-    </div>
-    <span class="seat-count" aria-label={m.cn_seats()}
-      ><Icon name="players" /> {players.length}/{maxPlayers}</span
-    >
-    <div class="viewer">
-      <span class="avatar"
-        >{viewer?.name
-          .split(/\s+/)
-          .slice(0, 2)
-          .map((n) => n[0])
-          .join('')}</span
-      ><span
-        ><b>{viewer?.name}</b><small
-          >{connected ? m.cn_online() : m.disconnected()}<i
-            class:online={connected}
-          ></i></small
-        ></span
-      >
-    </div>
-    <nav class="tools" aria-label={m.cn_settings()}>
-      <button
-        class="compact-history"
-        aria-label={m.cn_clue_history()}
-        title={m.cn_clue_history()}
-        onclick={(e) => open('history', e.currentTarget)}
-        ><Icon name="history" /></button
-      >
-      <button
-        class="compact-players"
-        aria-label={m.cn_players_count({ count: players.length })}
-        title={m.cn_players_count({ count: players.length })}
-        onclick={(e) => open('players', e.currentTarget)}
-        ><Icon name="players" /></button
-      >
-      {#if key}<button
-          class="compact-key"
-          aria-label={m.cn_spymaster_mode()}
-          title={m.cn_spymaster_mode()}
-          onclick={(e) => open('key', e.currentTarget)}
-          ><Icon name="key" /></button
-        >{/if}
-      <button
-        aria-label={m.cn_settings()}
-        title={m.cn_settings()}
-        onclick={(e) => open('settings', e.currentTarget)}
-        ><Icon name="settings" /></button
-      >
-    </nav>
-  </header>
+  <button
+    class="corner book"
+    aria-label={m.cn_rules()}
+    title={m.cn_rules()}
+    onclick={(e) => open('rules', e.currentTarget)}
+    ><svg viewBox="0 0 36 30" aria-hidden="true"
+      ><path
+        d="M18 7Q10 1 3 5v21q8-4 15 1 7-5 15-1V5q-7-4-15 2Z"
+        fill="#efe1bd"
+        stroke="#be9557"
+        stroke-width="1.5"
+      /><path
+        d="M18 7v20M7 10l7 2M7 15l7 2M22 12l7-2M22 17l7-2"
+        stroke="#7a2f2a"
+        stroke-width="1.3"
+      /></svg
+    ></button
+  >
+  <button
+    class="corner gear"
+    aria-label={m.cn_settings()}
+    title={m.cn_settings()}
+    onclick={(e) => open('settings', e.currentTarget)}
+    ><svg viewBox="0 0 32 32" aria-hidden="true"
+      ><path
+        d="M13.4 2.5h5.2l.9 3.6 2.6 1.1 3.2-1.9 3.7 3.7-1.9 3.2 1.1 2.6 3.6.9v5.2l-3.6.9-1.1 2.6 1.9 3.2-3.7 3.7-3.2-1.9-2.6 1.1-.9 3.6h-5.2l-.9-3.6-2.6-1.1-3.2 1.9-3.7-3.7 1.9-3.2-1.1-2.6-3.6-.9v-5.2l3.6-.9 1.1-2.6-1.9-3.2 3.7-3.7 3.2 1.9 2.6-1.1Z"
+        fill="#efe1bd"
+        stroke="#be9557"
+        stroke-width="1.5"
+        stroke-linejoin="round"
+      /><circle
+        cx="16"
+        cy="16"
+        r="5"
+        fill="#7a2f2a"
+        stroke="#be9557"
+        stroke-width="1.3"
+      /></svg
+    ></button
+  >
+  {#if s.phase !== 'setup' && !(narrow || enlarged)}<p class="wordmark">
+      <Icon name="logo" />{m.cn_title()}
+    </p>{/if}
   {#if !connected}<p class="notice" role="status">{m.cn_offline()}</p>{/if}
   {#if localError}<p class="notice" role="alert">{localError}</p>{/if}
   {#if s.phase === 'setup'}
@@ -616,112 +743,71 @@
       >
       <p class="hint">{m.cn_wait_ready()}</p>
     </div>
-  {:else}
+  {:else if narrow || enlarged}
+    <!-- Compact: slim status bar, the board, and a drawer for history and players. -->
     <div class="table-layout">
       <div class="team-row">
-        <section class="team-status red">
-          <h2>{m.cn_red()}</h2>
-          <div><Icon name="agents" /><strong>{s.remaining.red}</strong></div>
-          <p>{m.cn_agents_remaining()}</p>
-        </section>
-        <div class="turn-banner glass">
-          <div class="turn-meta">
-            <span class="round-label">{m.cn_round({ turn: s.turn })}</span
-            ><strong
-              aria-label={s.result
-                ? m.cn_winner({ team: teamLabel(s.result.team) })
-                : m.cn_team_turn({ team: teamLabel(s.activeTeam) })}
-              class="turn-pill {s.result?.team ?? s.activeTeam}"
-              >{s.result
-                ? m.cn_winner({ team: teamLabel(s.result.team) })
-                : narrow || enlarged
-                  ? teamLabel(s.activeTeam)
-                  : m.cn_team_turn({ team: teamLabel(s.activeTeam) })}</strong
-            >
-          </div>
-          <div class="action-bar">
-            {#if canClue}<button
-                class="give-clue"
-                {disabled}
-                onclick={(e) => open('clue', e.currentTarget)}
-                >{m.cn_give_clue()}</button
-              >
-            {:else if s.phase === 'clue'}<p>
-                {m.cn_wait_clue({ team: teamLabel(s.activeTeam) })}
-              </p>
-            {:else if s.phase === 'guessing' && s.clue}<p class="active-clue">
-                <b
-                  >{s.clue.word} · {s.clue.count === 'unlimited'
-                    ? '∞'
-                    : s.clue.count}</b
-                ><span>{guessesLeft}</span>
-              </p>
-              {#if guessing}<button
-                  disabled={disabled || s.used < 1}
-                  title={s.used < 1 ? m.cn_end_turn_first() : undefined}
-                  aria-describedby={s.used < 1 ? 'cn-first-guess' : undefined}
-                  onclick={() => act({ type: 'endTurn' })}
-                  >{m.cn_end_turn()}</button
-                >{#if s.used < 1}<small id="cn-first-guess"
-                    >{m.cn_end_turn_first()}</small
-                  >{/if}{/if}
-            {:else if s.result}<button
-                onclick={(e) => open('result', e.currentTarget)}
-                >{m.cn_finished()}</button
-              >{/if}
-          </div>
-        </div>
-        <section class="team-status blue">
-          <h2>{m.cn_blue()}</h2>
-          <div><strong>{s.remaining.blue}</strong><Icon name="agents" /></div>
-          <p>{m.cn_agents_remaining()}</p>
-        </section>
+        {@render teamStatus('red')}{@render turnBanner()}{@render teamStatus(
+          'blue',
+        )}
       </div>
-      <main
-        class="word-grid"
-        aria-label={m.cn_title()}
-        aria-describedby="cn-guess-reason"
-      >
-        {#each s.board as card}
-          {@const identity =
-            card.identity ??
-            (showKey ? view.private.key?.[card.index] : undefined)}
-          <button
-            class="dossier {identity ?? 'unknown'}"
-            class:revealed={card.revealed}
-            class:key={!!identity && !card.revealed}
-            class:selected={selected === card.index}
-            data-card={card.index}
-            data-identity={identity}
-            disabled={disabled || !guessing || card.revealed}
-            aria-label={`${card.word}${identity ? ` · ${identityLabel(identity)} · ${card.revealed ? m.cn_revealed() : m.cn_unrevealed()}` : ''}`}
-            aria-pressed={selected === card.index}
-            onclick={(e) => choose(card.index, e.currentTarget)}
-          >
-            <strong class:long={card.word.length >= 10}>{card.word}</strong>
-          </button>
-        {/each}
-      </main>
-      <span id="cn-guess-reason" class="sr-only"
-        >{!guessing ? m.cn_wait_guess() : m.cn_confirm_hint()}</span
-      >
-      <div class="bottom-panels" class:with-key={!!key}>
-        <section class="players-panel glass">
-          <h2>{m.cn_players_count({ count: players.length })}</h2>
-          {@render roster()}
-        </section>
+      {@render board()}
+      <nav class="drawer" aria-label={m.cn_settings()}>
+        <button
+          aria-label={m.cn_clue_history()}
+          onclick={(e) => open('history', e.currentTarget)}
+          ><Icon name="history" /><span class="label"
+            >{s.clueHistory.length}</span
+          ></button
+        ><button
+          aria-label={m.cn_players_count({ count: players.length })}
+          onclick={(e) => open('players', e.currentTarget)}
+          ><Icon name="players" /><span class="label">{players.length}</span
+          ></button
+        >{#if key}<button
+            aria-label={m.cn_spymaster_mode()}
+            onclick={(e) => open('key', e.currentTarget)}
+            ><Icon name="key" /></button
+          >{/if}
+      </nav>
+    </div>
+  {:else if layout === 'center'}
+    <div class="table-layout">
+      {#each ['red', 'blue'] as t}{@const team = t as Team}
+        <div class="cell score-{team}">{@render teamStatus(team)}</div>
+        <div class="cell stack history-{team}">
+          {@render historySection(team)}
+          {#if key && (mine?.team ?? 'red') === team}<section
+              class="key-panel glass"
+            >
+              {@render keyPanel()}
+            </section>{/if}
+        </div>
+        <div class="cell players-{team}">{@render playersSection(team)}</div>
+      {/each}
+      {@render board()}
+      {@render turnBanner()}
+    </div>
+  {:else}
+    <div class="table-layout">
+      <aside class="rail info">
+        <div class="score-row">
+          {@render teamStatus('red')}{@render teamStatus('blue')}
+        </div>
+        {@render turnBanner()}
+        {@render historySection(null)}
+        {@render playersSection(null)}
         {#if key}<section class="key-panel glass">
             {@render keyPanel()}
           </section>{/if}
-      </div>
-      <aside class="history-panel glass" aria-label={m.cn_clue_history()}>
-        <header>
-          <h2>{m.cn_clue_history()}</h2>
-          <small>{m.cn_round({ turn: s.turn })}</small>
-        </header>
-        {@render history()}
       </aside>
+      {@render board()}
     </div>
+  {/if}
+  {#if s.phase !== 'setup'}
+    <span id="cn-guess-reason" class="sr-only"
+      >{!guessing ? m.cn_wait_guess() : m.cn_confirm_hint()}</span
+    >
     {#if announce}<p class="deal-notice" role="status">
         {m.cn_starts({ team: teamLabel(s.startingTeam) })}
       </p>{/if}
@@ -733,6 +819,8 @@
 
 <dialog
   class="cn-dialog cn-table-tokens"
+  class:px-tokens={pixel}
+  class:cn-pixel={pixel}
   bind:this={dialog}
   class:confirmation={panel === 'confirm'}
   class:result={panel === 'result'}
@@ -858,6 +946,47 @@
           >{m.cn_winner({ team: teamLabel(s.result.team) })}</button
         >{/if}
     {/if}
+    <fieldset class="layout-choice skin-choice">
+      <legend>{m.cn_skin()}</legend>
+      {#each [['classic', m.cn_skin_classic()], ['pixel', m.cn_skin_pixel()]] as [value, label]}<label
+          ><input
+            type="radio"
+            name="cn-skin"
+            {value}
+            checked={skin === value}
+            onchange={() => {
+              skin = value as Skin;
+              setGameSkin('codenames', skin);
+            }}
+          />{label}</label
+        >{/each}
+    </fieldset>
+    <fieldset class="layout-choice">
+      <legend>{m.cn_layout()}</legend>
+      {#each [['left', m.cn_layout_left()], ['center', m.cn_layout_center()], ['right', m.cn_layout_right()]] as [value, label]}<label
+          ><input
+            type="radio"
+            name="cn-layout"
+            {value}
+            bind:group={layout}
+          />{label}</label
+        >{/each}
+    </fieldset>
+    {#if practice || roomId}<p class="room-line">
+        {#if practice}{m.cn_practice()}{:else if roomId}<button
+            class="invite"
+            disabled={!onInvite}
+            onclick={() => void onInvite?.()}
+            ><span>{m.cn_room({ room: roomId })}</span><Icon name="invite" />
+            {copied ? m.copied() : m.invite()}</button
+          >{/if}
+        <span><Icon name="players" /> {players.length}/{maxPlayers}</span>
+        {#if viewer}<span
+            >{viewer.name} · {connected
+              ? m.cn_online()
+              : m.disconnected()}</span
+          >{/if}
+      </p>{/if}
     <div class="preferences">
       <label
         ><input

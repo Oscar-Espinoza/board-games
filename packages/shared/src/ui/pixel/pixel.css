@@ -1,0 +1,72 @@
+/* Shared 8-bit kit: font, palette and hard-edged primitives for pixel skins.
+   Rules: no blur, no rotation, no gradients on UI chrome; sprites pixelated;
+   motion uses steps(). See docs/pixel-kit.md. */
+@font-face {
+  font-family: 'Jersey 10';
+  src: url('/fonts/pixel/jersey-10-400.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Pixelify Sans';
+  src: url('/fonts/pixel/pixelify-sans-400.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Pixelify Sans';
+  src: url('/fonts/pixel/pixelify-sans-700.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+.px-tokens {
+  /* Jersey 10: single weight, so never synthesize bold (it smears the pixels). */
+  --px-font: 'Jersey 10', system-ui, sans-serif;
+  font-synthesis: none;
+  --px-ink: #1a0f08;
+  --px-wood: #5b3620;
+  --px-wood-dark: #3a2213;
+  --px-wood-edge: #8a5a32;
+  --px-cream: #f6e7c8;
+  --px-paper: #efdcb2;
+  --px-paper-edge: #b98f58;
+  --px-gold: #f2c14e;
+  --px-green: #3f9a4a;
+  --px-red: #c8453a;
+  --px-red-dark: #7a2019;
+  --px-blue: #2f6fce;
+  --px-blue-dark: #173a78;
+  --px-shadow: #0000008c;
+  /* One "pixel" of chrome. Borders and shadows are whole multiples of it. */
+  --px: 3px;
+}
+.px-panel {
+  background: var(--px-wood);
+  color: var(--px-cream);
+  border: calc(var(--px) + 1px) solid var(--px-wood-dark);
+  box-shadow:
+    inset 0 0 0 var(--px) var(--px-wood-edge),
+    0 calc(var(--px) * 2) 0 var(--px-ink);
+  border-radius: 0;
+}
+.px-button {
+  font-family: var(--px-font);
+  background: var(--px-gold);
+  color: var(--px-ink);
+  border: var(--px) solid var(--px-ink);
+  border-radius: 0;
+  box-shadow:
+    inset calc(var(--px) * -1) calc(var(--px) * -1) 0 #0000004d,
+    inset var(--px) var(--px) 0 #ffffff66,
+    0 var(--px) 0 var(--px-ink);
+  cursor: pointer;
+}
+.px-button:enabled:active {
+  translate: 0 var(--px);
+  box-shadow:
+    inset var(--px) var(--px) 0 #0000004d,
+    0 0 0 var(--px-ink);
+}
+.px-sprite {
+  image-rendering: pixelated;
+}

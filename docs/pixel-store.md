@@ -33,7 +33,7 @@ The cell aspect goes in `cells` (`shopkeeper.ts`); `stride` is the scene-width %
 cycle covers, so walk durations keep the feet planted instead of skating.
 
 `store.webp` is the unkeyed background saved as WebP quality 80. Raw generations are not committed.
-Pixelify Sans is bundled under `static/fonts/pixel-store/` (OFL).
+Pixelify Sans is bundled under `static/fonts/pixel/` (OFL) and loaded by the shared kit (`packages/shared/src/ui/pixel/pixel.css`, see [pixel-kit](pixel-kit.md)).
 
 ## Prompts
 
