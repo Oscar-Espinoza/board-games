@@ -12,6 +12,14 @@
   import { eventGate, readJson, write } from '@board-games/shared/ui';
   import { prefersReducedMotion } from 'svelte/motion';
   import { soundEffects } from './effects.js';
+  import {
+    gameSkin,
+    setGameSkin,
+    type Skin,
+  } from '@board-games/shared/ui/pixel';
+  import { providePixel } from './pixel/context.js';
+  import Sprite from './pixel/Sprite.svelte';
+  import type { PixelCue } from './pixel/sound.js';
   let {
     view,
     playerId,
@@ -73,6 +81,54 @@
   const systemReduced = $derived(prefersReducedMotion.current);
   const audio = soundEffects(),
     animations = new Set<Animation>();
+  // 8-bit skin: viewer-only. Its CSS and chiptune pack load only when chosen.
+  let skin = $state<Skin>(gameSkin('little-secret')),
+    pixelReady = $state(false),
+    chip = $state<((cue: PixelCue) => void) | null>(null),
+    stamped = $state<string[]>([]);
+  $effect(() => {
+    if (skin === 'pixel' && !pixelReady)
+      void Promise.all([
+        import('./pixel.css'),
+        import('./pixel/sound.js'),
+      ]).then(([, sound]) => {
+        chip = sound.chiptune(audio.audio);
+        pixelReady = true;
+      });
+  });
+  const pixel = $derived(skin === 'pixel' && pixelReady);
+  providePixel(() => pixel);
+  const still = $derived(reduced || systemReduced);
+  function cue(name: PixelCue) {
+    if (pixel && sound && chip) chip(name);
+  }
+  /** One chiptune cue for a batch of accepted events, most dramatic first. */
+  function pixelCue(events: Event[]): PixelCue {
+    const score = events.find((e) => e.type === 'score');
+    if (score?.type === 'score')
+      return (score.points[playerId] ?? 0) > 0
+        ? 'win'
+        : s.result?.reason === 'survivors'
+          ? 'escaped'
+          : 'lose';
+    const out = events.find((e) => e.type === 'elimination');
+    if (out?.type === 'elimination')
+      return out.role === 'disciple' ? 'vote' : 'caught';
+    const guess = events.find((e) => e.type === 'guess');
+    if (guess?.type === 'guess') return guess.correct ? 'win' : 'lose';
+    if (events.some((e) => e.type === 'ballots')) return 'reveal';
+    if (events.some((e) => e.type === 'deal')) return 'deal';
+    return 'vote';
+  }
+  let lastSpeaker: string | null = null;
+  $effect(() => {
+    const speaker = s.speaker;
+    untrack(() => {
+      if (speaker && lastSpeaker && speaker !== lastSpeaker && mounted)
+        cue('turn');
+      lastSpeaker = speaker;
+    });
+  });
   function cancel() {
     for (const a of animations) a.cancel();
     animations.clear();
@@ -111,6 +167,10 @@
     localError = '';
     try {
       await send(action);
+      const type = (action as { type: string }).type;
+      if (type === 'clue') cue('clue');
+      else if (type === 'vote' || type === 'rps') cue('vote');
+      else if (type !== 'guess') cue('select');
     } catch {
       localError = m.ls_error();
     } finally {
@@ -141,6 +201,7 @@
       secret = false;
       ballotReview = null;
       answer = '';
+      stamped = [];
     });
   });
   $effect(() => {
@@ -173,6 +234,9 @@
       if (!mounted || document.hidden) return;
       const reveal = accepted.find((e) => e.type === 'ballots');
       if (reveal?.type === 'ballots') ballotReview = reveal;
+      stamped = accepted.flatMap((e) =>
+        e.type === 'elimination' ? [e.player] : [],
+      );
       if (accepted.length && !reduced && !systemReduced && root?.animate) {
         const a = root.animate([{ opacity: 0.82 }, { opacity: 1 }], {
           duration: 240,
@@ -180,11 +244,14 @@
         animations.add(a);
         a.onfinish = () => animations.delete(a);
       }
-      if (sound && accepted.length)
-        audio.play(
-          0.35,
-          accepted.some((e) => e.type === 'score') ? 'finish' : 'reveal',
-        );
+      if (sound && accepted.length) {
+        if (pixel && chip) chip(pixelCue(accepted));
+        else
+          audio.play(
+            0.35,
+            accepted.some((e) => e.type === 'score') ? 'finish' : 'reveal',
+          );
+      }
     });
   });
   $effect(() => {
@@ -218,6 +285,9 @@
 
 <section
   class="ls-table"
+  class:px-tokens={pixel}
+  class:ls-pixel={pixel}
+  class:still={pixel && still}
   class:result-stage={!!s.result && !ballotReview}
   class:dense={players.length > 6}
   data-testid="little-secret-board"
@@ -244,6 +314,19 @@
         >{/each}
     </h1>
     <p>{practice ? m.ls_practice() : m.ls_briefing()}</p>
+    {#if pixel}<span class="brand-cat"
+        ><Sprite
+          sheet="mascot"
+          frame={s.result?.winners.length
+            ? 'cheer'
+            : s.result || ballotReview
+              ? 'look'
+              : secret
+                ? 'shh'
+                : 'idle'}
+          scale={2}
+        /></span
+      >{/if}
   </header>
   <div class="phase-banner">
     <Paper kind="banner"
@@ -280,6 +363,7 @@
                 onclick={() => {
                   gesture();
                   target = p.id;
+                  cue('select');
                 }}
                 ><PlayerToken
                   name={p.name}
@@ -328,8 +412,13 @@
               ? ' ◆'
               : ''}</small
           >
-          {#if s.result || s.revealed[p.id]}<small class="role-stamp"
-              >{role(s.result?.roles[p.id] ?? s.revealed[p.id]!)}</small
+          {#if s.result || s.revealed[p.id]}<small
+              class="role-stamp"
+              class:drop={pixel && stamped.includes(p.id)}
+              >{#if pixel}<Sprite
+                  sheet="icons"
+                  frame={s.result?.roles[p.id] ?? s.revealed[p.id]!}
+                />{/if}{role(s.result?.roles[p.id] ?? s.revealed[p.id]!)}</small
             >{/if}
           {#if !p.connected}<small class="status-stamp">{m.ls_offline()}</small
             >{/if}
@@ -465,7 +554,13 @@
                     onclick={() => {
                       gesture();
                       symbol = value as Symbol;
-                    }}>{m[`ls_${value as Symbol}`]()}</button
+                      cue('select');
+                    }}
+                    >{#if pixel}<Sprite
+                        sheet="icons"
+                        frame={value}
+                        scale={2}
+                      />{/if}{m[`ls_${value as Symbol}`]()}</button
                   >{/each}
               </div>
               <button
@@ -554,31 +649,42 @@
                   onclick={() => {
                     gesture();
                     secret = !secret;
+                    cue(secret ? 'open' : 'select');
                   }}
                   >{secret ? m.ls_conceal() : m.ls_reveal()}
-                  <svg
-                    class="envelope-mark"
-                    viewBox="0 0 64 44"
-                    aria-hidden="true"
-                    ><rect
-                      x="2"
-                      y="2"
-                      width="60"
-                      height="40"
-                      rx="2"
-                      fill="#f6e9ca"
-                      stroke="#a38960"
-                    /><path
-                      d="M2 2l30 25L62 2M2 42l20-17m40 17L42 25"
-                      fill="none"
-                      stroke="#a38960"
-                    /><circle cx="32" cy="27" r="9" fill="#823f3b" /><path
-                      d="M26 27q6-8 12 0-6 8-12 0z"
-                      fill="none"
-                      stroke="#e1ba75"
-                    /></svg
-                  ></button
-                >{#if secret}<div data-testid="own-secret">
+                  {#if pixel}<Sprite
+                      sheet="envelope"
+                      frame={secret ? 'open' : 'closed'}
+                      scale={1.5}
+                    />{:else}<svg
+                      class="envelope-mark"
+                      viewBox="0 0 64 44"
+                      aria-hidden="true"
+                      ><rect
+                        x="2"
+                        y="2"
+                        width="60"
+                        height="40"
+                        rx="2"
+                        fill="#f6e9ca"
+                        stroke="#a38960"
+                      /><path
+                        d="M2 2l30 25L62 2M2 42l20-17m40 17L42 25"
+                        fill="none"
+                        stroke="#a38960"
+                      /><circle cx="32" cy="27" r="9" fill="#823f3b" /><path
+                        d="M26 27q6-8 12 0-6 8-12 0z"
+                        fill="none"
+                        stroke="#e1ba75"
+                      /></svg
+                    >{/if}</button
+                >{#if secret}<div
+                    class="letter"
+                    data-testid="own-secret"
+                    {@attach (el) => {
+                      if (pixel) el.scrollIntoView({ block: 'nearest' });
+                    }}
+                  >
                     <h3>{m.ls_envelope()}</h3>
                     <strong class="password"
                       >{mine.role === 'journalist'
@@ -602,9 +708,20 @@
     </main>
   </div>
   <SideSheet state={s} {players} onreview={(event) => (ballotReview = event)} />
+  {#if pixel && !still && s.result?.winners.length && !ballotReview}<div
+      class="px-confetti"
+      aria-hidden="true"
+    >
+      {#each { length: 28 } as _, i}<i
+          style={`--x:${(i * 37) % 100}%;--d:${(i % 7) * 0.23}s;--t:${2.4 + (i % 5) * 0.35}s;--c:${['#f2c14e', '#c8453a', '#3f9a4a', '#2f6fce', '#f6e7c8'][i % 5]}`}
+        ></i>{/each}
+    </div>{/if}
 </section>
 <dialog
   bind:this={dialog}
+  class="ls-dialog"
+  class:px-tokens={pixel}
+  class:ls-pixel={pixel}
   oncancel={(e) => {
     e.preventDefault();
     close();
@@ -620,7 +737,24 @@
   {#if panel === 'rules'}{@render rulesContent?.()}{:else if panel === 'settings'}<div
       class="settings"
     >
-      {@render settingsContent?.()}<label class="check"
+      {@render settingsContent?.()}
+      <fieldset class="skin-choice">
+        <legend>{m.skin()}</legend>
+        {#each [['classic', m.skin_classic()], ['pixel', m.skin_pixel()]] as [value, label]}<label
+            class="check"
+            ><input
+              type="radio"
+              name="ls-skin"
+              {value}
+              checked={skin === value}
+              onchange={() => {
+                skin = value as Skin;
+                setGameSkin('little-secret', skin);
+              }}
+            />{label}</label
+          >{/each}
+      </fieldset>
+      <label class="check"
         ><input
           type="checkbox"
           bind:checked={sound}
@@ -1002,6 +1136,18 @@
   .settings {
     display: grid;
     gap: 16px;
+  }
+  .skin-choice {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    margin: 0;
+    padding: 10px 14px 12px;
+    border: 1px solid #b69d76;
+    border-radius: 4px;
+  }
+  .skin-choice legend {
+    padding: 0 6px;
   }
   button:focus-visible,
   input:focus-visible,

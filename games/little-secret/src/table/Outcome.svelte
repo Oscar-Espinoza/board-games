@@ -2,6 +2,9 @@
   import type { Public, Role } from '../types.js';
   import { m } from '@board-games/shared/messages';
   import PlayerToken from './PlayerToken.svelte';
+  import { usePixel } from '../pixel/context.js';
+  import Sprite from '../pixel/Sprite.svelte';
+  const pixel = usePixel();
   let {
     state,
     players,
@@ -20,17 +23,40 @@
   ]);
 </script>
 
-<div class="outcome" data-testid="ls-outcome">
-  <div class="emblems" aria-hidden="true">
-    {#each factions as faction}<span
-        class:infiltrator={faction === 'infiltrator'}
-        >{faction === 'disciple'
-          ? '✦'
-          : faction === 'journalist'
-            ? '✒'
-            : '◈'}</span
-      >{/each}
-  </div>
+<div class="outcome" class:px={pixel()} data-testid="ls-outcome">
+  {#if pixel()}<div class="px-scene" aria-hidden="true">
+      <Sprite
+        sheet="props"
+        frame={state.result!.winners.length
+          ? 'trophy'
+          : state.result!.reason === 'disciples'
+            ? 'cuffs'
+            : state.result!.reason === 'guess'
+              ? 'open'
+              : 'door'}
+        scale={2}
+      />
+      {#each factions as faction}<Sprite
+          sheet="icons"
+          frame={faction}
+          scale={2}
+        />{/each}
+      {#if state.result!.winners.length}<Sprite
+          sheet="mascot"
+          frame="cheer"
+          scale={2}
+        />{/if}
+    </div>{:else}
+    <div class="emblems" aria-hidden="true">
+      {#each factions as faction}<span
+          class:infiltrator={faction === 'infiltrator'}
+          >{faction === 'disciple'
+            ? '✦'
+            : faction === 'journalist'
+              ? '✒'
+              : '◈'}</span
+        >{/each}
+    </div>{/if}
   <h3>
     {state.result!.winners.length
       ? m.ls_winners()

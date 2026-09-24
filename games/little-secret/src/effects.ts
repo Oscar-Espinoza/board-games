@@ -9,6 +9,8 @@ export function soundEffects() {
     finish: [440, 660, 0.28, 'sine'],
   } as const;
   return {
+    /** The shared instance, reused by the 8-bit chiptune pack. */
+    audio,
     unlock: audio.unlock,
     play(volume: number, cue: keyof typeof cues) {
       const [from, to, duration, type] = cues[cue];

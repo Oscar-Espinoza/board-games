@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { usePixel } from '../pixel/context.js';
+  import Sprite from '../pixel/Sprite.svelte';
+  const pixel = usePixel();
   let {
     name,
     seat,
@@ -12,15 +15,26 @@
   } = $props();
 </script>
 
-<div class="player-token" class:lit={active} class:muted aria-hidden="true">
-  <span
-    >{name
-      .trim()
-      .split(/\s+/)
-      .map((part) => part[0])
-      .slice(0, 2)
-      .join('')}</span
-  >
+<div
+  class="player-token"
+  class:lit={active}
+  class:muted
+  class:px={pixel()}
+  aria-hidden="true"
+>
+  {#if pixel()}<Sprite
+      sheet="suspects"
+      frame={String((seat - 1) % 9)}
+      row={muted ? 1 : 0}
+      fill
+    />{:else}<span
+      >{name
+        .trim()
+        .split(/\s+/)
+        .map((part) => part[0])
+        .slice(0, 2)
+        .join('')}</span
+    >{/if}
   <small>{String(seat).padStart(2, '0')}</small>
 </div>
 
