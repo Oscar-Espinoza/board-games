@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { onMount, tick, untrack, type Snippet } from 'svelte';
+  import { onMount, setContext, tick, untrack, type Snippet } from 'svelte';
+  import {
+    gameSkin,
+    setGameSkin,
+    type Skin,
+  } from '@board-games/shared/ui/pixel';
+  import { skinKey } from './palette.js';
   import { m } from '@board-games/shared/messages';
   import type { Locale } from '@board-games/shared/runtime';
   import {
@@ -90,9 +96,25 @@
   const ring = $derived(
     ringGeometry(visual.factories.length, phone ? 'compact' : 'tabletop'),
   );
+  // Viewer-only table skin: the 8-bit styles and chiptunes load only when chosen.
+  let skin = $state<Skin>(gameSkin('azul')),
+    pixelReady = $state(false),
+    chiptunes = $state.raw<import('./pixel/sound.js').PixelSounds | null>(null);
+  $effect(() => {
+    if (skin === 'pixel' && !pixelReady)
+      void Promise.all([
+        import('./pixel.css'),
+        import('./pixel/sound.js'),
+      ]).then(([, sounds]) => {
+        chiptunes = sounds.pixelSounds(audio.raw);
+        pixelReady = true;
+      });
+  });
+  const pixel = $derived(skin === 'pixel' && pixelReady);
+  setContext(skinKey, () => pixel);
   const gate = new RevisionGate(),
     audio = ceramicAudio(),
-    flights = tileFlights();
+    flights = tileFlights(() => pixel);
   let opener: HTMLElement | null = null,
     epoch = 0,
     flightScrollTop = 0;
@@ -234,11 +256,13 @@
     };
     destination = null;
     notice = '';
+    audio.chip((p) => p.pick());
     if (phone) open('draft');
   }
   function chooseDestination(d: Destination) {
     settle();
     destination = d;
+    audio.chip((p) => (d.kind === 'floor' ? p.floor() : p.place()));
   }
   async function confirm() {
     if (
@@ -326,6 +350,11 @@
     };
   });
   $effect(() => {
+    audio.pixel = pixel ? chiptunes : null;
+    // Switching skins moves every anchor, so restart from a silent baseline.
+    if (untrack(() => mounted)) untrack(baseline);
+  });
+  $effect(() => {
     const prefs = { sound, volume, motion };
     audio.configure(sound, volume);
     // System motion changes also restart presentation from a fresh baseline.
@@ -395,9 +424,11 @@
             after,
             (step) => {
               if (epoch === token) {
+                const fresh = step.recent.slice(recent.length);
                 visual = step.state;
                 recent = step.recent;
                 hiddenLocations = step.hidden;
+                if (fresh.length) audio.chip((p) => cue(p, fresh));
               }
             },
             () => {
@@ -430,6 +461,7 @@
     if (visual.phase === 'finished' && !animating && resultShown !== key) {
       resultShown = key;
       untrack(() => open('results'));
+      audio.chip((p) => p.end(visual.winners.includes(playerId)));
     }
   });
   function keyboard(event: KeyboardEvent) {
@@ -445,6 +477,27 @@
     settle();
     trayExpanded = !trayExpanded;
   }
+  /** 8-bit cues for scoring steps as they appear on the boards. */
+  function cue(p: import('./pixel/sound.js').PixelSounds, fresh: Event[]) {
+    const walls = fresh.flatMap((e) => (e.type === 'wall' ? [e] : []));
+    if (walls.length) p.score(Math.max(...walls.map((e) => e.scoring.points)));
+    if (fresh.some((e) => e.type === 'penalty' && e.loss)) p.penalty();
+    if (
+      fresh.some(
+        (e) =>
+          e.type === 'finish' &&
+          e.bonus.rows + e.bonus.columns + e.bonus.colors,
+      )
+    )
+      p.bonus();
+  }
+  /** The wall tile each accepted scoring event placed, with its points. */
+  const gains = (id: string) =>
+    recent.flatMap((e) =>
+      e.type === 'wall' && e.player === id
+        ? [{ row: e.row, column: e.column, points: e.scoring.points }]
+        : [],
+    );
   const highlight = (id: string): [number, number][] =>
     recent.flatMap((e) =>
       e.type === 'wall' && e.player === id ? e.scoring.cells : [],
@@ -459,6 +512,9 @@
 />
 <div
   class="azul-table"
+  class:px-tokens={pixel}
+  class:az-pixel={pixel}
+  class:az-reduced={pixel && reduced}
   class:compact-table={phone}
   class:tray-expanded={phone && trayExpanded}
   bind:this={root}
@@ -466,30 +522,30 @@
   data-game-revision={view.public.revision}
   data-azul-layout={phone ? 'compact' : 'tabletop'}
 >
-  <img
-    decoding="async"
-    class="table-prop lantern-prop"
-    src="/games/azul/rich/lantern-v2.webp"
-    alt=""
-    aria-hidden="true"
-    draggable="false"
-  />
-  <img
-    decoding="async"
-    class="table-prop chest-prop"
-    src="/games/azul/rich/tile-chest.webp"
-    alt=""
-    aria-hidden="true"
-    draggable="false"
-  />
-  <img
-    decoding="async"
-    class="table-prop tea-prop"
-    src="/games/azul/rich/tea-glass.webp"
-    alt=""
-    aria-hidden="true"
-    draggable="false"
-  />
+  {#if !pixel}<img
+      decoding="async"
+      class="table-prop lantern-prop"
+      src="/games/azul/rich/lantern-v2.webp"
+      alt=""
+      aria-hidden="true"
+      draggable="false"
+    />
+    <img
+      decoding="async"
+      class="table-prop chest-prop"
+      src="/games/azul/rich/tile-chest.webp"
+      alt=""
+      aria-hidden="true"
+      draggable="false"
+    />
+    <img
+      decoding="async"
+      class="table-prop tea-prop"
+      src="/games/azul/rich/tea-glass.webp"
+      alt=""
+      aria-hidden="true"
+      draggable="false"
+    />{/if}
   <button
     class="corner book"
     aria-label={m.azul_help()}
@@ -608,7 +664,9 @@
               <img
                 decoding="async"
                 class="factory-plate"
-                src="/games/azul/rich/factory-plate.webp"
+                src={pixel
+                  ? '/games/azul/pixel/factory.webp'
+                  : '/games/azul/rich/factory-plate.webp'}
                 alt=""
                 aria-hidden="true"
                 draggable="false"
@@ -758,6 +816,7 @@
               {destination}
               choose={playable ? chooseDestination : undefined}
               highlights={highlight(playerId)}
+              gains={gains(playerId)}
             />
             {#if phone}<button
                 class="tray-toggle"
@@ -854,6 +913,10 @@
   {/snippet}
   <dialog
     class:drafting={modal === 'draft'}
+    class:az-help={pixel && modal === 'help'}
+    class:px-tokens={pixel}
+    class:az-pixel={pixel}
+    class:az-reduced={pixel && reduced}
     bind:this={dialog}
     aria-labelledby="azul-dialog-title"
     onclose={() => opener?.focus({ preventScroll: true })}
@@ -946,23 +1009,24 @@
           </h2>
           <p>{m.azul_tiebreak()}</p>
           <div class="result-boards">
-            {#each visual.boards as board, i}<article>
+            {#each visual.boards as board, i}<article
+                class:winner={visual.winners.includes(visual.players[i])}
+              >
                 <h3>{name(visual.players[i])}</h3>
                 <dl>
-                  <dt>{m.azul_wall_points()}</dt>
-                  <dd>{board.wallPoints}</dd>
-                  <dt>{m.azul_raw_floor()}</dt>
-                  <dd>−{board.floorDeductions}</dd>
-                  <dt>{m.azul_loss()}</dt>
-                  <dd>−{board.floorLoss}</dd>
-                  <dt>{m.azul_rows_bonus()}</dt>
-                  <dd>+{board.bonus.rows}</dd>
-                  <dt>{m.azul_columns_bonus()}</dt>
-                  <dd>+{board.bonus.columns}</dd>
-                  <dt>{m.azul_colors_bonus()}</dt>
-                  <dd>+{board.bonus.colors}</dd>
-                  <dt class="total">{m.azul_total()}</dt>
-                  <dd class="total">{board.score}</dd>
+                  {#each [[m.azul_wall_points(), '', board.wallPoints], [m.azul_raw_floor(), '−', board.floorDeductions], [m.azul_loss(), '−', board.floorLoss], [m.azul_rows_bonus(), '+', board.bonus.rows], [m.azul_columns_bonus(), '+', board.bonus.columns], [m.azul_colors_bonus(), '+', board.bonus.colors], [m.azul_total(), '', board.score]] as const as [label, sign, value], line}
+                    {@const total = line === 6}
+                    <dt class:total>{label}</dt>
+                    <!-- The 8-bit skin counts each value up in steps (pixel.css). -->
+                    <dd
+                      class:total
+                      data-sign={sign}
+                      style:--az-n={pixel ? value : undefined}
+                      style:--az-line={pixel ? line : undefined}
+                    >
+                      <span class="az-value">{sign}{value}</span>
+                    </dd>
+                  {/each}
                 </dl>
               </article>{/each}
           </div>
@@ -983,7 +1047,24 @@
             step="0.05"
             bind:value={volume}
           /></label
-        ><label
+        >
+        <fieldset class="skin-choice">
+          <legend>{m.skin()}</legend>
+          {#each [['classic', m.skin_classic()], ['pixel', m.skin_pixel()]] as const as [value, label]}<label
+              class="toggle"
+              ><input
+                type="radio"
+                name="azul-skin"
+                {value}
+                checked={skin === value}
+                onchange={() => {
+                  skin = value;
+                  setGameSkin('azul', value);
+                }}
+              />{label}</label
+            >{/each}
+        </fieldset>
+        <label
           >{m.azul_motion()}<select
             aria-label={m.azul_motion()}
             bind:value={motion}
@@ -1618,6 +1699,21 @@
     padding: 12px;
     border-radius: 4px;
     min-height: 44px;
+  }
+  .skin-choice {
+    display: flex;
+    gap: 18px;
+    margin: 0;
+    padding: 6px 12px 8px;
+    border: 1px solid #b9aa8a;
+    border-radius: 4px;
+  }
+  .skin-choice legend {
+    padding: 0 4px;
+    font-size: 14px;
+  }
+  .settings .skin-choice label {
+    min-height: 32px;
   }
   .room-settings {
     border-top: 1px solid #b9aa8a;

@@ -1,0 +1,1237 @@
+/* Azul 8-bit skin: a 16-bit puzzle game in a Moorish palace. Loaded only when the
+   viewer's skin is `pixel`; layout stays the classic one, only the look changes.
+   Hard edges only (no radius, blur, filter, rotation or gradients on chrome); sprites
+   are pixelated; motion uses steps(). See docs/azul-pixel.md.
+   `:is(…, #az-pixel)` lifts every rule above the classic scoped styles. */
+@import '@board-games/shared/ui/pixel.css';
+
+@property --az-score {
+  syntax: '<integer>';
+  inherits: false;
+  initial-value: 0;
+}
+@property --az-n {
+  syntax: '<integer>';
+  inherits: false;
+  initial-value: 0;
+}
+
+.az-pixel {
+  /* One chrome pixel = one sprite pixel (tiles are 16 px sprites drawn at 2x). */
+  --px: 2px;
+  --az-ink: #070b16;
+  --az-navy: #0f1f3d;
+  --az-navy-2: #183463;
+  --az-navy-edge: #2d5696;
+  --az-brass: #e0a93a;
+  --az-brass-light: #ffd87a;
+  --az-brass-dark: #8a5a14;
+  --az-cream: #fbe7b8;
+  --az-cell: #e9d8ae;
+  --az-soft: #c9b68e;
+  --az-cedar: #6b3419;
+  --az-cedar-dark: #3d1a0c;
+  --az-red: #e0604e;
+  --az-teal: #3fb8ae;
+  --azul-title: var(--px-font);
+  --azul-body: var(--px-font);
+  font-family: var(--px-font);
+  /* Jersey 10 is small for its em box; match the classic x-height. */
+  font-size-adjust: ex-height 0.58;
+  letter-spacing: 0.02em;
+}
+
+/* Tiles: one hand-made 16 px sheet. Row 0 glazed tiles, row 1 the wall's hints. */
+.px-tile {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  container-type: size;
+  background: url('/games/azul/pixel/tiles.webp') 0 0 / 600% 300% no-repeat;
+  image-rendering: pixelated;
+  &.px-yellow {
+    background-position-x: 20%;
+  }
+  &.px-red {
+    background-position-x: 40%;
+  }
+  &.px-black {
+    background-position-x: 60%;
+  }
+  &.px-white {
+    background-position-x: 80%;
+  }
+  &.px-marker {
+    background-position-x: 100%;
+  }
+  &.px-ghost {
+    background-position-y: 50%;
+  }
+  b {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: #15364c;
+    font:
+      400 78cqh/1 'Jersey 10',
+      system-ui;
+    font-synthesis: none;
+    translate: 0 4%;
+  }
+}
+.azul-flight.az-pixel {
+  image-rendering: pixelated;
+}
+
+:is(.azul-table.az-pixel, #az-pixel) {
+  background: #0c1a33 url('/games/azul/pixel/palace.webp') center / cover
+    no-repeat;
+  image-rendering: pixelated;
+  color: var(--az-cream);
+  &::before,
+  &::after {
+    display: none;
+  }
+  button:focus-visible {
+    outline: var(--px) solid var(--az-brass-light);
+    outline-offset: var(--px);
+  }
+
+  /* ── Corner buttons: brass-framed tiles. ── */
+  .corner {
+    border-radius: 0;
+    border: var(--px) solid var(--az-ink);
+    background: var(--az-navy);
+    color: var(--az-brass-light);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--az-brass-dark),
+      inset calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--az-navy-edge),
+      0 var(--px) 0 var(--az-ink);
+    transition: translate 120ms steps(2);
+  }
+  .corner:hover {
+    translate: 0 calc(var(--px) * -1);
+  }
+  /* Hand-drawn 16 px icons from the tile sheet replace the vector ones. */
+  .corner svg {
+    display: none;
+  }
+  .corner::before {
+    content: '';
+    display: block;
+    width: 32px;
+    height: 32px;
+    margin: auto;
+    background: url('/games/azul/pixel/tiles.webp') 0 -64px / 192px 96px
+      no-repeat;
+  }
+  .gear::before {
+    background-position-x: -32px;
+  }
+  .corner:active {
+    translate: 0 var(--px);
+    box-shadow: inset 0 0 0 var(--px) var(--az-brass-dark);
+  }
+
+  /* ── Heading: a hanging palace sign. ── */
+  .wordmark {
+    color: var(--az-brass-light);
+    letter-spacing: 0.18em;
+    text-shadow:
+      var(--px) var(--px) 0 var(--az-brass-dark),
+      calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--az-ink);
+  }
+  .round,
+  .table-heading h1 {
+    color: var(--az-cream);
+    text-shadow: var(--px) var(--px) 0 var(--az-ink);
+  }
+  .connection {
+    border-radius: 0;
+    border: var(--px) solid var(--az-ink);
+    background: var(--az-red);
+    color: #fff4ec;
+    box-shadow: 0 var(--px) 0 var(--az-ink);
+  }
+
+  /* ── Opponents: framed miniatures with a name plate. ── */
+  .opponent {
+    transform: none !important;
+    isolation: isolate;
+    filter: none;
+    border-radius: 0;
+  }
+  .opponent,
+  .opponent-heading {
+    border-radius: 0;
+  }
+  .opponent strong {
+    color: var(--az-brass-light);
+  }
+  .inspect {
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .inspect:hover {
+    outline: var(--px) solid var(--az-brass-light);
+  }
+
+  /* ── Factory displays: pixel plates, tiles snap to 2x. ── */
+  .factory-plate {
+    border-radius: 0;
+    filter: none;
+    image-rendering: pixelated;
+  }
+  .factory-tiles button {
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    transition: translate 100ms steps(2);
+  }
+  .factory-tiles button .px-tile {
+    width: 32px;
+    height: 32px;
+    box-shadow: var(--px) var(--px) 0 #0b0f1f99;
+  }
+  .factory-tiles button:not(:disabled):hover {
+    background: transparent;
+    translate: 0 calc(var(--px) * -1);
+  }
+  .factory-tiles button:not(:disabled):hover .px-tile,
+  .factory-tiles button.selected .px-tile {
+    outline: var(--px) solid var(--az-ink);
+    box-shadow:
+      0 0 0 calc(var(--px) * 2) var(--az-brass-light),
+      var(--px) calc(var(--px) * 3) 0 #0b0f1f99;
+  }
+  .factory-tiles button.selected {
+    outline: 0;
+    background: transparent;
+    translate: 0 calc(var(--px) * -2);
+  }
+  .factory-empty {
+    border-radius: 0;
+  }
+
+  /* ── Centre pool: a zellige rug with a brass border. ── */
+  .center::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: -8px -10px -6px;
+    background: url('/games/azul/pixel/zellige.webp') 0 0 / 128px 128px;
+    border: var(--px) solid var(--az-ink);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--az-brass),
+      inset 0 0 0 calc(var(--px) * 2) var(--az-brass-dark),
+      0 calc(var(--px) * 2) 0 #0008;
+  }
+  .center {
+    isolation: isolate;
+  }
+  .center h2 {
+    color: var(--az-brass-light);
+    font-size: 13px;
+    letter-spacing: 0.2em;
+    text-shadow: var(--px) var(--px) 0 var(--az-ink);
+  }
+  .center-group {
+    border-radius: 0;
+    border: var(--px) solid transparent;
+    transition: translate 100ms steps(2);
+  }
+  .center-tile {
+    /* Scattered, never rotated: pixels stay on the grid. */
+    transform: none !important;
+  }
+  .center-group:enabled:hover {
+    translate: 0 calc(var(--px) * -1);
+  }
+  .center-group.selected {
+    border-color: var(--az-brass-light);
+    background: #0f1f3dcc;
+  }
+  .center-group b {
+    border-radius: 0;
+    border: var(--px) solid var(--az-ink);
+    background: var(--az-navy);
+    color: var(--az-brass-light);
+    font-size: 13px;
+    line-height: 1;
+    padding: 1px 4px 0;
+  }
+  .center-marker {
+    filter: none;
+  }
+
+  /* ── Bag and discard lid. ── */
+  .reserves > span {
+    color: var(--az-cream);
+    text-shadow: var(--px) var(--px) 0 var(--az-ink);
+  }
+  .reserves svg {
+    display: none;
+  }
+  .reserves > span::before {
+    content: '';
+    flex: none;
+    width: 30px;
+    height: 30px;
+    background: url('/games/azul/pixel/bag.webp') center / contain no-repeat;
+    image-rendering: pixelated;
+  }
+  .reserves > span:last-child::before {
+    background-image: url('/games/azul/pixel/lid.webp');
+  }
+
+  /* ── Confirmation, status and footer buttons: brass-rimmed navy panels. ── */
+  .confirmation,
+  .factory-picker,
+  .results {
+    border-radius: 0;
+    border: var(--px) solid var(--az-ink);
+    background: var(--az-navy);
+    color: var(--az-cream);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--az-brass-dark),
+      inset 0 0 0 calc(var(--px) * 2) var(--az-navy-2),
+      0 calc(var(--px) * 2) 0 #000a;
+  }
+  .confirmation p,
+  .marker-preview {
+    color: var(--az-cream);
+  }
+  .marker-preview {
+    color: var(--az-brass-light);
+  }
+  .in-hand > span:first-child {
+    width: 32px;
+    height: 32px;
+  }
+  .in-hand b {
+    color: var(--az-brass-light);
+    font-size: 20px;
+  }
+  .confirmation button,
+  .table-status button,
+  .factory-picker button,
+  .results .primary,
+  .settings > button,
+  .skip {
+    border-radius: 0;
+    border: var(--px) solid var(--az-ink);
+    background: var(--az-navy-2);
+    color: var(--az-cream);
+    font-family: var(--px-font);
+    font-size: 16px;
+    box-shadow:
+      inset calc(var(--px) * -1) calc(var(--px) * -1) 0 #0006,
+      inset var(--px) var(--px) 0 #ffffff33,
+      0 var(--px) 0 var(--az-ink);
+    transition: translate 80ms steps(1);
+  }
+  .table-status button {
+    white-space: nowrap;
+  }
+  .confirmation button:enabled:hover,
+  .table-status button:hover,
+  .factory-picker button:hover {
+    background: var(--az-navy-edge);
+  }
+  .confirmation .primary,
+  .results .primary {
+    background: var(--az-brass);
+    color: var(--az-ink);
+    border-color: var(--az-ink);
+  }
+  .confirmation .primary:enabled:hover,
+  .results .primary:hover {
+    background: var(--az-brass-light);
+  }
+  .confirmation button:enabled:active,
+  .table-status button:active,
+  .factory-picker button:active,
+  .results .primary:active {
+    translate: 0 var(--px);
+    box-shadow: inset var(--px) var(--px) 0 #0006;
+  }
+  .primary:disabled {
+    opacity: 1;
+    background: #5c5a52;
+    color: #2a2822;
+  }
+  .factory-picker button {
+    background: var(--az-cream);
+    color: var(--az-ink);
+  }
+  .factory-picker button:hover {
+    background: #fff5d8;
+  }
+}
+
+/* ── Player boards ── */
+:is(.azul-table.az-pixel, #az-pixel) .player-board {
+  --tile: 32px;
+  /* The classic drop-shadow filter doubled as a stacking context; keep one. */
+  isolation: isolate;
+  filter: none;
+  color: var(--az-ink);
+  image-rendering: pixelated;
+  /* Carved cedar frame with a zellige inlay (frame.webp, 14 px slices at 2x). */
+  &:not(.compact)::before {
+    content: '';
+    position: absolute;
+    z-index: 0;
+    top: 0;
+    right: 0;
+    left: 0;
+    box-sizing: border-box;
+    height: calc(100% - 38px);
+    border: 28px solid transparent;
+    border-image: url('/games/azul/pixel/frame.webp') 14 / 28px round;
+    background: var(--az-cream) padding-box;
+    pointer-events: none;
+  }
+  &:not(.compact).active::before {
+    outline: var(--px) solid var(--az-brass-light);
+    outline-offset: calc(var(--px) * 2);
+  }
+  &:not(.compact) header {
+    top: 0;
+    border-radius: 0;
+    border: var(--px) solid var(--az-ink);
+    background: var(--az-navy);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--az-brass-dark),
+      0 var(--px) 0 var(--az-ink);
+    color: var(--az-cream);
+  }
+  &:not(.compact) .name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--az-cream);
+    font-size: 20px;
+  }
+  &:not(.compact) header strong {
+    color: var(--az-brass-light);
+    font-size: 24px;
+  }
+  &:not(.compact) header small {
+    color: var(--az-soft);
+    font-size: 12px;
+  }
+  /* The next-starter badge is the marker sprite; the numeral stays text. */
+  .starter {
+    display: inline-grid;
+    width: 24px;
+    height: 24px;
+    place-items: center;
+    vertical-align: -4px;
+    font-size: 0;
+    background: url('/games/azul/pixel/tiles.webp') 100% 0 / 600% 300%;
+  }
+  .starter::after {
+    content: '1';
+    color: #15364c;
+    font-size: 19px;
+    line-height: 1;
+  }
+  .board-labels,
+  &:not(.compact) .board-labels {
+    color: var(--az-cedar);
+    font-size: 13px;
+  }
+  .row-number,
+  &:not(.compact) .row-number {
+    color: var(--az-cedar);
+    font-size: 13px;
+  }
+  &:not(.compact) .arrow {
+    color: var(--az-brass-dark);
+  }
+  /* Pattern lines: recessed slots. */
+  .pattern {
+    border-radius: 0;
+    border: var(--px) solid transparent;
+  }
+  .empty-slot,
+  &:not(.compact) .empty-slot {
+    border: 0;
+    border-radius: 0;
+    background: #d8c08a;
+    box-shadow:
+      inset var(--px) var(--px) 0 #a88a52,
+      inset calc(var(--px) * -1) calc(var(--px) * -1) 0 #fff3cf;
+  }
+  .legal {
+    border: var(--px) dashed var(--az-cedar);
+    background: #f2d48633;
+  }
+  .legal:hover,
+  .selected {
+    border: var(--px) solid var(--az-ink) !important;
+    background: #ffd87a88 !important;
+    box-shadow: inset 0 0 0 var(--px) var(--az-brass) !important;
+  }
+  .row-issue {
+    border-radius: 0;
+    background: #fbe7b8f2;
+    color: var(--az-cedar-dark);
+    font-size: 13px;
+    border: var(--px) solid var(--az-cedar);
+  }
+  /* The wall: an inlaid panel of printed hints. */
+  .wall {
+    position: relative;
+  }
+  &:not(.compact) .wall::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: 4px -2px;
+    background: var(--az-cell);
+    border: var(--px) solid #a88a52;
+    box-shadow: inset var(--px) var(--px) 0 #c9ae74;
+  }
+  &:not(.compact) .mosaic {
+    isolation: isolate;
+  }
+  .wall-cell {
+    position: relative;
+  }
+  .scored {
+    border-radius: 0;
+    outline: var(--px) solid var(--az-brass-light);
+    outline-offset: 0;
+    box-shadow: 0 0 0 calc(var(--px) * 2) var(--az-ink);
+  }
+  .px-gain {
+    position: absolute;
+    z-index: 6;
+    left: 50%;
+    bottom: 60%;
+    translate: -50% 0;
+    color: var(--az-brass-light);
+    font-size: 22px;
+    line-height: 1;
+    white-space: nowrap;
+    text-shadow:
+      var(--px) 0 0 var(--az-ink),
+      calc(var(--px) * -1) 0 0 var(--az-ink),
+      0 var(--px) 0 var(--az-ink),
+      0 calc(var(--px) * -1) 0 var(--az-ink),
+      var(--px) var(--px) 0 var(--az-ink);
+    pointer-events: none;
+    animation: az-gain 1.6s steps(8, jump-end) both;
+  }
+  /* Floor line: a cedar strip of seven slots with penalty chips. */
+  &:not(.compact) .floor {
+    bottom: 64px;
+    width: min(360px, calc(100% - 330px));
+    height: 54px;
+    background: var(--az-cedar);
+    border: var(--px) solid var(--az-ink);
+    box-shadow:
+      inset 0 0 0 var(--px) #a0582a,
+      inset 0 calc(var(--px) * -3) 0 var(--az-cedar-dark),
+      0 calc(var(--px) * 2) 0 #0009;
+    filter: none;
+  }
+  &:not(.compact) .floor.legal {
+    border-style: dashed;
+    border-color: var(--az-brass-light);
+  }
+  &:not(.compact) .floor.legal:hover,
+  &:not(.compact) .floor.selected {
+    background: #8a4a22 !important;
+  }
+  &:not(.compact) .floor-label {
+    top: 50%;
+    right: calc(100% + 10px);
+    left: auto;
+    width: 110px;
+    translate: 0 -50%;
+    color: var(--az-cedar);
+    font-size: 13px;
+    text-align: right;
+  }
+  &:not(.compact) .floor-slots {
+    inset: 14px 8px 6px;
+  }
+  &:not(.compact) .floor-space small {
+    top: -22px;
+    width: auto;
+    height: auto;
+    min-width: 18px;
+    padding: 1px 3px 0;
+    border-radius: 0;
+    border: var(--px) solid var(--az-ink);
+    background: var(--az-red);
+    color: #fff4ec;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1;
+  }
+  &:not(.compact) .floor .slot {
+    width: 32px;
+    height: 32px;
+    transform: none;
+  }
+  .floor .empty-slot {
+    background: var(--az-cedar-dark);
+    box-shadow:
+      inset var(--px) var(--px) 0 #1f0c05,
+      inset calc(var(--px) * -1) calc(var(--px) * -1) 0 #8a4a22;
+  }
+  /* Score track: a navy strip with a brass medallion. */
+  &:not(.compact) .score-rail {
+    height: 34px;
+    background: var(--az-navy);
+    border: var(--px) solid var(--az-ink);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--az-brass-dark),
+      0 var(--px) 0 var(--az-ink);
+    filter: none;
+  }
+  &:not(.compact) .rail-ticks {
+    inset: 2px 40px 2px;
+    color: var(--az-soft);
+    font-size: 12px;
+  }
+  &:not(.compact) .rail-ticks span::after {
+    top: 14px;
+    width: var(--px);
+    height: 6px;
+    background: var(--az-brass-dark);
+  }
+  &:not(.compact) .score-marker {
+    top: -6px;
+    width: 32px;
+    height: 32px;
+    background: url('/games/azul/pixel/medallion.webp') center / 100% 100%;
+    image-rendering: pixelated;
+    transition: left 600ms steps(6);
+  }
+  .score-marker b {
+    top: -22px;
+    border-radius: 0;
+    border: var(--px) solid var(--az-ink);
+    background: var(--az-brass-light);
+    color: var(--az-ink);
+    font-size: 13px;
+    line-height: 1;
+    padding: 1px 3px 0;
+  }
+  &:not(.compact) .score-overflow {
+    color: var(--az-brass-light);
+  }
+  &:not(.compact) .bonus-legend {
+    right: 36px;
+    bottom: 64px;
+    width: 124px;
+    padding: 4px 6px;
+  }
+  .bonus-legend {
+    border-radius: 0;
+    border: var(--px) solid var(--az-cedar);
+    background: var(--az-cream);
+    box-shadow: var(--px) var(--px) 0 #0006;
+    color: var(--az-cedar-dark);
+    font-size: 12px;
+    line-height: 1.2;
+  }
+  .bonus-legend span + span {
+    border-top: var(--px) dotted #a88a52;
+  }
+  /* Header score ticks up in steps; the real number stays for assistive tech. */
+  header strong {
+    counter-reset: az-score var(--az-score);
+    transition: --az-score 700ms steps(7, jump-end);
+  }
+  header strong::before {
+    content: counter(az-score);
+  }
+  header .az-value {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  /* Miniatures (opponents, the collapsed phone tray). */
+  &.compact {
+    overflow: hidden;
+    background: var(--az-cream);
+    border: var(--px) solid var(--az-cedar-dark);
+    border-radius: 0;
+    box-shadow: inset 0 0 0 var(--px) #a0582a;
+    filter: none;
+  }
+  &.compact .mosaic {
+    inset: 14% 7% 22%;
+  }
+  &.compact .wall {
+    background: var(--az-cell);
+  }
+  &.compact .empty-slot {
+    box-shadow: none;
+    background: #d8c08a;
+  }
+  &.compact .floor .empty-slot {
+    background: #a0582a;
+  }
+}
+
+/* Desktop opponents sit on the palace floor as framed miniatures. */
+:is(.azul-table.az-pixel:not(.compact-table), #az-pixel) {
+  .opponent {
+    filter: none;
+  }
+  .opponent-heading {
+    border: var(--px) solid var(--az-ink);
+    background: var(--az-navy);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--az-brass-dark),
+      0 var(--px) 0 var(--az-ink);
+  }
+  .opponent.turn .opponent-heading {
+    border-color: var(--az-ink);
+    background: var(--az-navy-2);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--az-brass-light),
+      0 var(--px) 0 var(--az-ink);
+  }
+  .opponent-name {
+    color: var(--az-cream);
+    font-size: 15px;
+  }
+  .opponent strong {
+    font-size: 18px;
+  }
+  .opponent.turn .opponent-preview {
+    outline: var(--px) solid var(--az-brass-light);
+    outline-offset: var(--px);
+  }
+  .table-heading {
+    top: 6px;
+    width: auto;
+    min-width: 300px;
+    height: auto;
+    padding: 2px 22px 6px;
+    text-shadow: none;
+    background: var(--az-navy);
+    border: var(--px) solid var(--az-ink);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--az-brass-dark),
+      inset 0 0 0 calc(var(--px) * 2) var(--az-navy-2),
+      0 calc(var(--px) * 2) 0 #000a;
+  }
+  .wordmark {
+    font-size: 44px;
+    line-height: 0.9;
+  }
+  .round {
+    font-size: 16px;
+    color: var(--az-soft);
+  }
+  .table-heading h1 {
+    font-size: 16px;
+    color: var(--az-cream);
+  }
+  .table-heading h1::before {
+    color: var(--az-brass);
+  }
+  /* The bag and the box lid stand side by side, each with a counter plate. */
+  .reserves {
+    right: 18px;
+    bottom: 16px;
+    display: flex;
+    width: auto;
+    align-items: flex-end;
+    gap: 10px;
+  }
+  .reserves > span:first-child,
+  .reserves > span:last-child {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: auto;
+    height: auto;
+    min-width: 0;
+    min-height: 0;
+    gap: 4px;
+    padding: 0;
+    transform: none;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    filter: none;
+  }
+  .reserves > span::before {
+    width: 120px;
+    height: 120px;
+  }
+  .reserves > span:last-child::before {
+    width: 96px;
+    height: 96px;
+  }
+  .reserves > span > span {
+    max-width: 124px;
+    padding: 2px 6px 1px;
+    border: var(--px) solid var(--az-ink);
+    background: var(--az-navy);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--az-brass-dark),
+      0 var(--px) 0 var(--az-ink);
+    color: var(--az-cream);
+    font-size: 14px;
+    line-height: 1.1;
+    text-align: center;
+    text-shadow: none;
+  }
+  .confirmation {
+    box-shadow:
+      inset 0 0 0 var(--px) var(--az-brass-dark),
+      inset 0 0 0 calc(var(--px) * 2) var(--az-navy-2),
+      0 calc(var(--px) * 2) 0 #000a;
+  }
+  .confirmation p {
+    font-size: 16px;
+  }
+  /* Wider pixel buttons get their own row under the preview. */
+  .confirmation {
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+  .confirmation .confirm-actions {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    justify-content: flex-end;
+  }
+  .confirmation .skip {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+}
+
+/* ── Phones and short screens ── */
+:is(.azul-table.az-pixel.compact-table, #az-pixel) {
+  .opponent {
+    border: var(--px) solid var(--az-ink);
+    background: #0f1f3de6;
+    box-shadow: inset 0 0 0 var(--px) var(--az-brass-dark);
+  }
+  .opponent.turn {
+    box-shadow: inset 0 0 0 var(--px) var(--az-brass-light);
+  }
+  .table-heading {
+    text-shadow: none;
+  }
+  .opponent-name {
+    font-size: 15px;
+  }
+  .round,
+  .table-heading h1 {
+    font-size: 15px;
+  }
+  .factory-open {
+    border-radius: 0;
+  }
+  .factory-open .factory-tiles {
+    grid-template-columns: repeat(2, 17px);
+    grid-template-rows: repeat(2, 17px);
+  }
+  .factory-slot .px-tile {
+    width: 16px;
+    height: 16px;
+  }
+  .factory-open:enabled:hover .factory-plate,
+  .factory-open:focus-visible {
+    outline: 0;
+  }
+  .factory:has(.factory-open:enabled:hover) .factory-plate {
+    translate: 0 calc(var(--px) * -1);
+  }
+  .own-board {
+    border-radius: 0;
+    border: var(--px) solid var(--az-ink);
+    background: var(--az-navy);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--az-brass-dark),
+      0 calc(var(--px) * -2) 0 #0008;
+  }
+  .own-board.open {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .own-board.open .tray-toggle {
+    border-radius: 0;
+    border: var(--px) solid var(--az-ink);
+    background: var(--az-navy);
+    box-shadow: inset 0 0 0 var(--px) var(--az-brass-dark);
+  }
+  .tray-toggle {
+    text-shadow: var(--px) var(--px) 0 var(--az-ink);
+    color: var(--az-cream);
+  }
+  .tray-toggle span {
+    font-size: 16px;
+  }
+  .tray-toggle b {
+    color: var(--az-brass-light);
+  }
+  .reserves > span {
+    font-size: 14px;
+    gap: 4px;
+  }
+  /* Whole or half scales only on small screens. */
+  .reserves > span::before {
+    width: 30px;
+    height: 30px;
+  }
+  .reserves > span:last-child::before {
+    width: 48px;
+    height: 48px;
+    margin: -9px 0;
+  }
+  .center::before {
+    inset: -4px -6px -2px;
+  }
+  .table-status button {
+    font-size: 15px;
+  }
+}
+
+/* ── Dialogs ── */
+dialog.az-pixel {
+  border-radius: 0;
+  border: var(--px) solid var(--az-ink);
+  background: var(--az-navy) url('/games/azul/pixel/zellige.webp') 0 0 / 128px
+    128px;
+  color: var(--az-cream);
+  image-rendering: pixelated;
+  box-shadow:
+    inset 0 0 0 calc(var(--px) * 2) var(--az-brass),
+    inset 0 0 0 calc(var(--px) * 3) var(--az-brass-dark),
+    0 calc(var(--px) * 4) 0 #000b;
+  &::backdrop {
+    background: #050a18c4;
+    backdrop-filter: none;
+  }
+  > h2,
+  h2 {
+    color: var(--az-brass-light);
+    font-family: var(--px-font);
+    font-size: 30px;
+    text-shadow: var(--px) var(--px) 0 var(--az-ink);
+  }
+  > :not(h2, .close) {
+    position: relative;
+  }
+  /* Body copy sits on a flat navy card so the zellige never fights the text. */
+  .settings,
+  .explanations {
+    background: #0f1f3df2;
+  }
+  .settings {
+    padding: 14px;
+    border: var(--px) solid var(--az-ink);
+    box-shadow: inset 0 0 0 var(--px) var(--az-navy-edge);
+  }
+  .close {
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border-radius: 0;
+    border: var(--px) solid var(--az-ink);
+    background: var(--az-red);
+    color: #fff4ec;
+    font-family: var(--px-font);
+    font-size: 30px;
+    line-height: 1;
+    box-shadow:
+      inset calc(var(--px) * -1) calc(var(--px) * -1) 0 #0006,
+      0 var(--px) 0 var(--az-ink);
+  }
+  .settings label,
+  .settings legend {
+    font-size: 17px;
+  }
+  .settings input[type='checkbox'],
+  .settings input[type='radio'],
+  .settings input[type='range'] {
+    accent-color: var(--az-brass);
+  }
+  .settings select,
+  .room-settings :is(select, button) {
+    border-radius: 0;
+    border: var(--px) solid var(--az-ink);
+    background: var(--az-cream);
+    color: var(--az-ink);
+    font-family: var(--px-font);
+    font-size: 16px;
+  }
+  .room-settings {
+    border-top: var(--px) dashed var(--az-navy-edge);
+  }
+  .room-settings a {
+    color: var(--az-brass-light);
+  }
+  .skin-choice {
+    border: var(--px) solid var(--az-navy-edge);
+  }
+  .explanations {
+    color: var(--az-cream);
+    padding: 8px;
+    font-size: 17px;
+  }
+  .explanations p {
+    border-left: calc(var(--px) * 2) solid var(--az-red);
+    background: var(--az-navy-2);
+  }
+  .explanations .gain {
+    border-left-color: var(--az-brass-light);
+  }
+  /* Results: a victory scroll where each line counts up in steps. */
+  .results {
+    background: var(--az-navy);
+  }
+  .results h2 {
+    font-size: 34px;
+    color: var(--az-brass-light);
+    animation: az-drop 480ms steps(4, jump-end) both;
+  }
+  .results > p {
+    color: var(--az-soft);
+    font-size: 15px;
+  }
+  .result-boards article {
+    padding: 10px 12px;
+    background: var(--az-cream);
+    color: var(--az-ink);
+    border: var(--px) solid var(--az-ink);
+    box-shadow:
+      inset 0 0 0 var(--px) #a88a52,
+      var(--px) calc(var(--px) * 2) 0 #0009;
+  }
+  /* Winners get a brass plaque with a pixel star. */
+  .result-boards article.winner {
+    background: #ffe9a8;
+    box-shadow:
+      inset 0 0 0 var(--px) var(--az-brass),
+      inset 0 0 0 calc(var(--px) * 2) var(--az-brass-light),
+      var(--px) calc(var(--px) * 2) 0 #0009;
+  }
+  .result-boards article.winner h3::after {
+    content: ' ★';
+    color: var(--az-brass-dark);
+  }
+  .result-boards h3 {
+    margin: 0 0 6px;
+    color: var(--az-cedar-dark);
+    font-size: 24px;
+  }
+  .result-boards dl {
+    font-size: 16px;
+    gap: 3px 10px;
+  }
+  .result-boards dd {
+    counter-reset: az-n var(--az-n);
+    animation: az-count 720ms steps(8, jump-end) calc(var(--az-line) * 160ms)
+      both;
+    font-variant-numeric: tabular-nums;
+  }
+  .result-boards dd::before {
+    content: attr(data-sign) counter(az-n);
+  }
+  .result-boards dd .az-value {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .result-boards dd[data-sign='−'] {
+    color: #b3372a;
+  }
+  .result-boards .total {
+    border-top: var(--px) solid var(--az-cedar);
+    font-size: 22px;
+  }
+  .result-boards dd.total {
+    color: var(--az-cedar-dark);
+  }
+  .explanations p,
+  .factory-picker,
+  .confirmation {
+    border-radius: 0;
+  }
+}
+/* The rules read like a parchment scroll in a brass frame. */
+dialog.az-pixel.az-help {
+  background: var(--az-cream);
+  color: var(--az-ink);
+  box-shadow:
+    inset 0 0 0 calc(var(--px) * 2) var(--az-brass),
+    inset 0 0 0 calc(var(--px) * 3) var(--az-brass-dark),
+    inset 0 0 0 calc(var(--px) * 5) var(--az-cream),
+    inset 0 0 0 calc(var(--px) * 6) #d8c08a,
+    0 calc(var(--px) * 4) 0 #000b;
+  h2,
+  h3,
+  h4 {
+    color: var(--az-cedar-dark);
+    font-family: var(--px-font);
+    text-shadow: none;
+  }
+  button,
+  input {
+    border-radius: 0;
+    font-family: var(--px-font);
+  }
+  .close {
+    color: #fff4ec;
+  }
+}
+dialog.az-pixel.drafting .confirmation {
+  color: var(--az-cream);
+}
+
+@keyframes az-count {
+  from {
+    --az-n: 0;
+  }
+}
+@keyframes az-gain {
+  0% {
+    opacity: 0;
+    translate: -50% 8px;
+  }
+  15% {
+    opacity: 1;
+    translate: -50% 0;
+  }
+  70% {
+    opacity: 1;
+    translate: -50% -14px;
+  }
+  100% {
+    opacity: 0;
+    translate: -50% -18px;
+  }
+}
+@keyframes az-drop {
+  from {
+    translate: 0 -24px;
+    opacity: 0;
+  }
+}
+@keyframes az-blink {
+  50% {
+    border-color: var(--az-brass-light);
+  }
+}
+:is(.azul-table.az-pixel:not(.az-reduced), #az-pixel)
+  .player-board
+  .legal:not(:hover, .selected) {
+  animation: az-blink 900ms steps(1) infinite;
+}
+
+/* Reduced motion keeps every state change and drops the flourishes. */
+.az-pixel.az-reduced,
+.az-pixel.az-reduced * {
+  transition: none !important;
+  animation: none !important;
+}
+.az-pixel.az-reduced .px-gain {
+  display: none;
+}
+
+/* Narrow full boards (the phone tray and the draft dialog): a 1x frame and fluid slots. */
+@media (max-width: 900px) {
+  :is(.azul-table.az-pixel, #az-pixel) .player-board:not(.compact) {
+    &::before {
+      border-width: 14px;
+      border-image: url('/games/azul/pixel/frame.webp') 14 / 14px round;
+    }
+    header {
+      width: max-content;
+      min-width: 0;
+      height: auto;
+      padding: 2px 12px;
+    }
+    .pattern {
+      padding: 1px;
+    }
+    .name {
+      font-size: 17px;
+    }
+    header strong {
+      font-size: 20px;
+    }
+    .mosaic {
+      top: 46px;
+      right: 18px;
+      left: 18px;
+      gap: 16px;
+      --tile: min(30px, calc((100cqw - 100px) / 10));
+    }
+    .wall::before {
+      inset: 6px -3px;
+    }
+    .row-number {
+      left: 2px;
+      font-size: 12px;
+    }
+    .arrow {
+      right: -13px;
+    }
+    .floor {
+      bottom: 52px;
+      width: calc(100% - 36px);
+      height: 48px;
+    }
+    .floor-label,
+    .bonus-legend {
+      display: none;
+    }
+    .floor-slots {
+      inset: 12px 6px 4px;
+    }
+    .floor .slot {
+      width: min(32px, calc((100cqw - 80px) / 7));
+      height: min(32px, calc((100cqw - 80px) / 7));
+    }
+    .score-rail {
+      height: 30px;
+    }
+    .rail-ticks {
+      inset: 2px 22px;
+      font-size: 11px;
+    }
+    .score-marker {
+      width: 24px;
+      height: 24px;
+      top: 1px;
+    }
+  }
+}
+
+/* Short landscape screens put the reserves beside the opponents: keep them small. */
+@media (min-width: 601px) and (max-height: 680px) {
+  :is(.azul-table.az-pixel.compact-table, #az-pixel) {
+    .reserves > span {
+      font-size: 13px;
+    }
+    .reserves > span:last-child::before {
+      width: 24px;
+      height: 24px;
+      margin: 0 3px;
+    }
+  }
+}
