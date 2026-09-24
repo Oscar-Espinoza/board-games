@@ -1,12 +1,19 @@
 <script lang="ts">
   import Tile from './Tile.svelte';
+  import { tileUrl } from './pixel/sprites.js';
 
   /** Loading cover: tiles stand up one by one as the table's art arrives. */
   let {
     progress = 0,
     label,
     leaving = false,
-  }: { progress?: number; label: string; leaving?: boolean } = $props();
+    pixel = false,
+  }: {
+    progress?: number;
+    label: string;
+    leaving?: boolean;
+    pixel?: boolean;
+  } = $props();
   const tiles: [number, number][] = [
     [6, 6],
     [6, 4],
@@ -21,14 +28,19 @@
   );
 </script>
 
-<div class="loading" class:leaving role="status" aria-live="polite">
+<div class="loading" class:leaving class:pixel role="status" aria-live="polite">
   <div class="row" aria-hidden="true">
     {#each tiles as [a, b], i}
       <span
         class="slot"
         class:in={i < shown}
         class:next={i === shown && progress < 1}
-        style:--i={i}><Tile near={a} far={b} vertical /></span
+        style:--i={i}
+        >{#if pixel}<img src={tileUrl(a, b)} alt="" />{:else}<Tile
+            near={a}
+            far={b}
+            vertical
+          />{/if}</span
       >
     {/each}
   </div>
@@ -145,6 +157,68 @@
       width: 32px;
       height: 64px;
     }
+  }
+  /* 8-bit: the pixel patio, hard shadows and stepped motion. */
+  @font-face {
+    font-family: 'Pixelify Sans';
+    src: url('/fonts/pixel-store/pixelify-sans-400.woff2') format('woff2');
+    font-display: swap;
+  }
+  .pixel {
+    background:
+      linear-gradient(rgb(14 10 18 / 0.72), rgb(14 10 18 / 0.72)),
+      url('/games/domino/pixel/patio.webp') center / cover,
+      #0e0a12;
+    image-rendering: pixelated;
+    font-family: 'Pixelify Sans', monospace;
+    transition-timing-function: steps(4, jump-end);
+  }
+  .pixel::before {
+    display: none;
+  }
+  .pixel .slot {
+    border-radius: 0;
+    box-shadow: 4px 4px 0 rgb(0 0 0 / 0.5);
+    transform: translateY(-26px);
+    transition:
+      opacity 0.3s steps(3, jump-end),
+      transform 0.4s steps(4, jump-end);
+  }
+  .pixel .slot.in {
+    transform: none;
+  }
+  .pixel .slot.next {
+    animation: waiting-8 0.8s steps(2, jump-none) infinite;
+  }
+  @keyframes waiting-8 {
+    50% {
+      opacity: 0.3;
+      transform: translateY(-12px);
+    }
+  }
+  .pixel img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+  }
+  .pixel p {
+    text-transform: uppercase;
+    text-shadow: 2px 2px 0 #000;
+  }
+  .pixel .bar {
+    height: 12px;
+    border: 2px solid #1e110a;
+    border-radius: 0;
+    background: #2a1a10;
+  }
+  .pixel .bar span {
+    background: repeating-linear-gradient(
+      90deg,
+      #f2c14e 0 10px,
+      #2a1a10 10px 12px
+    );
+    transition: transform 0.35s steps(5, jump-end);
   }
   @media (prefers-reduced-motion: reduce) {
     .slot.next {

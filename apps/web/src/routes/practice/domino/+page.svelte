@@ -1,6 +1,7 @@
 <script lang="ts">
   import Rulebook from '$lib/catalog/Rulebook.svelte';
   import Loading from '@board-games/domino/Loading.svelte';
+  import { lookOf } from '@board-games/domino/look';
   import { onMount, type Component } from 'svelte';
   import { gameClients } from '$lib/games';
   import { practice, seats } from '@board-games/domino/practice';
@@ -77,6 +78,7 @@
       </Board>{/key}{:else if !error}<Loading
       progress={0.05}
       label={m.domino_loading()}
+      pixel={lookOf() === 'pixel'}
     />{/if}
 </main>
 

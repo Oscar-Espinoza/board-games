@@ -1,42 +1,8 @@
 import * as THREE from 'three';
+import { SPOTS } from '../spots.js';
 
 /** Canvas-drawn textures: tile faces, carved plaques, and the painted art loader. */
 
-/** Pip spots in one half: [along the tile's length, across it], each 0–2. */
-const SPOTS: [number, number][][] = [
-  [],
-  [[1, 1]],
-  [
-    [0, 0],
-    [2, 2],
-  ],
-  [
-    [0, 0],
-    [1, 1],
-    [2, 2],
-  ],
-  [
-    [0, 0],
-    [2, 0],
-    [0, 2],
-    [2, 2],
-  ],
-  [
-    [0, 0],
-    [2, 0],
-    [1, 1],
-    [0, 2],
-    [2, 2],
-  ],
-  [
-    [0, 0],
-    [1, 0],
-    [2, 0],
-    [0, 2],
-    [1, 2],
-    [2, 2],
-  ],
-];
 const W = 512,
   H = 256;
 

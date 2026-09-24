@@ -181,7 +181,8 @@ Exactly four seats in fixed pairs. Rules, projection and the slam scatter live i
 `games/domino/src/index.ts`. Each tile's resting pose is public, cosmetic state: a new
 tile plugs onto its neighbour wherever that neighbour lies, a slam jitters poses with
 the server's random source, and any player can tidy them. Pure chain geometry
-(`layout.ts`) is kept apart from the board so an 8-bit board can reuse it later. The
-board is the only game rendered with three.js, loaded lazily with the game client. The local
+(`layout.ts`) is shared by two looks: a three.js patio and an 8-bit Canvas 2D table,
+each loaded lazily with its own art and sound over one `DominoGame` controller. The
+player picks the look (defaulting to the home page theme). The local
 practice route is pass-and-play and follows whoever is to move. See
 [Dominó](games/domino.md).

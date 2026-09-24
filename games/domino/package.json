@@ -9,7 +9,8 @@
     "./practice": "./src/practice.ts",
     "./layout": "./src/layout.ts",
     "./preload": "./src/preload.ts",
-    "./Loading.svelte": "./src/Loading.svelte"
+    "./Loading.svelte": "./src/Loading.svelte",
+    "./look": "./src/look.ts"
   },
   "dependencies": {
     "@board-games/game-core": "workspace:*",
