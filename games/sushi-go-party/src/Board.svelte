@@ -26,6 +26,16 @@
   import TableDecor from './table/TableDecor.svelte';
   import OpponentSeat from './table/OpponentSeat.svelte';
   import { desktopSeats, tableMenu, pawnColors } from './table/layout.js';
+  import {
+    gameSkin,
+    setGameSkin,
+    type Skin,
+  } from '@board-games/shared/ui/pixel';
+  import { m } from '@board-games/shared/messages';
+  import { providePixel } from './pixel/context.js';
+  import { pixelSounds, type PixelCue } from './pixel/sound.js';
+  import PixelDecor from './pixel/PixelDecor.svelte';
+  import PixelDish from './pixel/PixelDish.svelte';
   import './table/table.css';
   let {
     view,
@@ -121,7 +131,41 @@
     scoring = $state(false);
   let scoredCards = $state<string[]>([]);
   const cursor = new EventCursor(),
-    audio = tableAudio();
+    audio = tableAudio(),
+    chip = pixelSounds();
+  /** Viewer-only look; the 8-bit stylesheet loads the first time it is chosen. */
+  let skin = $state<Skin>(gameSkin('sushi-go-party')),
+    pixelReady = $state(false),
+    beltMoving = $state(false);
+  $effect(() => {
+    if (skin === 'pixel' && !pixelReady)
+      void import('./pixel.css').then(() => (pixelReady = true));
+  });
+  const pixel = $derived(skin === 'pixel' && pixelReady);
+  providePixel(() => pixel);
+  const podium = $derived(
+    [...pub.players].sort(
+      (a, b) => b.score - a.score || b.desserts.length - a.desserts.length,
+    ),
+  );
+  const tally = (list: PublicCard[]) =>
+    Object.entries(
+      list.reduce<Record<string, number>>(
+        (all, c) => ((all[c.kind] = (all[c.kind] ?? 0) + 1), all),
+        {},
+      ),
+    );
+  /** A revealed dish that completes a set on your own plate earns a jingle. */
+  function combo(card: PublicCard) {
+    const mine = own.tableau.filter(
+      (c) => c.kind === card.kind && !c.boxed && c.collectedRound === pub.round,
+    ).length;
+    return (
+      (card.kind === 'tempura' && mine > 0 && mine % 2 === 0) ||
+      (card.kind === 'sashimi' && mine > 0 && mine % 3 === 0) ||
+      (card.kind === 'nigiri' && !!card.wasabi)
+    );
+  }
   let lastPick = '';
   let lastPrompt = '';
   let cancelMotion = () => {};
@@ -136,6 +180,7 @@
     revealCards = [];
     scoring = false;
     scoredCards = [];
+    beltMoving = false;
   }
   const label = (key: string, values: Record<string, string | number> = {}) =>
     t(key, values, locale);
@@ -144,11 +189,15 @@
     return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
   }
   function gesture() {
-    if (sound) audio.unlock();
+    if (sound) (skin === 'pixel' ? chip : audio).unlock();
+  }
+  function cue(name: PixelCue) {
+    if (sound && pixel) chip.play(name, volume);
   }
   function keep() {
     if (!selectedCard || !allowed || priv.committed) return;
     gesture();
+    cue('lock');
     void send({
       type: 'PICK',
       round: pub.round,
@@ -213,6 +262,7 @@
       document.removeEventListener('visibilitychange', visibility);
       clearPresentation();
       audio.close();
+      chip.close();
     };
   });
   $effect(() => {
@@ -272,12 +322,51 @@
         : revealed.length
           ? label('revealed')
           : '';
-    if (sound)
+    if (sound && pixel) {
+      const finished = events.find((e) => e.type === 'finished');
+      const mine = revealed
+        .filter((r) => r.seat === playerId)
+        .map((r) => r.card);
+      chip.play(
+        finished?.type === 'finished'
+          ? finished.winners.includes(playerId)
+            ? 'win'
+            : 'lose'
+          : events.some((e) => e.type === 'round-end')
+            ? 'round'
+            : scored
+              ? 'score'
+              : mine.some(combo)
+                ? 'combo'
+                : mine.some((c) =>
+                      (desserts as readonly string[]).includes(c.kind),
+                    )
+                  ? 'dessert'
+                  : revealed.length
+                    ? 'reveal'
+                    : 'pass',
+        volume,
+      );
+      if (passing && revealed.length)
+        setTimeout(() => {
+          if (version === motionVersion) chip.play('pass', volume);
+        }, 420);
+    } else if (sound)
       audio.play(
         scored ? 'score' : revealed.length ? 'ceramic' : 'paper',
         volume,
       );
     if (motion && !systemReduced) {
+      if (pixel && passing) {
+        // The conveyor belt around the board steps round while hands travel.
+        beltMoving = true;
+        setTimeout(
+          () => {
+            if (version === motionVersion) beltMoving = false;
+          },
+          (revealed.length ? 300 : 0) + 760,
+        );
+      }
       revealCards = revealed;
       scoring = scored;
       scoredCards = events.flatMap((e) =>
@@ -292,6 +381,7 @@
               root,
               passing.edges,
               revealed.length ? 300 : 0,
+              pixel,
             );
         });
       timer = setTimeout(
@@ -317,6 +407,9 @@
   class:reduce={!motion || systemReduced}
   class:scoring
   class:rich={true}
+  class:px-tokens={pixel}
+  class:sgp-pixel={pixel}
+  class:passing={beltMoving}
   style:--table-scale={scale}
   style:--table-width={`${stageWidth}px`}
   style:--table-height={`${stageHeight}px`}
@@ -342,13 +435,19 @@
   />
 
   <div class="table-stage" data-guests={pub.players.length}>
-    <TableDecor
-      notes={[
-        label('table_note_one'),
-        label('table_note_two'),
-        label('table_note_three'),
-      ]}
-    />
+    {#if pixel}<PixelDecor
+        notes={[
+          label('table_note_one'),
+          label('table_note_two'),
+          label('table_note_three'),
+        ]}
+      />{:else}<TableDecor
+        notes={[
+          label('table_note_one'),
+          label('table_note_two'),
+          label('table_note_three'),
+        ]}
+      />{/if}
     <div class="table-content">
       <PartyBoard
         players={scorePlayers}
@@ -450,6 +549,7 @@
               card={face('maki', '3')}
             /><Dish card={face('dumpling')} />
           </div>
+          {#if pixel}<i class="px-chef" aria-hidden="true"></i>{/if}
           <p class="eyebrow">SUSHI GO PARTY! · {pub.players.length}</p>
           <h1>{label('menu_title')}</h1>
           <p>{label('menu_intro')}</p>
@@ -706,6 +806,20 @@
                 ? label('winners', { names: pub.winners.map(name).join(', ') })
                 : label('receipt')}
             </h2>
+            {#if pixel && pub.phase === 'finished'}<ol class="px-podium">
+                {#each podium as seat, rank (seat.id)}<li
+                    class:winner={pub.winners.includes(seat.id)}
+                    style:--d={`${rank * 120}ms`}
+                  >
+                    <b class="px-rank">{rank + 1}</b><ScorePawn
+                      color={color(seat.id)}
+                    /><span class="px-name">{name(seat.id)}</span><span
+                      class="px-dessert-count"
+                      ><PixelDish card={face(pub.menu.dessert)} />{seat.desserts
+                        .length}</span
+                    ><strong>{seat.score} ✦</strong>
+                  </li>{/each}
+              </ol>{/if}
             <div class="receipts">
               {#each pub.receipts.filter((r) => r.round === pub.round) as receipt}<details
                   open={receipt.playerId === playerId}
@@ -721,13 +835,38 @@
                       immediate: receipt.immediate,
                     })}
                   </p>
-                  {#each receipt.groups as g}<div class="score-line">
-                      <span>{label(g.kind)}</span><strong
+                  {#each receipt.groups as g, n}<div class="score-line">
+                      <span>{label(g.kind)}</span>{#if pixel}<span
+                          class="px-ticks"
+                          class:minus={g.amount < 0}
+                          aria-hidden="true"
+                          >{#each Array.from( { length: Math.min(12, Math.abs(g.amount)) } ) as _, i}<i
+                              style:--d={`${n * 90 + i * 45}ms`}
+                            ></i>{/each}</span
+                        >{/if}<strong
                         >{g.amount > 0 ? '+' : ''}{g.amount}</strong
                       >
                     </div>{/each}
+                  {#if pixel}{@const seat = pub.players.find(
+                      (p) => p.id === receipt.playerId,
+                    )}{#if seat?.desserts.length}<div
+                        class="px-desserts"
+                        aria-label={label('saved', {
+                          count: seat.desserts.length,
+                        })}
+                      >
+                        {#each tally(seat.desserts) as [kind, count]}<span
+                            ><PixelDish
+                              card={{ kind: kind as Kind, variant: '' }}
+                            /><b>×{count}</b></span
+                          >{/each}
+                      </div>{/if}{/if}
                 </details>{/each}
             </div>
+            {#if pixel && pub.phase === 'finished'}<i
+                class="px-chef px-chef-win"
+                aria-hidden="true"
+              ></i>{/if}
             {#if pub.phase === 'round-end'}<button
                 class="primary"
                 data-testid="sgp-ready"
@@ -764,7 +903,10 @@
               class="dessert-badge"
               aria-label={label('saved', { count: own.desserts.length })}
               onclick={() => open('tray', playerId)}
-              >♡ {own.desserts.length}</button
+              >{#if pixel}<span class="px-badge-art"
+                  ><PixelDish card={face(pub.menu.dessert)} /></span
+                >{:else}♡{/if}
+              {own.desserts.length}</button
             >
           </div>
           <span class="own-caption">{label('table_my_dishes')}</span>
@@ -831,6 +973,7 @@
                   aria-pressed={selection === card.handle}
                   aria-label={`${cardName(card, locale)}: ${label('rule_' + card.kind)}`}
                   onclick={() => {
+                    if (selection !== card.handle) cue('pick');
                     selection = card.handle;
                     copyTarget = '';
                   }}><Card {card} {locale} /></button
@@ -862,6 +1005,8 @@
 
 <dialog
   class="sushi-dialog"
+  class:px-tokens={pixel}
+  class:sgp-pixel={pixel}
   bind:this={dialog}
   oncancel={close}
   onclose={() => {
@@ -933,6 +1078,21 @@
         bind:checked={motion}
       /></label
     >
+    <fieldset class="skin-choice">
+      <legend>{m.skin()}</legend>
+      {#each [['classic', m.skin_classic()], ['pixel', m.skin_pixel()]] as [value, text]}<label
+          ><input
+            type="radio"
+            name="sgp-skin"
+            {value}
+            checked={skin === value}
+            onchange={() => {
+              skin = value as Skin;
+              setGameSkin('sushi-go-party', skin);
+            }}
+          />{text}</label
+        >{/each}
+    </fieldset>
     {#if settingsContent}{@render settingsContent()}{:else}<label
         class="setting"
         >{label('language')}<select
@@ -1582,6 +1742,35 @@
     gap: 15px;
     min-height: 64px;
     border-bottom: 1px solid #dfdeca;
+  }
+  .skin-choice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 18px;
+    margin: 0;
+    padding: 12px 0;
+    min-height: 64px;
+    box-sizing: border-box;
+    border: 0;
+    border-bottom: 1px solid #dfdeca;
+  }
+  .skin-choice legend {
+    float: left;
+    padding: 0;
+    margin-right: auto;
+  }
+  .skin-choice label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+  }
+  .skin-choice input {
+    width: 20px;
+    height: 20px;
+    min-height: 0;
+    accent-color: #b96453;
   }
   .setting input[type='checkbox'] {
     width: 24px;
