@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { getContext } from 'svelte';
   let { values }: { values: number[] | null } = $props();
+  const pixel = getContext<(() => boolean) | undefined>('catan:pixel');
   const faces = (front: number) => {
     const sides = [1, 2, 3, 4, 5, 6].filter(
       (n) => n !== front && n !== 7 - front,
@@ -18,20 +20,38 @@
 
 <div
   class="dice"
+  class:px-dice={pixel?.()}
   aria-live="polite"
   aria-label={values ? values.join(' + ') : '—'}
 >
   {#each [0, 1] as i}
     <div class="die-space">
-      <div class="die" class:red={i === 1} data-value={values?.[i] ?? 0}>
-        {#each faces(values?.[i] ?? 1) as value, face}
-          <div class="face" data-face={face}>
-            {#each Array(9) as _, cell}<i
-                class:visible={pips[value - 1].includes(cell)}
-              ></i>{/each}
-          </div>
-        {/each}
-      </div>
+      {#if pixel?.()}
+        <!-- 8-bit: flat faces stacked; the tumble flicks between them. -->
+        <div class="die" class:red={i === 1} data-value={values?.[i] ?? 1}>
+          {#each [1, 2, 3, 4, 5, 6] as value}
+            <div
+              class="face"
+              class:shown={value === (values?.[i] ?? 1)}
+              data-pips={value}
+            >
+              {#each Array(9) as _, cell}<i
+                  class:visible={pips[value - 1].includes(cell)}
+                ></i>{/each}
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <div class="die" class:red={i === 1} data-value={values?.[i] ?? 0}>
+          {#each faces(values?.[i] ?? 1) as value, face}
+            <div class="face" data-face={face}>
+              {#each Array(9) as _, cell}<i
+                  class:visible={pips[value - 1].includes(cell)}
+                ></i>{/each}
+            </div>
+          {/each}
+        </div>
+      {/if}
     </div>
   {/each}
 </div>

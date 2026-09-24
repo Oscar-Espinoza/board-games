@@ -1,6 +1,27 @@
 <script lang="ts">
-  import { onMount, tick, type Snippet } from 'svelte';
+  import { onMount, setContext, tick, untrack, type Snippet } from 'svelte';
   import { RevisionGate, read, write } from '@board-games/shared/ui';
+  import {
+    gameSkin,
+    setGameSkin,
+    type Skin,
+  } from '@board-games/shared/ui/pixel';
+  import {
+    P,
+    cell,
+    developmentCell,
+    discPixels,
+    linePixels,
+    polygonPixels,
+    sheets,
+    snap,
+  } from './pixel/geometry.js';
+  import {
+    ramp,
+    robberRamp,
+    sprites,
+    type SpriteName,
+  } from './pixel/sprites.js';
   import { prefersReducedMotion } from 'svelte/motion';
   import { playEffects, softAudio } from './effects.js';
   import type { playerView } from './index.js';
@@ -53,6 +74,15 @@
 
   let root: HTMLElement;
   let map: SVGSVGElement;
+  /** Viewer-only look; the 8-bit stylesheet loads the first time it is chosen. */
+  let skin = $state<Skin>(gameSkin('catan')),
+    pixelReady = $state(false);
+  $effect(() => {
+    if (skin === 'pixel' && !pixelReady)
+      void import('./pixel.css').then(() => (pixelReady = true));
+  });
+  const pixel = $derived(skin === 'pixel' && pixelReady);
+  setContext('catan:pixel', () => pixel);
   let sound = $state(read('catan:sound') !== 'false'),
     motion = $state(read('catan:motion') !== 'false');
   const reduced = $derived(prefersReducedMotion.current);
@@ -148,7 +178,7 @@
     if (id ? !canTradeWith(id) : !canTrade()) {
       if (sound) {
         audio.unlock();
-        audio.reject();
+        audio.reject(pixel);
       }
       return;
     }
@@ -290,6 +320,7 @@
     const enabled = motion && !reduced,
       audible = sound;
     const events = view.public.events;
+    const chip = untrack(() => pixel);
     stopEffects();
     clearTimeout(diceTimer);
     diceVisible = false;
@@ -305,7 +336,7 @@
       if (enabled && roll?.type === 'roll') {
         rolling = true;
       }
-      if (audible && events.length) audio.play(events);
+      if (audible && events.length) audio.play(events, chip, playerId);
       if (enabled)
         void tick().then(() => {
           if (!cancelled)
@@ -314,6 +345,7 @@
               events,
               () => (diceVisible = false),
               () => (rolling = false),
+              chip,
             );
         });
     }
@@ -464,6 +496,57 @@
         ? 'BUILD_ROAD'
         : selected,
   );
+  /** 8-bit island geometry, rasterized once per board on the art-pixel grid. */
+  const pixelIsland = $derived.by(() => {
+    if (!pixel) return null;
+    const corners = board.hexes.map((h: any) => h.vertices.map(point));
+    return {
+      foam: corners.map((c: number[][]) => polygonPixels(c, 9)).join(''),
+      sand: corners.map((c: number[][]) => polygonPixels(c, 6)).join(''),
+      sandShade: corners
+        .map((c: number[][]) =>
+          polygonPixels(
+            c.map(([x, y]) => [x, y + 2 * P]),
+            5,
+          ),
+        )
+        .join(''),
+      ink: corners.map((c: number[][]) => polygonPixels(c, 1)).join(''),
+      tiles: corners.map((c: number[][]) => polygonPixels(c, -0.6)),
+      rings: corners.map(
+        (c: number[][]) => polygonPixels(c, -0.6) + polygonPixels(c, -3.2),
+      ),
+    };
+  });
+  /** Road pixels per edge; boards of one size share their geometry. */
+  const roadCache = new Map<
+    string,
+    { ink: string; body: string; light: string }
+  >();
+  function pixelRoad(edge: number) {
+    const key = board.edges.length + ':' + edge;
+    let road = roadCache.get(key);
+    if (!road) {
+      const a = point(board.edges[edge][0]),
+        b = point(board.edges[edge][1]);
+      road = {
+        ink: linePixels(a, b, 2, 0, 0.17) + linePixels(a, b, 2, 1, 0.17),
+        body: linePixels(a, b, 1, 0, 0.17),
+        light: linePixels(a, b, 0, -1, 0.2),
+      };
+      roadCache.set(key, road);
+    }
+    return road;
+  }
+  const ownColor = $derived(
+    pub.players.find((p) => p.id === playerId)?.color ?? 0,
+  );
+  const colorIndex = (id: string) =>
+    pub.players.find((p: any) => p.id === id)?.color ?? 0;
+  const center = (h: { q: number; r: number }) => [
+    (2 * h.q + h.r) * tileX,
+    3 * h.r * tileY,
+  ];
   let bounds = $derived.by(() => {
     const xs = board.vertices.map((v: number[]) => v[0] * tileX),
       ys = board.vertices.map((v: number[]) => v[1] * tileY);
@@ -471,8 +554,103 @@
   });
 </script>
 
+{#snippet pixelSprite(
+  name: SpriteName,
+  palette: Record<string, string>,
+  x: number,
+  y: number,
+)}
+  {@const sprite = sprites[name]}
+  <g
+    class="px-art"
+    transform={`translate(${snap(x - (sprite.w * P) / 2)} ${snap(y - sprite.h * P)}) scale(${P})`}
+    >{#each sprite.layers as layer}<path
+        d={layer.d}
+        fill={palette[layer.key]}
+      />{/each}</g
+  >
+{/snippet}
+
+{#snippet sheetSprite(
+  url: string,
+  index: number,
+  cols: number,
+  size: number,
+  x: number,
+  y: number,
+  scale = size,
+  tall = size,
+)}
+  <svg
+    class="px-sheet"
+    x={snap(x)}
+    y={snap(y)}
+    width={scale * P}
+    height={(tall * scale * P) / size}
+    viewBox={`${index * size} 0 ${size} ${tall}`}
+    preserveAspectRatio="none"
+    ><image
+      class="px-sprite"
+      href={url}
+      width={cols * size}
+      height={tall}
+    /></svg
+  >
+{/snippet}
+
+{#snippet pixelRoadArt(edge: number, fill: string)}
+  {@const road = pixelRoad(edge)}
+  <path d={road.ink} fill="#1a0f08" /><path d={road.body} {fill} /><path
+    d={road.light}
+    fill={shade(fill, 1.35)}
+  />
+{/snippet}
+
+{#snippet pixelToken(x: number, y: number, n: number)}
+  {@const hot = n === 6 || n === 8}
+  <g class="px-token" aria-hidden="true">
+    <path d={discPixels(x, y + P, 11)} fill="#1a0f0899" />
+    <path d={discPixels(x, y, 11)} fill="#1a0f08" />
+    <path d={discPixels(x, y, 10)} fill="#c9a66b" />
+    <path d={discPixels(x - P, y - P, 9)} fill="#f6e7c8" />
+    <text
+      x={snap(x)}
+      y={snap(y + 3.6 * P)}
+      text-anchor="middle"
+      fill={hot ? '#c8453a' : '#1a0f08'}>{n}</text
+    >
+    {#each Array(6 - Math.abs(7 - n)) as _, k}<rect
+        x={snap(x) + (k * 2 - (6 - Math.abs(7 - n))) * P + P / 2}
+        y={snap(y) + 5 * P}
+        width={P}
+        height={P}
+        fill={hot ? '#c8453a' : '#1a0f08'}
+      />{/each}
+  </g>
+{/snippet}
+
 {#snippet ghost(action: any)}
-  {#if action.vertex !== undefined}
+  {#if pixel}
+    {#if action.vertex !== undefined}
+      {@const p = point(action.vertex)}
+      {@render pixelSprite(
+        action.type === 'BUILD_CITY' ? 'city' : 'settlement',
+        ramp(colors[ownColor]),
+        p[0],
+        p[1] + 6 * P,
+      )}
+    {:else if action.edge !== undefined}
+      {@render pixelRoadArt(action.edge, colors[ownColor])}
+    {:else}
+      {@const h = board.hexes[action.hex]}{@const c = center(h)}
+      {@render pixelSprite(
+        'robber',
+        robberRamp,
+        c[0] + (h.number ? 24 : 0),
+        c[1] + (h.number ? 16 : 14),
+      )}
+    {/if}
+  {:else if action.vertex !== undefined}
     {@const p = point(action.vertex)}
     <path
       transform={'translate(' + p[0] + ' ' + p[1] + ') scale(1.25)'}
@@ -550,10 +728,13 @@
 <section
   bind:this={root}
   class="catan"
+  class:px-tokens={pixel}
+  class:ca-pixel={pixel}
   class:still={!motion || reduced}
   aria-label="CATAN"
   style:--ocean={'url("' + ocean + '")'}
   style:--wood-grain={'url("' + woodGrain + '")'}
+  style:--px-table={pixel ? `url("${sheets.table}")` : undefined}
 >
   <nav class="table-navigation" aria-label={m.catalog({}, { locale })}>
     <a href="/" onclick={() => onLeave?.()}
@@ -634,6 +815,21 @@
           {motion && !reduced ? '✓' : '×'}</button
         >
       </div>
+      <fieldset class="skin-choice">
+        <legend>{m.skin({}, { locale })}</legend>
+        {#each [['classic', m.skin_classic({}, { locale })], ['pixel', m.skin_pixel({}, { locale })]] as [value, text]}<label
+            ><input
+              type="radio"
+              name="catan-skin"
+              {value}
+              checked={skin === value}
+              onchange={() => {
+                skin = value as Skin;
+                setGameSkin('catan', skin);
+              }}
+            />{text}</label
+          >{/each}
+      </fieldset>
       <details>
         <summary>{m.catan_help({}, { locale })}</summary>
         <p>{m.catan_help_text({}, { locale })}</p>
@@ -649,7 +845,13 @@
         class:active={pub.phase.player === p.id}
         style={`--seat:${colors[p.color]}`}
       >
-        <div class="crest" aria-hidden="true">{crests[p.color]}</div>
+        {#if pixel}<div
+            class="crest px-crest px-sprite"
+            aria-hidden="true"
+            style={cell(sheets.crests.url, p.color, sheets.crests.cols)}
+          ></div>{:else}<div class="crest" aria-hidden="true">
+            {crests[p.color]}
+          </div>{/if}
         <div class="seat-identity">
           <div class="civilization-name">{civilizations()[p.color]}</div>
           {#if chooseSeat}<button
@@ -692,10 +894,18 @@
           >{/if}
         {#if pub.longest === p.id || pub.army === p.id}<div class="awards">
             {#if pub.longest === p.id}<small
-                ><span aria-hidden="true">⚒</span>
+                >{#if pixel}<span
+                    class="px-award px-sprite"
+                    aria-hidden="true"
+                    style={cell(sheets.crests.url, 6, sheets.crests.cols)}
+                  ></span>{:else}<span aria-hidden="true">⚒</span>{/if}
                 {m.catan_longest_route({}, { locale })}</small
               >{/if}{#if pub.army === p.id}<small
-                ><span aria-hidden="true">♟</span>
+                >{#if pixel}<span
+                    class="px-award px-sprite"
+                    aria-hidden="true"
+                    style={cell(sheets.crests.url, 7, sheets.crests.cols)}
+                  ></span>{:else}<span aria-hidden="true">♟</span>{/if}
                 {m.catan_largest_army({}, { locale })}</small
               >{/if}
           </div>{/if}
@@ -723,6 +933,22 @@
   <div class="dice-bowl" aria-label={m.catan_roll_dice({}, { locale })}>
     {#if pub.dice && !diceVisible}<Dice values={pub.dice} />{/if}
   </div>
+  {#if pixel && pub.phase.type === 'finished'}
+    {@const winner = pub.players.find((p) => p.id === pub.phase.winner)}
+    <!-- 8-bit result banner; the phase line below still announces it. -->
+    <div
+      class="px-victory"
+      aria-hidden="true"
+      style={`--seat:${colors[winner?.color ?? 0]}`}
+    >
+      <span
+        class="px-victory-crest px-sprite"
+        style={cell(sheets.crests.url, winner?.color ?? 0, sheets.crests.cols)}
+      ></span>
+      <strong>{name(pub.phase.winner)} {m.catan_wins({}, { locale })}</strong>
+      <small>{civilizations()[winner?.color ?? 0]}</small>
+    </div>
+  {/if}
   <p class="phase" aria-live="polite">
     {phaseText}{#if pub.paired}
       · {m.catan_paired_opportunity({}, { locale })}{/if}
@@ -801,20 +1027,27 @@
           /><stop offset="1" stop-color="#080b0c" /></radialGradient
         ></defs
       >
-      <defs
-        >{#each terrain as url, i}<pattern
-            id={`terrain-${i}`}
-            width="1"
-            height="1"
-            patternContentUnits="objectBoundingBox"
-            ><image
-              href={url}
+      <!-- Pixel terrain is clipped, not patterned: pattern images ignore image-rendering. -->
+      {#if pixel && pixelIsland}<defs
+          >{#each pixelIsland.tiles as tile, i}<clipPath id={`px-tile-${i}`}
+              ><path d={tile} /></clipPath
+            >{/each}</defs
+        >{:else}
+        <defs
+          >{#each terrain as url, i}<pattern
+              id={`terrain-${i}`}
               width="1"
               height="1"
-              preserveAspectRatio="xMidYMid slice"
-            /></pattern
-          >{/each}</defs
-      >
+              patternContentUnits="objectBoundingBox"
+              ><image
+                href={url}
+                width="1"
+                height="1"
+                preserveAspectRatio="xMidYMid slice"
+              /></pattern
+            >{/each}</defs
+        >
+      {/if}
       <g
         class="island-map"
         transform={'translate(' +
@@ -825,133 +1058,264 @@
           zoom +
           ')'}
       >
-        <!-- Keep the island bounds available to accepted dice effects. -->
-        <g
-          class="shore"
-          fill="#dab57a"
-          stroke="#f0d69d"
-          stroke-width="9"
-          stroke-linejoin="round"
-          >{#each board.hexes as h}<polygon
+        {#if pixel && pixelIsland}
+          <!-- Keep the island bounds available to accepted dice effects. -->
+          <g class="shore px-shore" aria-hidden="true">
+            <path d={pixelIsland.foam} fill="#bfe9ef" />
+            <path d={pixelIsland.sandShade} fill="#b8894a" />
+            <path d={pixelIsland.sand} fill="#ecd08a" />
+            <path d={pixelIsland.ink} fill="#1a0f08" />
+          </g>
+          {#each board.hexes as h, i}
+            {@const c = center(h)}
+            <g data-hex={i} class="px-hex">
+              <g clip-path={`url(#px-tile-${i})`}
+                >{@render sheetSprite(
+                  sheets.terrain.url,
+                  h.resource ?? 5,
+                  sheets.terrain.cols,
+                  sheets.terrain.w,
+                  c[0] - 50,
+                  c[1] - (sheets.terrain.h * P) / 2,
+                  sheets.terrain.w,
+                  sheets.terrain.h,
+                )}</g
+              >
+              <path
+                class="px-glow"
+                d={pixelIsland.rings[i]}
+                fill="#fff3a8"
+                fill-rule="evenodd"
+                opacity="0"
+              />
+              {#if h.number}{@render pixelToken(c[0], c[1], h.number)}{/if}
+              {#if allowed('MOVE_ROBBER')}<text
+                  class="px-hex-id"
+                  x={c[0]}
+                  y={c[1] + 33}
+                  text-anchor="middle">#{i}</text
+                >{/if}
+              {#if pub.robber === i}<g
+                  data-robber
+                  aria-label={m.catan_robber({}, { locale })}
+                  >{@render pixelSprite(
+                    'robber',
+                    robberRamp,
+                    c[0] + (h.number ? 24 : 0),
+                    c[1] + (h.number ? 16 : 14),
+                  )}</g
+                >{/if}
+            </g>
+          {/each}
+        {:else}
+          <!-- Keep the island bounds available to accepted dice effects. -->
+          <g
+            class="shore"
+            fill="#dab57a"
+            stroke="#f0d69d"
+            stroke-width="9"
+            stroke-linejoin="round"
+            >{#each board.hexes as h}<polygon
+                points={h.vertices
+                  .map((v: number) => point(v).join(','))
+                  .join(' ')}
+              />{/each}</g
+          >
+          {#each board.hexes as h, i}
+            <polygon
+              data-hex={i}
               points={h.vertices
                 .map((v: number) => point(v).join(','))
                 .join(' ')}
-            />{/each}</g
-        >
-        {#each board.hexes as h, i}
-          <polygon
-            data-hex={i}
-            points={h.vertices.map((v: number) => point(v).join(',')).join(' ')}
-            fill={`url(#terrain-${h.resource ?? 5})`}
-            stroke="#f4da9c"
-            stroke-width="3.5"
-          />
-          {#if h.number}<circle
-              cx={(2 * h.q + h.r) * tileX}
-              cy={3 * h.r * tileY}
-              r="16"
-              class="number-token"
-              fill="#fff0cd"
-            /><text
-              x={(2 * h.q + h.r) * tileX}
-              y={3 * h.r * tileY + 6}
-              text-anchor="middle"
-              fill={h.number === 6 || h.number === 8 ? '#b73428' : '#31291e'}
-              font-size="18"
-              font-weight="600">{h.number}</text
-            >{/if}
-          {#if allowed('MOVE_ROBBER')}<text
-              x={(2 * h.q + h.r) * tileX}
-              y={3 * h.r * tileY + 28}
-              text-anchor="middle"
-              font-size="10"
-              fill="#fff">#{i}</text
-            >{/if}{#if pub.robber === i}
-            <g
-              transform={'translate(' +
-                ((2 * h.q + h.r) * tileX + 17) +
-                ' ' +
-                (3 * h.r * tileY - 7) +
-                ')'}
-              ><g data-robber aria-label={m.catan_robber({}, { locale })}>
-                <ellipse cy="10" rx="10" ry="4" fill="#172017" opacity=".45" />
-                <path
-                  d="M-7 5Q-6-1-4-8H4Q6-1 7 5Q10 12 0 12Q-10 12-7 5Z"
-                  fill="url(#robber-lacquer)"
-                  stroke="#1b1d1a"
-                  stroke-width=".8"
-                />
-                <ellipse cy="5" rx="7" ry="3" fill="url(#robber-lacquer)" />
-                <circle
-                  cy="-12"
-                  r="6"
-                  fill="url(#robber-lacquer)"
-                  stroke="#252822"
-                  stroke-width=".7"
-                />
-              </g></g
-            >{/if}
-        {/each}
+              fill={`url(#terrain-${h.resource ?? 5})`}
+              stroke="#f4da9c"
+              stroke-width="3.5"
+            />
+            {#if h.number}<circle
+                cx={(2 * h.q + h.r) * tileX}
+                cy={3 * h.r * tileY}
+                r="16"
+                class="number-token"
+                fill="#fff0cd"
+              /><text
+                x={(2 * h.q + h.r) * tileX}
+                y={3 * h.r * tileY + 6}
+                text-anchor="middle"
+                fill={h.number === 6 || h.number === 8 ? '#b73428' : '#31291e'}
+                font-size="18"
+                font-weight="600">{h.number}</text
+              >{/if}
+            {#if allowed('MOVE_ROBBER')}<text
+                x={(2 * h.q + h.r) * tileX}
+                y={3 * h.r * tileY + 28}
+                text-anchor="middle"
+                font-size="10"
+                fill="#fff">#{i}</text
+              >{/if}{#if pub.robber === i}
+              <g
+                transform={'translate(' +
+                  ((2 * h.q + h.r) * tileX + 17) +
+                  ' ' +
+                  (3 * h.r * tileY - 7) +
+                  ')'}
+                ><g data-robber aria-label={m.catan_robber({}, { locale })}>
+                  <ellipse
+                    cy="10"
+                    rx="10"
+                    ry="4"
+                    fill="#172017"
+                    opacity=".45"
+                  />
+                  <path
+                    d="M-7 5Q-6-1-4-8H4Q6-1 7 5Q10 12 0 12Q-10 12-7 5Z"
+                    fill="url(#robber-lacquer)"
+                    stroke="#1b1d1a"
+                    stroke-width=".8"
+                  />
+                  <ellipse cy="5" rx="7" ry="3" fill="url(#robber-lacquer)" />
+                  <circle
+                    cy="-12"
+                    r="6"
+                    fill="url(#robber-lacquer)"
+                    stroke="#252822"
+                    stroke-width=".7"
+                  />
+                </g></g
+              >{/if}
+          {/each}
+        {/if}
         {#each board.ports as port}
           {@const ends = board.edges[port.edge]}{@const a = point(
             ends[0],
           )}{@const b = point(ends[1])}
           {@const cx = (a[0] + b[0]) / 2}{@const cy =
             (a[1] + b[1]) / 2}{@const length = Math.hypot(cx, cy) || 1}
-          <g
-            class="harbor"
-            aria-label={(port.resource === null
-              ? m.catan_everyone({}, { locale })
-              : names()[port.resource]) +
-              ' ' +
-              (port.resource === null ? '3:1' : '2:1')}
-          >
-            <line
-              x1={cx}
-              y1={cy}
-              x2={cx + (cx / length) * 25}
-              y2={cy + (cy / length) * 25}
-              stroke="#ae8654"
-              stroke-width="5"
-            />
+          {#if pixel}
+            {@const hx = snap(cx + (cx / length) * 36)}{@const hy = snap(
+              cy + (cy / length) * 36,
+            )}{@const wide = port.resource !== null}
             <g
-              transform={'translate(' +
-                (cx + (cx / length) * 32) +
+              class="harbor px-harbor"
+              aria-label={(port.resource === null
+                ? m.catan_everyone({}, { locale })
+                : names()[port.resource]) +
                 ' ' +
-                (cy + (cy / length) * 32) +
-                ') scale(1.2)'}
+                (port.resource === null ? '3:1' : '2:1')}
             >
               <path
-                d="M0-20 17-10 17 11 0 21-17 11-17-10Z"
-                fill="#083348"
-                stroke="#d8a95c"
-                stroke-width="2"
+                d={linePixels(
+                  [cx, cy],
+                  [cx + (cx / length) * 24, cy + (cy / length) * 24],
+                  2,
+                )}
+                fill="#1a0f08"
+              /><path
+                d={linePixels(
+                  [cx, cy],
+                  [cx + (cx / length) * 24, cy + (cy / length) * 24],
+                  1,
+                )}
+                fill="#9c6a3c"
               />
-              {#if port.resource === null}<path
-                  d="m-12 1 5 4h14l5-4Z"
-                  fill="#fff2cd"
-                /><path d="M0 0v-12L9-2H0" fill="#fff1cd" />{/if}
-              <text
-                x="0"
-                y="15"
-                text-anchor="middle"
-                font-size="9"
-                font-weight="800"
-                fill="#fff1cd">{port.resource === null ? '3:1' : '2:1'}</text
+              <g class="px-bob"
+                >{@render sheetSprite(
+                  sheets.boat.url,
+                  0,
+                  1,
+                  sheets.boat.size,
+                  hx - 12 * P,
+                  hy - 18 * P,
+                )}</g
               >
-              {#if port.resource !== null}<image
-                  x="-11"
-                  y="-17"
-                  width="22"
-                  height="22"
-                  href={resourceArtwork[port.resource]}
-                />{/if}
+              <rect
+                x={hx - (wide ? 13 : 9) * P}
+                y={hy + 5 * P}
+                width={(wide ? 26 : 18) * P}
+                height={11 * P}
+                fill="#1a0f08"
+              /><rect
+                x={hx - (wide ? 12 : 8) * P}
+                y={hy + 6 * P}
+                width={(wide ? 24 : 16) * P}
+                height={9 * P}
+                fill={wide ? '#f2c14e' : '#f6e7c8'}
+              />
+              {#if port.resource !== null}{@render sheetSprite(
+                  sheets.resourcesSmall.url,
+                  port.resource,
+                  sheets.resourcesSmall.cols,
+                  sheets.resourcesSmall.size,
+                  hx - 14 * P,
+                  hy + 2 * P,
+                )}{/if}
+              <text
+                class="px-rate"
+                x={hx + (wide ? 5 : 0) * P}
+                y={hy + 13.5 * P}
+                text-anchor="middle"
+                fill="#1a0f08">{wide ? '2:1' : '3:1'}</text
+              >
             </g>
-          </g>
+          {:else}
+            <g
+              class="harbor"
+              aria-label={(port.resource === null
+                ? m.catan_everyone({}, { locale })
+                : names()[port.resource]) +
+                ' ' +
+                (port.resource === null ? '3:1' : '2:1')}
+            >
+              <line
+                x1={cx}
+                y1={cy}
+                x2={cx + (cx / length) * 25}
+                y2={cy + (cy / length) * 25}
+                stroke="#ae8654"
+                stroke-width="5"
+              />
+              <g
+                transform={'translate(' +
+                  (cx + (cx / length) * 32) +
+                  ' ' +
+                  (cy + (cy / length) * 32) +
+                  ') scale(1.2)'}
+              >
+                <path
+                  d="M0-20 17-10 17 11 0 21-17 11-17-10Z"
+                  fill="#083348"
+                  stroke="#d8a95c"
+                  stroke-width="2"
+                />
+                {#if port.resource === null}<path
+                    d="m-12 1 5 4h14l5-4Z"
+                    fill="#fff2cd"
+                  /><path d="M0 0v-12L9-2H0" fill="#fff1cd" />{/if}
+                <text
+                  x="0"
+                  y="15"
+                  text-anchor="middle"
+                  font-size="9"
+                  font-weight="800"
+                  fill="#fff1cd">{port.resource === null ? '3:1' : '2:1'}</text
+                >
+                {#if port.resource !== null}<image
+                    x="-11"
+                    y="-17"
+                    width="22"
+                    height="22"
+                    href={resourceArtwork[port.resource]}
+                  />{/if}
+              </g>
+            </g>
+          {/if}
         {/each}
-        {#each pub.roads as owner, e}{#if owner}{@const a = point(
-              board.edges[e][0],
-            )}{@const b = point(board.edges[e][1])}<g data-piece={'road-' + e}
+        {#each pub.roads as owner, e}{#if owner && pixel}<g
+              data-piece={'road-' + e}
+              ><g class="built px-built"
+                >{@render pixelRoadArt(e, color(owner))}</g
+              ></g
+            >{:else if owner}{@const a = point(board.edges[e][0])}{@const b =
+              point(board.edges[e][1])}<g data-piece={'road-' + e}
               ><line
                 x1={a[0] * 0.86 + b[0] * 0.14 + 1}
                 y1={a[1] * 0.86 + b[1] * 0.14 + 2}
@@ -970,8 +1334,17 @@
                 stroke-width="8"
               /></g
             >{/if}{/each}
-        {#each pub.buildings as building, v}{#if building}{@const p =
-              point(v)}<g
+        {#each pub.buildings as building, v}{#if building && pixel}{@const p =
+              point(v)}<g data-piece={'building-' + v}
+              ><g class="built px-built"
+                >{@render pixelSprite(
+                  building.city ? 'city' : 'settlement',
+                  ramp(colors[building.color]),
+                  p[0],
+                  p[1] + 6 * P,
+                )}</g
+              ></g
+            >{:else if building}{@const p = point(v)}<g
               data-piece={'building-' + v}
               transform={'translate(' + p[0] + ' ' + p[1] + ') scale(1.25)'}
               ><path
@@ -1117,8 +1490,13 @@
               const action = legal.find((a) => a.type === type);
               if (action) send(action);
             }}
-            ><span aria-hidden="true">{type === 'END_TURN' ? '▶' : '▱'}</span
-            >{label({ type })}</button
+            >{#if pixel && type === 'BUY_DEVELOPMENT'}<span
+                class="px-card-icon px-sprite"
+                aria-hidden="true"
+                style={cell(sheets.cards.url, 5, sheets.cards.cols)}
+              ></span>{:else}<span aria-hidden="true"
+                >{type === 'END_TURN' ? '▶' : '▱'}</span
+              >{/if}{label({ type })}</button
           >{/each}
         {#each legal.filter( (a) => ['FINISH_ROADS', 'STEAL'].includes(a.type) ) as action}<button
             onclick={() => send(action)}>{label(action)}</button
@@ -1153,22 +1531,45 @@
               showPlacements = true;
               pending = null;
             }}
-            ><svg
-              class="build-icon"
-              viewBox="-13 -13 26 26"
-              aria-hidden="true"
-              fill={color(playerId)}
-              stroke="#fff3cb"
-              stroke-width="1.5"
-            >
-              {#if type === 'BUILD_ROAD'}<path
-                  d="M-9 6 7-9 11-5-5 10Z"
-                />{:else}<path
-                  d={type === 'BUILD_CITY'
-                    ? 'M -10 9 V -8 H -2 V -1 H 8 V 9 Z'
-                    : 'M -8 8 V -2 L 0 -10 L 8 -2 V 8 Z'}
-                />{/if}
-            </svg>{label({ type })}</button
+            >{#if pixel}{@const icon =
+                type === 'BUILD_CITY'
+                  ? sprites.city
+                  : type === 'BUILD_SETTLEMENT'
+                    ? sprites.settlement
+                    : null}<svg
+                class="build-icon px-build-icon"
+                viewBox="0 0 20 19"
+                aria-hidden="true"
+                shape-rendering="crispEdges"
+                >{#if icon}<g
+                    transform={`translate(${Math.floor((20 - icon.w) / 2)} ${19 - icon.h})`}
+                    >{#each icon.layers as layer}<path
+                        d={layer.d}
+                        fill={ramp(colors[ownColor])[layer.key]}
+                      />{/each}</g
+                  >{:else}<path
+                    d="M1 14h4v-2h4v-2h4v-2h4v-2h3v5h-4v2h-4v2h-4v2h-7z"
+                    fill="#1a0f08"
+                  /><path
+                    d="M2 15h4v-2h4v-2h4v-2h4v-2h1v3h-4v2h-4v2h-4v2h-5z"
+                    fill={colors[ownColor]}
+                  />{/if}</svg
+              >{:else}<svg
+                class="build-icon"
+                viewBox="-13 -13 26 26"
+                aria-hidden="true"
+                fill={color(playerId)}
+                stroke="#fff3cb"
+                stroke-width="1.5"
+              >
+                {#if type === 'BUILD_ROAD'}<path
+                    d="M-9 6 7-9 11-5-5 10Z"
+                  />{:else}<path
+                    d={type === 'BUILD_CITY'
+                      ? 'M -10 9 V -8 H -2 V -1 H 8 V 9 Z'
+                      : 'M -8 8 V -2 L 0 -10 L 8 -2 V 8 Z'}
+                  />{/if}
+              </svg>{/if}{label({ type })}</button
           >{/each}
       </div>
 
@@ -1207,7 +1608,9 @@
         >
         <div
           class="card-art"
-          style={'background-image:url(' + terrain[i] + ')'}
+          style={pixel
+            ? cell(sheets.terrain.url, i, sheets.terrain.cols)
+            : 'background-image:url(' + terrain[i] + ')'}
         >
           <ResourceArt resource={i} />
         </div>
@@ -1226,7 +1629,19 @@
           >{priv.development.filter((c) => c.kind === kind).length}</b
         >
         <span class="card-title">{label({ type: kind })}</span>
-        <img decoding="async" class="card-art" src={developmentBack} alt="" />
+        {#if pixel}<span
+            class="card-art px-sprite"
+            style={cell(
+              sheets.cards.url,
+              developmentCell(kind),
+              sheets.cards.cols,
+            )}
+          ></span>{:else}<img
+            decoding="async"
+            class="card-art"
+            src={developmentBack}
+            alt=""
+          />{/if}
         <span class="card-footer">CATAN</span>
       </button>
     {/each}
@@ -2300,6 +2715,27 @@
   }
   .preferences button[aria-pressed='true'] {
     border-color: #f3d79b;
+  }
+  .skin-choice {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin: 0 0 14px;
+    padding: 8px 12px 10px;
+    border: 1px solid #b9915580;
+    border-radius: 5px;
+    font-size: 14px;
+  }
+  .skin-choice legend {
+    padding: 0 4px;
+    font-size: 13px;
+    font-weight: bold;
+  }
+  .skin-choice label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
   }
   summary {
     cursor: pointer;
