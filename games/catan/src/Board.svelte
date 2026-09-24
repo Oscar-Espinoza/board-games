@@ -412,6 +412,16 @@
     priv = $derived(view.private),
     board = $derived(pub.board),
     legal = $derived(priv.legalActions as any[]);
+  /** Pieces a seat still has in its box. */
+  const reserve = (p: (typeof pub.players)[number]) => ({
+    roads: 15 - pub.roads.filter((owner) => owner === p.id).length,
+    settlements:
+      5 -
+      pub.buildings.filter((b) => b && b.color === p.color && !b.city).length,
+    cities:
+      4 -
+      pub.buildings.filter((b) => b && b.color === p.color && b.city).length,
+  });
   const validOffer = () =>
     !tradeReason(targetPlayer) &&
     give.some((n) => n > 0) &&
@@ -909,26 +919,23 @@
                 {m.catan_largest_army({}, { locale })}</small
               >{/if}
           </div>{/if}
+        {#if pixel && ['west', 'east'].includes(position(p.id))}<div
+            class="px-supply"
+            aria-hidden="true"
+          >
+            <PieceReserve color={colors[p.color]} {...reserve(p)} />
+          </div>{/if}
       </div>{/each}
   </div>
-  {#each pub.players.filter( (p) => ['west', 'east'].includes(position(p.id)) ) as p}
-    <div
-      class="reserve"
-      data-reserve-position={position(p.id)}
-      aria-hidden="true"
-    >
-      <PieceReserve
-        color={colors[p.color]}
-        roads={15 - pub.roads.filter((owner) => owner === p.id).length}
-        settlements={5 -
-          pub.buildings.filter((b) => b && b.color === p.color && !b.city)
-            .length}
-        cities={4 -
-          pub.buildings.filter((b) => b && b.color === p.color && b.city)
-            .length}
-      />
-    </div>
-  {/each}
+  {#if !pixel}{#each pub.players.filter( (p) => ['west', 'east'].includes(position(p.id)) ) as p}
+      <div
+        class="reserve"
+        data-reserve-position={position(p.id)}
+        aria-hidden="true"
+      >
+        <PieceReserve color={colors[p.color]} {...reserve(p)} />
+      </div>
+    {/each}{/if}
   <BuildingCosts {locale} />
   <div class="dice-bowl" aria-label={m.catan_roll_dice({}, { locale })}>
     {#if pub.dice && !diceVisible}<Dice values={pub.dice} />{/if}

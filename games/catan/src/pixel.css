@@ -244,11 +244,40 @@
   & .table:has(> svg:focus-visible) .zoom-controls {
     outline: var(--px) solid var(--px-gold);
   }
-  & .reserve {
-    transform: none;
+  /* West/east seats keep their spare pieces on a wooden tray under the plaque. */
+  & .px-supply {
+    position: absolute;
+    top: calc(100% + var(--px) * 4);
+    left: 0;
+    width: 184px;
+    padding: calc(var(--px) * 3);
+    background: var(--px-wood);
+    border: var(--px) solid var(--px-ink);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--px-wood-edge),
+      0 calc(var(--px) * 2) 0 var(--px-ink);
+    pointer-events: none;
   }
-  & .reserve[data-reserve-position] {
-    width: 11%;
+  & [data-position='east'] > .px-supply {
+    left: auto;
+    right: 0;
+  }
+  & .px-supply .px-reserve {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: hidden;
+  }
+  @media (max-width: 1100px), (max-height: 760px) {
+    & .px-supply {
+      width: 138px;
+      padding: calc(var(--px) * 2);
+    }
+  }
+  @media (max-width: 700px), (max-height: 620px) {
+    & .px-supply {
+      display: none;
+    }
   }
 
   /* A square wooden dice tray instead of the round bowl. */
