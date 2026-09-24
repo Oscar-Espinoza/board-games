@@ -2,6 +2,15 @@
   import { onMount, untrack, type Snippet } from 'svelte';
   import { prefersReducedMotion } from 'svelte/motion';
   import { modal, read, write } from '@board-games/shared/ui';
+  import {
+    gameSkin,
+    setGameSkin,
+    type Skin,
+  } from '@board-games/shared/ui/pixel';
+  import { m } from '@board-games/shared/messages';
+  import { loadPixelArt } from './pixel/atlas.svelte.js';
+  import PixelIcon from './pixel/PixelIcon.svelte';
+  import type { pixelAudio } from './pixel/sound.js';
   import FigureSprite from './table/FigureSprite.svelte';
   import {
     ground,
@@ -99,8 +108,53 @@
     cy -= delta.y;
   }
   let settings = $state(false);
-  const audio = tableAudio(),
+  const classicAudio = tableAudio(),
     gate = new EventGate();
+  // Viewer-only table style. The 8-bit stylesheet, art and chiptune pack load only
+  // when chosen, so classic players never download them.
+  let skin = $state<Skin>(gameSkin('carcassonne')),
+    pixelReady = $state(false),
+    chiptune: ReturnType<typeof pixelAudio> | undefined;
+  $effect(() => {
+    if (skin !== 'pixel' || pixelReady) return;
+    void Promise.all([
+      import('./pixel.css'),
+      import('./pixel/sound.js'),
+      loadPixelArt(),
+    ]).then(([, pack]) => {
+      chiptune ??= pack.pixelAudio();
+      chiptune.mute(!sound);
+      pixelReady = true;
+    });
+  });
+  const pixel = $derived(skin === 'pixel' && pixelReady);
+  // One facade over both sound packs; the chosen skin decides which one plays.
+  const audio = {
+    get pack() {
+      return pixel && chiptune ? chiptune : classicAudio;
+    },
+    unlock() {
+      this.pack.unlock();
+    },
+    play(kind: string, delay = 0) {
+      this.pack.play(kind, delay);
+    },
+    events(events: Parameters<typeof classicAudio.events>[0]) {
+      this.pack.events(events);
+    },
+    mute(value: boolean) {
+      classicAudio.mute(value);
+      chiptune?.mute(value);
+    },
+    close() {
+      classicAudio.close();
+      chiptune?.close();
+    },
+  };
+  function chooseSkin(value: Skin) {
+    skin = value;
+    setGameSkin('carcassonne', value);
+  }
   let ferryPreview = $state<{ tile: string; pair: [string, string] } | null>(
     null,
   );
@@ -181,7 +235,30 @@
     const f = byNode.get(node(k, r.id));
     return { complete: !!f?.complete, rising: !!f && rising.includes(f.id) };
   }
-  let receipts = $state<{ id: number; player: string; points: number }[]>([]);
+  let receipts = $state<
+    {
+      id: number;
+      player: string;
+      points: number;
+      /** World point of the scored feature, for the 8-bit score pop. */
+      at: { x: number; y: number } | null;
+    }[]
+  >([]);
+  function scoredAt(e: {
+    target?: string;
+    tiles?: string[];
+  }): { x: number; y: number } | null {
+    const keys = (
+      e.tiles?.length ? e.tiles : e.target ? [split(e.target).tile] : []
+    )
+      .map((k) => k.split(',').map(Number))
+      .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
+    if (!keys.length) return null;
+    return {
+      x: (keys.reduce((n, [x]) => n + x, 0) / keys.length) * 100 + 50,
+      y: (keys.reduce((n, [, y]) => n + y, 0) / keys.length) * 100 + 50,
+    };
+  }
   let recentTimer: ReturnType<typeof setTimeout>;
   const locations = $derived([
     ...new Map(
@@ -524,7 +601,12 @@
       audio.events(events);
       receipts = events
         .filter((e) => e.points && e.player)
-        .map((e) => ({ id: e.id, player: e.player!, points: e.points! }));
+        .map((e) => ({
+          id: e.id,
+          player: e.player!,
+          points: e.points!,
+          at: scoredAt(e),
+        }));
       recent = events.filter((e) => e.target).map((e) => split(e.target!).tile);
       const lifted = events
         .filter((e) => e.kind === 'place' && e.target)
@@ -798,14 +880,16 @@
 />
 <div
   class="carc-table"
+  class:px-tokens={pixel}
+  class:cc-pixel={pixel}
   class:carrying={!!drag?.moved}
   class:supply-open={supplyOpen}
   class:motion
 >
   <header class="table-header">
-    <span class="fleur" aria-hidden="true">⚜</span><span class="table-title"
-      >Carcassonne</span
-    >
+    <span class="fleur" aria-hidden="true"
+      >{#if pixel}<PixelIcon name="castle" />{:else}⚜{/if}</span
+    ><span class="table-title">Carcassonne</span>
     <span class="edition-tag">{t('edition')}</span>
   </header>
   <div class="landscape">
@@ -846,19 +930,25 @@
               y="5"
               width="97"
               height="98"
-              rx="2"
+              rx={pixel ? 0 : 2}
               fill="#080d08"
               opacity=".35"
             />
             {#each tileEdge as e}<rect
                 width="100"
                 height="100"
-                rx="1.2"
+                rx={pixel ? 0 : 1.2}
                 fill={e.fill}
                 transform={`translate(${e.x} ${e.y})`}
               />{/each}
             <g class="tile-surface"
-              ><TileArt id={tile.id} rotation={tile.rotation} /></g
+              ><TileArt
+                id={tile.id}
+                rotation={tile.rotation}
+                {pixel}
+                x={tile.x}
+                y={tile.y}
+              /></g
             >
             {#if feature?.tiles.includes(k)}<g
                 transform={`rotate(${tile.rotation * 90} 50 50)`}
@@ -942,6 +1032,7 @@
               cities={cityStates(k, tile.id)}
               monastery={monasteryState(k, tile.id)}
               detail={scale >= 0.45}
+              {pixel}
             />
             {#each p.figures.filter((f) => f.tile === k) as f, i}
               {@const r = tiles[tile.id].regions.find(
@@ -954,11 +1045,12 @@
                 transform={`translate(${a[0] + (i % 2) * 4} ${a[1]}) ${uprightMatrix} rotate(${r.kind === 'field' ? 75 : 0}) scale(${f.type === 'large' ? 1.75 : 1.3})`}
                 class="figure"
                 data-region={node(k, f.region)}
-                ><FigureSprite color={colors[index]} type={f.type} />
+                ><FigureSprite color={colors[index]} type={f.type} {pixel} />
                 {#if f.attachment}<g transform="translate(17 6) scale(.65)"
                     ><FigureSprite
                       color={colors[index]}
                       type={f.attachment}
+                      {pixel}
                     /></g
                   >{/if}</g
               >
@@ -1001,7 +1093,19 @@
                 stroke-dasharray="2 2"
                 class="region"
                 ><title>{t(r.kind)} ({tile.x}, {tile.y})</title></circle
-              >
+              >{#if pixel && legal}<g
+                  class="px-target"
+                  transform={`translate(${a[0]} ${a[1]}) ${uprightMatrix}`}
+                  pointer-events="none"
+                  ><path
+                    class="px-target-arrow"
+                    d="M-4 -24h8v6h4l-8 8l-8 -8h4z"
+                    fill="#ffe08a"
+                    stroke="#22160e"
+                    stroke-width="1.6"
+                    shape-rendering="crispEdges"
+                  /></g
+                >{/if}
             {/each}
           </g>{/each}
         {#if p.phase === 'place' && mine && tool === 'tile'}{#each locations as loc}<g
@@ -1032,8 +1136,16 @@
             data-preview="true"
             ><g
               class="rotating"
-              style={`transform:rotate(${visualRotation * 90}deg);transform-origin:50px 50px`}
-              ><TileArt id={p.current} /></g
+              style={pixel
+                ? ''
+                : `transform:rotate(${visualRotation * 90}deg);transform-origin:50px 50px`}
+              >{#if pixel}<TileArt
+                  id={p.current}
+                  {rotation}
+                  pixel
+                  x={preview.x}
+                  y={preview.y}
+                />{:else}<TileArt id={p.current} />{/if}</g
             ><rect
               x="2"
               y="2"
@@ -1042,16 +1154,39 @@
               fill="none"
               stroke={valid ? '#eaffb7' : '#ee795e'}
               stroke-width="4"
+              class="ghost-frame"
+              class:invalid={!valid}
             /></g
           >{/if}
       </g>
     </svg>
 
     <div class="receipts" aria-live="polite">
-      {#each receipts as receipt (receipt.id)}<div>
+      {#each receipts as receipt (receipt.id)}<div
+          style={`--seat:${colors[p.players.indexOf(receipt.player)] ?? '#fff'}`}
+        >
+          {#if pixel}<svg
+              class="receipt-meeple"
+              viewBox="-16 -18 32 33"
+              aria-hidden="true"
+              ><FigureSprite
+                color={colors[p.players.indexOf(receipt.player)] ?? '#fff'}
+                shadow={false}
+                pixel
+              /></svg
+            >{/if}
           {name(receipt.player)} <strong>+{receipt.points}</strong>
         </div>{/each}
     </div>
+    {#if pixel}{#each receipts as receipt (receipt.id)}{#if receipt.at}{@const at =
+            screen(receipt.at, camera, space.anchor)}
+          <div
+            class="px-pop"
+            style={`left:${at.x}px;top:${at.y}px;--seat:${colors[p.players.indexOf(receipt.player)] ?? '#fff'}`}
+            aria-hidden="true"
+          >
+            <span class="px-burst"></span><b>+{receipt.points}</b>
+          </div>{/if}{/each}{/if}
     {#if journal}<aside class="journal" aria-label={t('history')}>
         <header>
           <h2>{t('history')}</h2>
@@ -1145,7 +1280,7 @@
         style={`--seat:${colors[i]}`}
       >
         <svg class="portrait-piece" viewBox="-16 -18 32 33" aria-hidden="true"
-          ><FigureSprite color={colors[i]} /></svg
+          ><FigureSprite color={colors[i]} {pixel} /></svg
         >
         <strong title={player.name}>{player.name}</strong>
         <span class="player-score"
@@ -1158,7 +1293,7 @@
           {#each Array(remaining) as _}<svg
               viewBox="-15 -17 30 31"
               aria-hidden="true"
-              ><FigureSprite color={colors[i]} shadow={false} /></svg
+              ><FigureSprite color={colors[i]} shadow={false} {pixel} /></svg
             >{/each}
         </span>
         {#if player.connected === false}<small class="connection-status"
@@ -1174,22 +1309,29 @@
     <button
       onclick={() => zoom(1.2)}
       aria-label={t('zoom_in')}
-      title={t('zoom_in')}>+</button
+      title={t('zoom_in')}
+      >{#if pixel}<PixelIcon name="plus" />{:else}+{/if}</button
     >
     <button
       onclick={() => zoom(1 / 1.2)}
       aria-label={t('zoom_out')}
-      title={t('zoom_out')}>−</button
+      title={t('zoom_out')}
+      >{#if pixel}<PixelIcon name="minus" />{:else}−{/if}</button
     >
-    <button onclick={fit} aria-label={t('fit')} title={t('fit')}>⛶</button>
+    <button onclick={fit} aria-label={t('fit')} title={t('fit')}
+      >{#if pixel}<PixelIcon name="fit" />{:else}⛶{/if}</button
+    >
     <button
       onclick={() => focus(p.last)}
       aria-label={t('last')}
       title={t('last')}
-      disabled={!p.last}>⌖</button
+      disabled={!p.last}
+      >{#if pixel}<PixelIcon name="target" />{:else}⌖{/if}</button
     >
     <details class="pan-menu">
-      <summary aria-label={t('pan')} title={t('pan')}>✥</summary>
+      <summary aria-label={t('pan')} title={t('pan')}
+        >{#if pixel}<PixelIcon name="pan" />{:else}✥{/if}</summary
+      >
       <div class="pan-buttons">
         <button onclick={() => pan(0, 100)} aria-label={t('pan_up')}>↑</button>
         <button onclick={() => pan(100, 0)} aria-label={t('pan_left')}>←</button
@@ -1209,21 +1351,23 @@
     onclick={() => (guide = true)}
     aria-label={t('guide')}
     title={t('guide')}
-    ><svg viewBox="0 0 28 28" aria-hidden="true"
-      ><path
-        d="M4 6.5Q9 4 14 7v15q-5-3-10-.5Zm20 0q-5-2.5-10 .5v15q5-3 10-.5Z"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="1.6"
-        stroke-linejoin="round"
-      /><path
-        d="M7 10q2.5-.7 4.5.5M17 10q2.5-.7 4.5.5M7 14q2.5-.7 4.5.5M17 14q2.5-.7 4.5.5"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="1.1"
-        opacity=".7"
-      /></svg
-    ></button
+    >{#if pixel}<PixelIcon name="guide" />{:else}<svg
+        viewBox="0 0 28 28"
+        aria-hidden="true"
+        ><path
+          d="M4 6.5Q9 4 14 7v15q-5-3-10-.5Zm20 0q-5-2.5-10 .5v15q5-3 10-.5Z"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linejoin="round"
+        /><path
+          d="M7 10q2.5-.7 4.5.5M17 10q2.5-.7 4.5.5M7 14q2.5-.7 4.5.5M17 14q2.5-.7 4.5.5"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.1"
+          opacity=".7"
+        /></svg
+      >{/if}</button
   >
   {#if p.phase !== 'setup'}<button
       class="journal-toggle corner-control"
@@ -1231,80 +1375,86 @@
       aria-label={t('history')}
       aria-expanded={journal}
       title={t('history')}
-      ><svg viewBox="0 0 28 28" aria-hidden="true"
-        ><path
-          d="M8 5h13a2 2 0 0 1 2 2v1h-4M8 5a2 2 0 0 0-2 2v14a2.5 2.5 0 0 1-2.5 2.5H18a2.5 2.5 0 0 0 2.5-2.5V8"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linejoin="round"
-        /><path
-          d="M10 11h7M10 15h7M10 19h4"
-          stroke="#e9c879"
-          stroke-width="1.3"
-          stroke-linecap="round"
-        /></svg
-      ></button
+      >{#if pixel}<PixelIcon name="journal" />{:else}<svg
+          viewBox="0 0 28 28"
+          aria-hidden="true"
+          ><path
+            d="M8 5h13a2 2 0 0 1 2 2v1h-4M8 5a2 2 0 0 0-2 2v14a2.5 2.5 0 0 1-2.5 2.5H18a2.5 2.5 0 0 0 2.5-2.5V8"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linejoin="round"
+          /><path
+            d="M10 11h7M10 15h7M10 19h4"
+            stroke="#e9c879"
+            stroke-width="1.3"
+            stroke-linecap="round"
+          /></svg
+        >{/if}</button
     ><button
       class="overview-toggle corner-control"
       onclick={() => (overview = true)}
       aria-label={t('board_overview')}
       title={t('board_overview')}
-      ><svg viewBox="0 0 28 28" aria-hidden="true"
-        ><path
-          d="M5 22.5h18"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linecap="round"
-        /><path
-          d="M7.5 20V14h3v6Zm5 0V8h3v12Zm5 0V11h3v9Z"
-          fill="#e9c879"
-          stroke="currentColor"
-          stroke-width="1.2"
-          stroke-linejoin="round"
-        /><path
-          d="m7 10 5-4 4 2 5-4"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.4"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        /></svg
-      ></button
+      >{#if pixel}<PixelIcon name="overview" />{:else}<svg
+          viewBox="0 0 28 28"
+          aria-hidden="true"
+          ><path
+            d="M5 22.5h18"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          /><path
+            d="M7.5 20V14h3v6Zm5 0V8h3v12Zm5 0V11h3v9Z"
+            fill="#e9c879"
+            stroke="currentColor"
+            stroke-width="1.2"
+            stroke-linejoin="round"
+          /><path
+            d="m7 10 5-4 4 2 5-4"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          /></svg
+        >{/if}</button
     >{/if}
   <button
     class="settings-toggle corner-control"
     onclick={() => (settings = true)}
     aria-label={t('settings')}
     title={t('settings')}
-    ><svg viewBox="0 0 28 28" aria-hidden="true"
-      ><path
-        d="M6 8h16M6 14h16M6 20h16"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="1.6"
-        stroke-linecap="round"
-      /><circle
-        cx="11"
-        cy="8"
-        r="2.2"
-        fill="#e9c879"
-        stroke="currentColor"
-      /><circle
-        cx="18"
-        cy="14"
-        r="2.2"
-        fill="#e9c879"
-        stroke="currentColor"
-      /><circle
-        cx="13"
-        cy="20"
-        r="2.2"
-        fill="#e9c879"
-        stroke="currentColor"
-      /></svg
-    ></button
+    >{#if pixel}<PixelIcon name="settings" />{:else}<svg
+        viewBox="0 0 28 28"
+        aria-hidden="true"
+        ><path
+          d="M6 8h16M6 14h16M6 20h16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+        /><circle
+          cx="11"
+          cy="8"
+          r="2.2"
+          fill="#e9c879"
+          stroke="currentColor"
+        /><circle
+          cx="18"
+          cy="14"
+          r="2.2"
+          fill="#e9c879"
+          stroke="currentColor"
+        /><circle
+          cx="13"
+          cy="20"
+          r="2.2"
+          fill="#e9c879"
+          stroke="currentColor"
+        /></svg
+      >{/if}</button
   >
   {#if p.phase === 'setup'}<section class="setup-panel">
       <svg
@@ -1397,9 +1547,9 @@
   {:else}
     <div class="turn-hint" aria-live="polite">
       <span class="turn-line"
-        ><span class="medallion" aria-hidden="true">⚜</span>{name(who)} · {t(
-          'turn',
-        )}
+        ><span class="medallion" aria-hidden="true"
+          >{#if pixel}<PixelIcon name="meeple" />{:else}⚜{/if}</span
+        >{name(who)} · {t('turn')}
         {p.turn}</span
       >
       <p>
@@ -1436,11 +1586,13 @@
             onpointerdown={(e) => beginDrag('tile', e)}
             onclick={() => pick('tile')}
             ><svg viewBox="0 0 100 100" aria-hidden="true"
-              ><g
-                class="rotating"
-                style={`transform:rotate(${visualRotation * 90}deg);transform-origin:50px 50px`}
-                ><TileArt id={p.current} /></g
-              ></svg
+              >{#if pixel}{#key rotation}<g class="px-turn"
+                    ><TileArt id={p.current} {rotation} pixel /></g
+                  >{/key}{:else}<g
+                  class="rotating"
+                  style={`transform:rotate(${visualRotation * 90}deg);transform-origin:50px 50px`}
+                  ><TileArt id={p.current} /></g
+                >{/if}</svg
             ></button
           >
         </div>{/if}
@@ -1450,25 +1602,31 @@
             onclick={() => rotate(1)}
             disabled={!mine}
             aria-label={t('rotate_right')}
-            title={t('rotate_right')}>⟳</button
+            title={t('rotate_right')}
+            >{#if pixel}<PixelIcon name="rotate" />{:else}⟳{/if}</button
           >
           <span class="rotate-caption">{t('rotate')}</span>
           {#if preview}<div class="confirm-row">
               <button
                 onclick={() => rotate(-1)}
                 aria-label={t('rotate_left')}
-                title={t('rotate_left')}>↶</button
+                title={t('rotate_left')}
+                >{#if pixel}<PixelIcon
+                    name="rotate-left"
+                  />{:else}↶{/if}</button
               >
               <button
                 class="confirm"
                 onclick={place}
                 disabled={!valid || !mine}
-                aria-label={t('confirm')}>✓</button
+                aria-label={t('confirm')}
+                >{#if pixel}<PixelIcon name="check" />{:else}✓{/if}</button
               >
               <button
                 class="cancel"
                 onclick={dismissPreview}
-                aria-label={t('cancel')}>×</button
+                aria-label={t('cancel')}
+                >{#if pixel}<PixelIcon name="cross" />{:else}×{/if}</button
               >
             </div>
             {#if !valid}<small>{t('mismatch')}</small>{/if}{/if}
@@ -1504,7 +1662,7 @@
                     if (!unavailable) pick(type);
                   }}
                   ><svg viewBox="-16 -18 32 36" aria-hidden="true"
-                    ><FigureSprite color={ownColor} {type} /></svg
+                    ><FigureSprite color={ownColor} {type} {pixel} /></svg
                   ></button
                 ><span
                   class="piece-tooltip"
@@ -1535,7 +1693,7 @@
                   if (!unavailable) attachmentPick(kind as 'builder' | 'pig');
                 }}
                 ><svg viewBox="-17 -17 36 36" aria-hidden="true"
-                  ><FigureSprite color={ownColor} type={kind} /></svg
+                  ><FigureSprite color={ownColor} type={kind} {pixel} /></svg
                 ></button
               ><span
                 class="piece-tooltip"
@@ -1599,9 +1757,9 @@
       aria-hidden="true"
     >
       {#if drag.kind === 'tile' && p.current}<svg viewBox="0 0 100 100"
-          ><TileArt id={p.current} {rotation} /></svg
+          ><TileArt id={p.current} {rotation} {pixel} /></svg
         >{:else}<svg viewBox="-16 -18 32 36"
-          ><FigureSprite color={ownColor} type={drag.kind} /></svg
+          ><FigureSprite color={ownColor} type={drag.kind} {pixel} /></svg
         >{/if}
     </div>{/if}
 
@@ -1609,6 +1767,8 @@
     {@attach modal(() => overview)}
     onclose={() => (overview = false)}
     class="overview-dialog"
+    class:px-tokens={pixel}
+    class:cc-pixel={pixel}
     aria-labelledby="carc-overview-title"
   >
     <button
@@ -1807,6 +1967,8 @@
     {@attach modal(() => guide)}
     onclose={() => (guide = false)}
     class="guide-dialog"
+    class:px-tokens={pixel}
+    class:cc-pixel={pixel}
     aria-labelledby="carc-guide-title"
   >
     <button
@@ -1871,6 +2033,8 @@
     {@attach modal(() => settings)}
     onclose={() => (settings = false)}
     class="settings-dialog"
+    class:px-tokens={pixel}
+    class:cc-pixel={pixel}
   >
     <button
       class="close"
@@ -1905,6 +2069,18 @@
         }}>{t('help')}</button
       >
     </div>
+    <fieldset class="skin-choice">
+      <legend>{m.skin({}, { locale })}</legend>
+      {#each [['classic', m.skin_classic({}, { locale })], ['pixel', m.skin_pixel({}, { locale })]] as [value, text]}<label
+          ><input
+            type="radio"
+            name="carc-skin"
+            {value}
+            checked={skin === value}
+            onchange={() => chooseSkin(value as Skin)}
+          /><span>{text}</span></label
+        >{/each}
+    </fieldset>
     {#if settingsContent}{@render settingsContent()}{/if}
     <small class="control-hint">{t('controls')}</small>
   </dialog>
@@ -2892,6 +3068,40 @@
   }
   .settings-grid button:hover:not(:disabled) {
     background: #fffbea;
+  }
+  .skin-choice {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+    margin: 0 0 18px;
+    padding: 0;
+    border: 0;
+  }
+  .skin-choice legend {
+    margin-bottom: 8px;
+    color: #6c542f;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .skin-choice label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border: 1px solid #8f6d374f;
+    border-radius: 4px;
+    background: #fff6d7a6;
+    color: #4a3a23;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .skin-choice label:has(:checked) {
+    border-color: #b37b2f;
+    background: #fffbea;
+  }
+  .skin-choice input {
+    accent-color: #9e6d2c;
+    margin: 0;
   }
   .guide-intro {
     max-width: 660px;

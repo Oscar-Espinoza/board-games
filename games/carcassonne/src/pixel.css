@@ -1,0 +1,1078 @@
+/* Carcassonne 8-bit skin. Loaded only when the viewer's skin is `pixel`; it overrides the
+   classic look without touching layout. Hard edges only: borders and shadows in whole
+   `--px`, no radius, blur, filters, gradients or rotation on chrome; motion uses steps(). */
+@import '@board-games/shared/ui/pixel.css';
+
+.carc-table.cc-pixel,
+dialog.px-tokens.cc-pixel {
+  --cc-parchment: #efdcb2;
+  --cc-parchment-edge: #b98f58;
+  --cc-ink-soft: #4a3520;
+  --cc-leaf: #3f7a35;
+  --cc-leaf-light: #6fae47;
+  font-family: var(--px-font);
+  /* Jersey 10 is small for its em box; match the classic skin's x-height. */
+  font-size-adjust: ex-height 0.6;
+  letter-spacing: 0.02em;
+}
+
+/* ── Shared hard-edged pieces ────────────────────────────────────────── */
+.carc-table.cc-pixel,
+dialog.px-tokens.cc-pixel {
+  h1,
+  h2,
+  h3,
+  .table-title,
+  .journal h2 {
+    font-family: var(--px-font);
+    font-weight: 400;
+    letter-spacing: 0.04em;
+  }
+  button,
+  summary {
+    font-family: var(--px-font);
+  }
+  button {
+    border-radius: 0;
+    border: var(--px) solid var(--px-ink);
+    background: var(--px-wood-edge);
+    color: var(--px-cream);
+    box-shadow:
+      inset calc(var(--px) * -1) calc(var(--px) * -1) 0 #0000004d,
+      inset var(--px) var(--px) 0 #ffffff33,
+      0 var(--px) 0 var(--px-ink);
+  }
+  button:hover:not(:disabled):not([aria-disabled='true']) {
+    background: #a0703f;
+    border-color: var(--px-ink);
+  }
+  button:active:not(:disabled):not([aria-disabled='true']) {
+    translate: 0 var(--px);
+    box-shadow: inset var(--px) var(--px) 0 #0000004d;
+  }
+  button:focus-visible,
+  summary:focus-visible {
+    outline: var(--px) solid var(--px-gold);
+    outline-offset: var(--px);
+  }
+  .px-icon {
+    display: block;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+  }
+  .primary {
+    background: var(--px-gold);
+    color: var(--px-ink);
+    border-color: var(--px-ink);
+  }
+  .primary:hover:not(:disabled) {
+    background: #ffd36b;
+  }
+  .primary:active:not(:disabled) {
+    transform: none;
+  }
+  .close {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    font-size: 24px;
+    line-height: 1;
+    color: var(--px-cream);
+    background: var(--px-red);
+    border: var(--px) solid var(--px-ink);
+    box-shadow:
+      inset calc(var(--px) * -1) calc(var(--px) * -1) 0 #0000004d,
+      0 var(--px) 0 var(--px-ink);
+  }
+  .close:hover:not(:disabled) {
+    background: #e05a4c;
+  }
+  .eyebrow {
+    opacity: 1;
+    color: #8a5a2a;
+    letter-spacing: 0.12em;
+    font-size: 13px;
+  }
+}
+
+/* ── Table and header ────────────────────────────────────────────────── */
+.carc-table.cc-pixel {
+  color: var(--px-cream);
+  background: #5b3620 url('/games/carcassonne/pixel/table.webp') center / cover;
+  image-rendering: pixelated;
+  .map:focus-visible {
+    box-shadow: inset 0 0 0 var(--px) var(--px-gold);
+  }
+  .table-header {
+    height: 62px;
+    background: var(--px-wood);
+    border: calc(var(--px) + 1px) solid var(--px-ink);
+    border-top: 0;
+    border-radius: 0;
+    box-shadow:
+      inset 0 calc(var(--px) * -1) 0 var(--px-wood-edge),
+      inset 0 calc(var(--px) * -2) 0 var(--px-wood-dark),
+      0 calc(var(--px) * 2) 0 #0000008c;
+  }
+  .fleur {
+    width: 30px;
+    height: 26px;
+    color: #e2dabd;
+    text-shadow: none;
+    flex: none;
+  }
+  .table-title {
+    display: grid;
+    place-items: center;
+    width: 336px;
+    height: 54px;
+    padding-bottom: 6px;
+    box-sizing: border-box;
+    background: url('/games/carcassonne/pixel/banner.webp') center / 336px 54px
+      no-repeat;
+    image-rendering: pixelated;
+    color: #fff1d0;
+    font-size: 25px;
+    line-height: 1;
+    text-shadow:
+      var(--px) var(--px) 0 var(--px-ink),
+      0 var(--px) 0 var(--px-ink);
+    flex: none;
+  }
+  /* Seats: wooden plaques with a player-colour stripe and pixel meeples. */
+  .player {
+    background: var(--px-wood);
+    border: calc(var(--px) + 1px) solid var(--px-ink);
+    border-radius: 0;
+    box-shadow:
+      inset var(--px) 0 0 var(--seat),
+      inset 0 0 0 var(--px) var(--px-wood-edge),
+      0 calc(var(--px) * 2) 0 #0000008c;
+  }
+  .player.active {
+    border-color: var(--px-gold);
+    box-shadow:
+      inset calc(var(--px) * 2) 0 0 var(--seat),
+      inset 0 0 0 var(--px) var(--px-gold),
+      0 calc(var(--px) * 2) 0 #0000008c;
+    animation: cc-blink 1s steps(1, jump-end) infinite;
+  }
+  .player.active::before {
+    content: '';
+    position: absolute;
+    left: calc(100% + 6px);
+    top: 50%;
+    width: 0;
+    height: 0;
+    margin-top: -8px;
+    border: 8px solid transparent;
+    border-left: 0;
+    border-right: 10px solid var(--px-gold);
+    animation: cc-nudge 0.8s steps(2, jump-none) infinite;
+  }
+  .player.self strong::after {
+    color: var(--px-gold);
+  }
+  .player strong {
+    font-size: 14px;
+  }
+  .player-score {
+    font-size: 24px;
+    color: var(--px-gold);
+    text-shadow: var(--px) var(--px) 0 var(--px-ink);
+  }
+  .player .portrait-piece,
+  .player-supply svg {
+    filter: none;
+  }
+  .player-supply svg + svg {
+    margin-left: -3px;
+  }
+  .connection-status,
+  .ready-mark {
+    color: #ffb08a;
+  }
+  .ready-mark {
+    color: var(--px-gold);
+  }
+  .corner-control {
+    border-radius: 0;
+    padding: 8px;
+    color: var(--px-cream);
+    background: var(--px-wood);
+    border: var(--px) solid var(--px-ink);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--px-wood-edge),
+      0 var(--px) 0 var(--px-ink);
+  }
+  .corner-control:hover:not(:disabled) {
+    background: #6f4629;
+    translate: 0 calc(var(--px) * -1);
+  }
+  .turn-line,
+  .turn-hint p {
+    border-left: var(--px) solid #00000040;
+    font-size: 18px;
+  }
+  .medallion {
+    width: 26px;
+    height: 26px;
+    padding: 4px;
+    box-sizing: border-box;
+    border-radius: 0;
+    border: var(--px) solid var(--px-ink);
+    background: var(--px-gold);
+    color: var(--px-ink);
+    box-shadow: none;
+  }
+  .turn-hint small {
+    color: #ffb08a;
+  }
+  .camera-hint {
+    font: 15px var(--px-font);
+    color: var(--px-cream);
+    text-shadow: 2px 2px 0 var(--px-ink);
+  }
+  .camera-controls {
+    border-radius: 0;
+    padding: 4px;
+    gap: 4px;
+    background: var(--px-wood);
+    border: var(--px) solid var(--px-ink);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--px-wood-edge),
+      0 calc(var(--px) * 2) 0 #0000008c;
+  }
+  .camera-controls button,
+  .pan-menu summary {
+    padding: 7px;
+    background: var(--px-wood-dark);
+    border: var(--px) solid var(--px-ink);
+    box-shadow: inset var(--px) var(--px) 0 #ffffff1f;
+  }
+  .camera-controls button + button {
+    border-left: var(--px) solid var(--px-ink);
+  }
+  .camera-controls button:hover:not(:disabled) {
+    background: var(--px-wood-edge);
+  }
+  .pan-buttons {
+    border-radius: 0;
+    gap: 4px;
+    background: var(--px-wood);
+    border: var(--px) solid var(--px-ink);
+    box-shadow: 0 calc(var(--px) * 2) 0 #0000008c;
+  }
+  .pan-buttons button {
+    font-size: 22px;
+    padding: 0;
+  }
+
+  /* ── The board: slots, ghost, targets ─────────────────────────────── */
+  .slot rect {
+    rx: 0;
+    fill: #ffe08a;
+    fill-opacity: 0.12;
+    stroke: #ffe08a;
+    stroke-width: 3;
+    stroke-linecap: butt;
+    stroke-dasharray: 8 6;
+  }
+  .slot path {
+    stroke: #ffe08a;
+    stroke-width: 3;
+  }
+  &.motion .slot rect {
+    animation: cc-march 1.2s steps(4, jump-none) infinite;
+  }
+  .ghost {
+    filter: none;
+  }
+  .ghost-frame {
+    stroke: #b9ff8c;
+    stroke-width: 4.5;
+  }
+  .ghost-frame.invalid {
+    stroke: #ff6a4a;
+  }
+  &.motion .ghost-frame {
+    animation: cc-blink 0.7s steps(1, jump-end) infinite;
+  }
+  .rotating {
+    transition: none;
+  }
+  .landed .tile-surface {
+    animation: cc-land 0.3s steps(3, jump-end);
+  }
+  .region[data-legal] {
+    stroke: #ffe08a;
+    stroke-width: 2.4;
+    stroke-dasharray: 4 3;
+  }
+  .px-target {
+    transform-box: fill-box;
+  }
+  &.motion .px-target-arrow {
+    animation: cc-bob 0.8s steps(2, jump-none) infinite;
+  }
+
+  /* ── Hand tray ────────────────────────────────────────────────────── */
+  .hand {
+    background: var(--px-wood);
+    border: calc(var(--px) + 1px) solid var(--px-ink);
+    border-radius: 0;
+    box-shadow:
+      inset 0 0 0 var(--px) var(--px-wood-edge),
+      inset 0 calc(var(--px) * 2) 0 calc(var(--px) * 1) #ffffff14,
+      0 calc(var(--px) * 3) 0 #0000008c;
+  }
+  .tray-heading {
+    font-size: 15px;
+    color: var(--px-gold);
+    text-shadow: 2px 2px 0 var(--px-ink);
+  }
+  .tray-heading small {
+    font-size: 15px;
+    color: #e3cfa6;
+    text-shadow: none;
+  }
+  .deck-count {
+    border-radius: 0;
+    background: var(--px-gold);
+    color: var(--px-ink);
+    border: var(--px) solid var(--px-ink);
+    font-size: 15px;
+    box-shadow: 0 var(--px) 0 var(--px-ink);
+  }
+  .own-tile {
+    border: var(--px) solid var(--px-ink);
+    border-radius: 0;
+    background: var(--px-ink);
+    box-shadow:
+      0 var(--px) 0 #9b8158,
+      0 calc(var(--px) * 2) 0 #6b5436,
+      0 calc(var(--px) * 3) 0 var(--px-ink);
+    transition: none;
+  }
+  .own-tile:hover:not(:disabled),
+  .own-tile.picked {
+    background: var(--px-ink);
+    transform: translateY(calc(var(--px) * -2));
+    outline: var(--px) solid var(--px-gold);
+    outline-offset: var(--px);
+  }
+  .px-turn {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: cc-flip 0.18s steps(2, jump-none);
+  }
+  .placement-controls .rotate-main {
+    border-radius: 0;
+    padding: 12px;
+    background: var(--px-gold);
+    color: var(--px-ink);
+    border-color: var(--px-ink);
+  }
+  .placement-controls .rotate-main:hover:not(:disabled) {
+    background: #ffd36b;
+  }
+  .rotate-caption {
+    font-size: 17px;
+  }
+  .confirm-row {
+    gap: 5px;
+  }
+  .confirm-row button {
+    padding: 6px;
+  }
+  .confirm-row .confirm {
+    background: var(--px-green);
+    color: #f1ffe4;
+  }
+  .confirm-row .confirm:hover:not(:disabled) {
+    background: #52b55c;
+  }
+  .confirm-row .cancel {
+    background: var(--px-red);
+  }
+  .placement-controls small {
+    font-size: 14px;
+    color: #ffb08a;
+  }
+  .meeple-supply {
+    border-left: var(--px) solid #00000040;
+  }
+  .loose-meeple,
+  .attachment {
+    background: none;
+    border: 0;
+    box-shadow: none;
+    transform: none;
+    transition: none;
+    image-rendering: pixelated;
+  }
+  .loose-meeple:hover:not([aria-disabled='true']),
+  .loose-meeple.picked,
+  .attachment.picked,
+  .attachment:hover:not([aria-disabled='true']) {
+    background: none;
+    transform: translateY(calc(var(--px) * -2));
+    translate: none;
+    box-shadow: none;
+  }
+  .loose-meeple.picked,
+  .attachment.picked {
+    outline: var(--px) solid var(--px-gold);
+    outline-offset: 1px;
+  }
+  .loose-meeple.used {
+    opacity: 0.2;
+  }
+  .piece-tooltip {
+    border-radius: 0;
+    background: var(--cc-parchment);
+    color: var(--cc-ink-soft);
+    border: var(--px) solid var(--px-ink);
+    box-shadow: 0 var(--px) 0 var(--px-ink);
+    font-size: 14px;
+    line-height: 1.25;
+  }
+  .supply-toggle,
+  .hand-actions button {
+    font-size: 16px;
+  }
+  .drag-piece {
+    filter: none;
+    transform: translate(-50%, -65%);
+    image-rendering: pixelated;
+  }
+  .drag-piece.returning {
+    transition:
+      left 0.2s steps(3, jump-end),
+      top 0.2s steps(3, jump-end);
+  }
+
+  /* ── Parchment panels: decision, inspection, journal, setup, result ─ */
+  .decision,
+  .inspection,
+  .journal,
+  .setup-panel,
+  .finished {
+    border-radius: 0;
+    color: var(--cc-ink-soft);
+    background: var(--cc-parchment)
+      url('/games/carcassonne/pixel/parchment.webp') 0 0 / 288px;
+    border: calc(var(--px) + 1px) solid var(--px-ink);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--cc-parchment-edge),
+      inset 0 0 0 calc(var(--px) * 2) #fff4d6,
+      0 calc(var(--px) * 3) 0 #0000008c;
+  }
+  .decision h2,
+  .inspection h3,
+  .journal h2 {
+    color: #6b3e18;
+    font-size: 22px;
+  }
+  .decision p,
+  .inspection {
+    font-size: 15px;
+    line-height: 1.3;
+  }
+  .choices button {
+    font-size: 15px;
+    color: var(--cc-ink-soft);
+    background: #fff4d6;
+  }
+  .choices button:hover:not(:disabled) {
+    background: #ffffff;
+  }
+  .journal {
+    font-size: 15px;
+  }
+  .journal header {
+    border-bottom: var(--px) solid var(--cc-parchment-edge);
+  }
+  .journal .close {
+    color: var(--px-cream);
+  }
+  .journal-entry {
+    border-radius: 0;
+    border: 0;
+    border-bottom: var(--px) dotted #b98f5888;
+    background: transparent;
+    box-shadow: none;
+    color: var(--cc-ink-soft);
+  }
+  .journal-entry.linked:hover,
+  .journal-entry.linked:focus-visible {
+    background: #fff4d6;
+  }
+  .journal-entry small {
+    width: 58px;
+    white-space: nowrap;
+    font-size: 14px;
+    color: #8a6a42;
+  }
+  .journal-entry i {
+    border-radius: 0;
+    box-shadow: 0 0 0 2px var(--px-ink);
+  }
+  .journal-entry strong {
+    color: #a0521a;
+  }
+  .receipts > div {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 0;
+    background: var(--px-wood);
+    color: var(--px-cream);
+    border: var(--px) solid var(--px-ink);
+    box-shadow:
+      inset var(--px) 0 0 var(--seat),
+      inset 0 0 0 var(--px) var(--px-wood-edge),
+      0 calc(var(--px) * 2) 0 #0000008c;
+    font-size: 20px;
+    animation: cc-receipt 2.2s steps(8, jump-end) both;
+  }
+  .receipts strong {
+    color: var(--px-gold);
+    font-size: 26px;
+    text-shadow: 2px 2px 0 var(--px-ink);
+  }
+  .receipt-meeple {
+    width: 26px;
+    height: 27px;
+    flex: none;
+  }
+  .px-pop {
+    position: absolute;
+    z-index: 2;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+  }
+  .px-burst {
+    position: absolute;
+    left: -48px;
+    top: -60px;
+    width: 96px;
+    height: 96px;
+    background: url('/games/carcassonne/pixel/burst.webp') 0 0 / 576px 96px;
+    image-rendering: pixelated;
+    animation:
+      cc-burst 0.6s steps(6, jump-none) both,
+      cc-hide 0s 0.7s forwards;
+  }
+  .px-pop b {
+    position: absolute;
+    left: 0;
+    top: -26px;
+    translate: -50% 0;
+    font-weight: 400;
+    font-size: 34px;
+    color: #fff1d0;
+    white-space: nowrap;
+    text-shadow:
+      3px 0 0 var(--px-ink),
+      -3px 0 0 var(--px-ink),
+      0 3px 0 var(--px-ink),
+      0 -3px 0 var(--px-ink),
+      3px 3px 0 var(--seat);
+    animation: cc-pop 2.2s steps(10, jump-end) both;
+  }
+
+  /* Setup and result. */
+  .setup-road {
+    display: none;
+  }
+  .setup > p,
+  .first-hint {
+    font-size: 15px;
+    line-height: 1.3;
+    color: #6c542f;
+  }
+  .presets button,
+  .module-card,
+  .player-chips button {
+    color: var(--cc-ink-soft);
+    background: #fff4d6;
+    border: var(--px) solid #8a6a42;
+    box-shadow: 0 var(--px) 0 #8a6a42;
+    transition: none;
+  }
+  .presets button {
+    font-size: 16px;
+  }
+  .presets button::after {
+    height: var(--px);
+    background: var(--px-red);
+    transition: none;
+  }
+  .presets button:hover:not(:disabled),
+  .player-chips button:hover:not(:disabled),
+  .module-card:hover:not(:disabled) {
+    background: #ffffff;
+    transform: none;
+    translate: 0 calc(var(--px) * -1);
+    box-shadow: 0 calc(var(--px) * 2) 0 #8a6a42;
+  }
+  .presets button.chosen,
+  .module-card.chosen,
+  .player-chips button.chosen {
+    background: #ffe9a8;
+    border-color: var(--px-ink);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--px-gold),
+      0 var(--px) 0 var(--px-ink);
+    animation: none;
+  }
+  .player-chips button.chosen {
+    box-shadow:
+      inset calc(var(--px) * 2) 0 0 var(--chip),
+      0 var(--px) 0 var(--px-ink);
+  }
+  .module-icon,
+  .guide-symbol,
+  .feature-symbol {
+    border-radius: 0;
+    background: var(--cc-leaf);
+    border: var(--px) solid var(--px-ink);
+    box-shadow: inset 0 calc(var(--px) * -1) 0 #1f4a22;
+    color: #fff1c1;
+  }
+  .module-copy strong {
+    font-size: 16px;
+  }
+  .module-copy small {
+    font-size: 13px;
+    line-height: 1.15;
+  }
+  .module-check {
+    border-radius: 0;
+    border: var(--px) solid #8a6a42;
+  }
+  .module-card.chosen .module-check {
+    background: var(--px-green);
+    border-color: var(--px-ink);
+  }
+  .starting-player legend {
+    font-size: 16px;
+    font-weight: 400;
+  }
+  .chip-meeple {
+    filter: none;
+  }
+  .starts {
+    animation: cc-blink 1s steps(1, jump-end) infinite;
+  }
+  .finished h1 {
+    display: grid;
+    place-items: center;
+    width: min(100%, 448px);
+    height: 72px;
+    margin: 0 auto;
+    padding-bottom: 8px;
+    box-sizing: border-box;
+    background: url('/games/carcassonne/pixel/banner.webp') center / 448px 72px
+      no-repeat;
+    image-rendering: pixelated;
+    color: #fff1d0;
+    font-size: 38px;
+    text-shadow: var(--px) var(--px) 0 var(--px-ink);
+  }
+  .finished h2 {
+    text-align: center;
+    color: #6b3e18;
+    font-size: 30px;
+  }
+  .finished .eyebrow {
+    text-align: center;
+  }
+  .result {
+    padding: 8px 12px;
+    background: #fff4d6;
+    border: var(--px) solid #8a6a42;
+    font-size: 20px;
+  }
+  .result:first-of-type {
+    background: #ffe9a8;
+    border-color: var(--px-ink);
+  }
+}
+
+/* ── Dialogs ─────────────────────────────────────────────────────────── */
+dialog.px-tokens.cc-pixel {
+  border-radius: 0;
+  color: var(--cc-ink-soft);
+  background: var(--cc-parchment) url('/games/carcassonne/pixel/parchment.webp')
+    0 0 / 288px;
+  border: calc(var(--px) + 1px) solid var(--px-ink);
+  image-rendering: pixelated;
+  box-shadow:
+    inset 0 0 0 var(--px) var(--cc-parchment-edge),
+    inset 0 0 0 calc(var(--px) * 2) #fff4d6,
+    0 calc(var(--px) * 3) 0 #000a;
+  &::backdrop {
+    background: #120c08b3;
+    backdrop-filter: none;
+  }
+  > .close {
+    margin: -8px -8px 0 0;
+    color: var(--px-cream);
+    background: var(--px-red);
+  }
+  h2 {
+    color: #6b3e18;
+    font-size: 30px;
+  }
+  .guide-section h3,
+  .overview-section h3 {
+    color: #6b3e18;
+    font-size: 19px;
+  }
+  .guide-intro,
+  .overview-intro,
+  .watchlist-heading p,
+  .turn-steps p,
+  .guide-cards p,
+  .scoring-guide p {
+    font-size: 14px;
+    line-height: 1.3;
+    color: #6c542f;
+  }
+  .settings-grid button,
+  .watch-filters button,
+  .watched-feature {
+    color: var(--cc-ink-soft);
+    background: #fff4d6;
+    border: var(--px) solid #8a6a42;
+    box-shadow: 0 var(--px) 0 #8a6a42;
+    font-size: 16px;
+  }
+  .settings-grid button:hover:not(:disabled),
+  .watched-feature:hover:not(:disabled) {
+    background: #ffffff;
+    transform: none;
+  }
+  .settings-grid button[aria-pressed='true'] {
+    background: #ffe9a8;
+  }
+  .skin-choice legend,
+  .starting-player legend {
+    color: #6c542f;
+    font-size: 16px;
+    font-weight: 400;
+  }
+  .skin-choice label {
+    border-radius: 0;
+    border: var(--px) solid #8a6a42;
+    background: #fff4d6;
+    box-shadow: 0 var(--px) 0 #8a6a42;
+    font-size: 17px;
+  }
+  .skin-choice label:has(:checked) {
+    border-color: var(--px-ink);
+    background: #ffe9a8;
+    box-shadow:
+      inset 0 0 0 var(--px) var(--px-gold),
+      0 var(--px) 0 var(--px-ink);
+  }
+  .skin-choice input {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border: var(--px) solid var(--px-ink);
+    background: #fff;
+  }
+  .skin-choice input:checked {
+    background: var(--px-red);
+    box-shadow: inset 0 0 0 2px #fff;
+  }
+  .control-hint {
+    font-size: 14px;
+  }
+  .turn-steps li,
+  .guide-cards article,
+  .status-strip span,
+  .overview-player,
+  .empty-watchlist {
+    border-radius: 0;
+    border: var(--px) solid #8a6a4288;
+    background: #fff4d6cc;
+  }
+  .guide-cards article.active,
+  .overview-player.self {
+    border-color: var(--cc-leaf);
+    background: #fffbea;
+  }
+  .overview-player {
+    box-shadow: inset calc(var(--px) * 2) 0 0 var(--player-color);
+  }
+  .turn-steps li > span {
+    border-radius: 0;
+    background: var(--cc-leaf);
+    border: var(--px) solid var(--px-ink);
+    font-size: 15px;
+  }
+  .turn-steps strong,
+  .guide-cards strong,
+  .overview-player header,
+  .feature-title {
+    font-size: 16px;
+  }
+  .guide-cards article > small {
+    font-size: 11px;
+  }
+  .guide-symbol.farmer {
+    transform: none;
+  }
+  .status-strip span,
+  .standing,
+  .figure-summary p,
+  .feature-copy > small,
+  .feature-owners {
+    font-size: 13px;
+  }
+  .status-strip strong,
+  .overview-score {
+    font-size: 26px;
+    font-weight: 400;
+    color: #8a4a12;
+  }
+  .overview-meeple {
+    filter: none;
+  }
+  .resource-summary > span,
+  .score-sources span,
+  .feature-modifiers i {
+    border-radius: 0;
+    border: 2px solid #8a6a4288;
+    font-size: 12px;
+  }
+  .resource-summary small,
+  .score-sources > small,
+  .feature-title b {
+    font-size: 12px;
+  }
+  .watch-filters {
+    border-radius: 0;
+    border: 0;
+    background: none;
+    gap: 6px;
+    padding: 0;
+  }
+  .watch-filters button.chosen {
+    background: #ffe9a8;
+    color: var(--cc-ink-soft);
+    border-color: var(--px-ink);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--px-gold),
+      0 var(--px) 0 var(--px-ink);
+  }
+  .figure-summary,
+  .score-sources {
+    border-top: var(--px) dotted #b98f5888;
+  }
+}
+
+/* ── Compact screens ─────────────────────────────────────────────────── */
+@media (max-width: 900px), (max-height: 540px) {
+  .carc-table.cc-pixel {
+    --px: 2px;
+    .table-header {
+      height: 52px;
+    }
+    .table-title {
+      width: 224px;
+      height: 36px;
+      padding-bottom: 4px;
+      background-size: 224px 36px;
+      font-size: 25px;
+    }
+    .fleur {
+      width: 22px;
+      height: 19px;
+    }
+    .corner-control {
+      padding: 6px;
+    }
+    .player strong {
+      font-size: 11px;
+    }
+    .player-score {
+      font-size: 17px;
+    }
+    .supply-toggle {
+      font-size: 12px;
+    }
+    .player.active::before {
+      display: none;
+    }
+    .turn-line,
+    .turn-hint p {
+      border: 0;
+      font-size: 15px;
+      text-shadow: 2px 2px 0 var(--px-ink);
+    }
+    .camera-controls button,
+    .pan-menu summary {
+      padding: 6px;
+    }
+    .tray-heading {
+      font-size: 13px;
+    }
+    .rotate-caption {
+      font-size: 14px;
+    }
+    .placement-controls .rotate-main {
+      padding: 8px;
+    }
+    .supply-open .meeple-supply {
+      border-radius: 0;
+      background: var(--px-wood);
+      border: var(--px) solid var(--px-ink);
+      box-shadow:
+        inset 0 0 0 var(--px) var(--px-wood-edge),
+        0 calc(var(--px) * 2) 0 #0000008c;
+    }
+    .finished h1 {
+      width: 336px;
+      height: 54px;
+      background-size: 336px 54px;
+      font-size: 30px;
+    }
+  }
+}
+
+/* The banner needs room: desktop keeps it at 3×, narrow headers drop to 2× or text. */
+@media (max-width: 1200px) {
+  .carc-table.cc-pixel .table-title {
+    width: 224px;
+    height: 36px;
+    padding-bottom: 4px;
+    background-size: 224px 36px;
+    font-size: 19px;
+  }
+}
+@media (min-width: 901px) and (min-height: 541px) and (max-width: 1200px) {
+  .carc-table.cc-pixel .turn-hint {
+    left: 330px;
+  }
+}
+@media (min-width: 1201px) and (min-height: 541px) {
+  .carc-table.cc-pixel .turn-hint {
+    left: 420px;
+  }
+}
+@media (max-width: 560px) {
+  .carc-table.cc-pixel .table-title {
+    width: auto;
+    background: none;
+    font-size: 19px;
+  }
+  .carc-table.cc-pixel .finished h1 {
+    width: 224px;
+    height: 36px;
+    padding-bottom: 4px;
+    background-size: 224px 36px;
+    font-size: 21px;
+  }
+}
+
+/* ── Motion (all stepped) ────────────────────────────────────────────── */
+@keyframes cc-blink {
+  50% {
+    border-color: var(--px-ink);
+    stroke-opacity: 0.35;
+  }
+}
+@keyframes cc-nudge {
+  to {
+    translate: -4px 0;
+  }
+}
+@keyframes cc-march {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+@keyframes cc-bob {
+  to {
+    translate: 0 -4px;
+  }
+}
+@keyframes cc-land {
+  from {
+    opacity: 0.5;
+    translate: 0 -14px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@keyframes cc-flip {
+  from {
+    scale: 0.7 1;
+  }
+}
+@keyframes cc-burst {
+  from {
+    background-position-x: 0;
+  }
+  to {
+    background-position-x: -480px;
+  }
+}
+@keyframes cc-hide {
+  to {
+    visibility: hidden;
+  }
+}
+@keyframes cc-pop {
+  0% {
+    opacity: 0;
+    translate: -50% 12px;
+  }
+  15% {
+    opacity: 1;
+    translate: -50% 0;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    translate: -50% -36px;
+  }
+}
+@keyframes cc-receipt {
+  0% {
+    opacity: 0;
+    translate: 0 12px;
+  }
+  15%,
+  80% {
+    opacity: 1;
+    translate: 0 0;
+  }
+  100% {
+    opacity: 0;
+    translate: 0 -12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .carc-table.cc-pixel *,
+  .carc-table.cc-pixel {
+    animation: none !important;
+    transition: none !important;
+  }
+  .carc-table.cc-pixel .px-burst {
+    display: none;
+  }
+}
