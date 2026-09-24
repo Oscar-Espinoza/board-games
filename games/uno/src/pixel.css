@@ -1,0 +1,1212 @@
+/* 8-bit UNO skin. Loaded only when the viewer's skin is `pixel`; restyles the classic
+   Board without touching layout logic. Hard edges only: borders and shadows in whole
+   `--px`, no radius, blur, filter, rotation or gradients on chrome; sprites are drawn
+   at whole-number scales (`--u` table cards, `--hu` hand cards, `--as` portraits) and
+   motion uses steps(). See docs/uno-pixel.md. */
+@import '@board-games/shared/ui/pixel.css';
+
+.uno-table.uno-pixel.px-tokens {
+  --ink: var(--px-ink);
+  --felt-ink: #0b2415;
+  --gold: #f7d43c;
+  /* Card sprites are 44x64 logical pixels. */
+  --u: 3px;
+  --u: max(1px, round(nearest, calc(min(19vh, 12.5vw) / 64), 1px));
+  --hu: 3px;
+  --hu: max(2px, round(down, calc(min(27vh, 17vw) / 64), 1px));
+  --card-w: calc(var(--u) * 44);
+  --card-h: calc(var(--u) * 64);
+  --hand-w: calc(var(--hu) * 44);
+  --hand-h: calc(var(--hu) * 64);
+  /* Portraits are 41x40 sprites in a --px ink frame. */
+  --as: 2px;
+  --as: max(1px, round(down, calc(clamp(52px, 9.4vh, 92px) / 40), 1px));
+  --portrait: calc(var(--as) * 40 + var(--px) * 2);
+  --sheet-cards: url('/games/uno/pixel/cards.webp');
+  --sheet-glyphs: url('/games/uno/pixel/glyphs.webp');
+  --sheet-fx: url('/games/uno/pixel/fx.webp');
+  --sheet-avatars: url('/games/uno/pixel/avatars.webp');
+  font-family: var(--px-font);
+  font-weight: 400;
+  font-size-adjust: ex-height 0.6;
+  letter-spacing: 0.03em;
+  background: #2a1a10 url('/games/uno/pixel/table-wide.webp') center / cover
+    no-repeat;
+  image-rendering: pixelated;
+
+  &::before {
+    display: none;
+  }
+  button {
+    font-family: inherit;
+  }
+  :focus-visible {
+    outline: var(--px) solid var(--gold);
+    outline-offset: var(--px);
+  }
+
+  /* Corner tools: square wooden keys. */
+  .tools button {
+    border-radius: 0;
+    border: var(--px) solid var(--px-ink);
+    background: var(--px-wood);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    color: var(--px-cream);
+    box-shadow:
+      inset calc(var(--px) * -1) calc(var(--px) * -1) 0 #0000004d,
+      inset var(--px) var(--px) 0 #ffffff33,
+      0 var(--px) 0 var(--px-ink);
+  }
+  .tools button:hover {
+    background: var(--px-wood-edge);
+    translate: 0 calc(var(--px) * -1);
+  }
+  .tools button:active {
+    translate: 0 var(--px);
+    box-shadow: inset var(--px) var(--px) 0 #0000004d;
+  }
+  .tools button[aria-pressed='false'] {
+    color: #a08a70;
+  }
+  .tools svg {
+    stroke-linecap: square;
+    stroke-linejoin: miter;
+    shape-rendering: crispEdges;
+  }
+
+  /* Seats: a framed character portrait over a wooden name plate. */
+  .plate {
+    border-radius: 0;
+    background: var(--px-wood);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border: var(--px) solid var(--px-ink);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--px-wood-edge),
+      0 var(--px) 0 var(--px-ink);
+    padding: 0 calc(var(--px) * 5) calc(var(--px) * 2);
+  }
+  .portrait {
+    position: relative;
+    width: calc(var(--as) * 41 + var(--px) * 2);
+    border-radius: 0;
+    border: var(--px) solid var(--px-ink);
+    background: #f3dfb4;
+    box-shadow:
+      inset 0 calc(var(--as) * -10) 0 #e2c48e,
+      0 0 0 var(--px) #8a5a32,
+      0 calc(var(--px) * 2) 0 var(--px-ink);
+    overflow: hidden;
+  }
+  .seat.active .portrait {
+    border-color: var(--px-ink);
+    animation: uno-px-turn 0.8s steps(1) infinite;
+  }
+  .plate b {
+    font-weight: 400;
+    font-size: 22px;
+    letter-spacing: 0.04em;
+    text-shadow: 2px 2px 0 var(--px-ink);
+  }
+  .plate span {
+    font-weight: 400;
+    font-size: 16px;
+    color: var(--px-gold);
+  }
+  .mini-back {
+    width: 36px;
+    height: 52px;
+    border: 0;
+    border-radius: 0;
+    transform: none;
+    left: calc(42px + var(--fan) * 10px);
+    top: calc(round(var(--fan) * var(--fan) * 1px, 2px));
+    background: url('/games/uno/pixel/mini-back.webp') 0 0 / 100% 100%;
+    box-shadow: 2px 2px 0 #0008;
+    &::after {
+      display: none;
+    }
+  }
+  .px-count {
+    position: absolute;
+    right: -2px;
+    bottom: -4px;
+    z-index: 2;
+    min-width: 26px;
+    padding: 0 4px;
+    border: var(--px) solid var(--px-ink);
+    background: var(--px-cream);
+    color: var(--px-ink);
+    font-size: 20px;
+    line-height: 20px;
+    text-align: center;
+    box-shadow: 0 var(--px) 0 var(--px-ink);
+  }
+
+  /* Speech bubbles: hard panels with a stepped tail. */
+  .bubble {
+    border-radius: 0;
+    border: var(--px) solid var(--px-ink);
+    font-weight: 400;
+    font-size: 26px;
+    line-height: 1;
+    padding: 4px 12px 6px;
+    transform: none;
+    box-shadow: 0 var(--px) 0 var(--px-ink);
+    animation: uno-px-pop 0.4s steps(4, jump-end) both;
+    text-shadow: 2px 2px 0 #0007;
+    &::after {
+      content: '';
+      position: absolute;
+      left: calc(var(--px) * 2);
+      bottom: calc(var(--px) * -3);
+      width: calc(var(--px) * 3);
+      height: calc(var(--px) * 2);
+      background: inherit;
+      border: var(--px) solid var(--px-ink);
+      border-top: 0;
+      clip-path: polygon(0 0, 100% 0, 100% 50%, 34% 50%, 34% 100%, 0 100%);
+    }
+  }
+  .bubble.uno {
+    background: var(--px-green);
+    color: #fff;
+  }
+  .bubble.draw {
+    background: var(--px-red);
+    color: #fff;
+    font-size: 32px;
+    animation:
+      uno-px-pop 0.4s steps(4, jump-end) both,
+      uno-px-fade 0.4s 1.3s steps(3, jump-end) both;
+  }
+
+  /* Direction arrows: dashed pixel tracks that march the way play goes. */
+  .flow {
+    stroke: #f6e8d3a6;
+    stroke-width: 8;
+    stroke-linecap: butt;
+    stroke-dasharray: 16 12;
+    shape-rendering: crispEdges;
+    animation: uno-px-march 0.8s steps(4) infinite;
+    transition: transform 0.24s steps(3, jump-end);
+  }
+  .flow.counter {
+    animation-direction: reverse;
+  }
+  .flow marker path {
+    fill: #f6e8d3a6;
+  }
+  /* The far arrow would cross the top seat's plate. */
+  .flow > path:first-of-type {
+    display: none;
+  }
+  .center-table {
+    top: 47.5%;
+  }
+  .pile-group > small,
+  .flow-label {
+    font-weight: 400;
+    text-shadow: 2px 2px 0 var(--px-ink);
+  }
+  .pile-group > small {
+    font-size: 24px;
+    letter-spacing: 0.06em;
+  }
+  .flow-label {
+    font-size: 18px;
+    color: var(--px-cream);
+  }
+  .color-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 12px 2px 4px;
+    border-radius: 0;
+    border: var(--px) solid var(--px-ink);
+    background: var(--px-wood-dark);
+    color: var(--px-cream);
+    font-weight: 400;
+    font-size: 22px;
+    text-shadow: 2px 2px 0 var(--px-ink);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--active-color),
+      0 var(--px) 0 var(--px-ink);
+  }
+
+  /* Cards: the sprite face, a centre glyph and two corner indices. */
+  .card {
+    --k: var(--u);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: calc(var(--k) * 2) calc(var(--k) * 2) 0 #0b24158c;
+    overflow: visible;
+    transition: translate 0.12s steps(2, jump-end);
+    &::before {
+      display: none;
+    }
+    &::after {
+      display: none;
+    }
+  }
+  .hand .card {
+    --k: var(--hu);
+    border: 0;
+    border-radius: 0;
+    transform: none;
+    translate: 0 var(--rise, 0px);
+    box-shadow: calc(var(--k) * -2) calc(var(--k) * 2) 0 #0b24158c;
+  }
+  .hand .card:hover:enabled,
+  .hand .card:focus-visible {
+    background: transparent;
+    transform: none;
+    --rise: calc(var(--k) * -8);
+  }
+  .hand .card.playable {
+    --rise: calc(var(--k) * -3);
+    box-shadow:
+      0 0 0 var(--k) var(--px-ink),
+      0 0 0 calc(var(--k) * 2) var(--gold),
+      calc(var(--k) * -2) calc(var(--k) * 4) 0 #0b24158c;
+  }
+  .hand .card.dim {
+    filter: none;
+    &::after {
+      display: block;
+      inset: 0;
+      background: #0b1a104d;
+      clip-path: polygon(
+        var(--k) 0,
+        calc(100% - var(--k)) 0,
+        calc(100% - var(--k)) var(--k),
+        100% var(--k),
+        100% calc(100% - var(--k)),
+        calc(100% - var(--k)) calc(100% - var(--k)),
+        calc(100% - var(--k)) 100%,
+        var(--k) 100%,
+        var(--k) calc(100% - var(--k)),
+        0 calc(100% - var(--k)),
+        0 var(--k),
+        var(--k) var(--k)
+      );
+    }
+  }
+  .px-art,
+  .card-back {
+    position: absolute;
+    inset: 0;
+    background: var(--sheet-cards) calc(var(--face) * var(--k) * -44) 0 /
+      calc(var(--k) * 264) calc(var(--k) * 64) no-repeat;
+  }
+  .card-back {
+    --face: 5;
+    position: relative;
+  }
+  .back-oval {
+    display: none;
+  }
+  .px-glyph {
+    position: absolute;
+    left: calc(var(--k) * 8);
+    top: calc(var(--k) * 20);
+    width: calc(var(--k) * 28);
+    height: calc(var(--k) * 24);
+    background: var(--sheet-glyphs) calc(var(--gx) * var(--k) * -28)
+      calc(var(--gy) * var(--k) * -24) / calc(var(--k) * 420)
+      calc(var(--k) * 130) no-repeat;
+  }
+  .px-corner {
+    position: absolute;
+    left: calc(var(--k) * 1);
+    top: calc(var(--k) * 2);
+    width: calc(var(--k) * 12);
+    height: calc(var(--k) * 10);
+    background: var(--sheet-glyphs) calc(var(--gx) * var(--k) * -12)
+      calc(var(--k) * -120) / calc(var(--k) * 420) calc(var(--k) * 130)
+      no-repeat;
+  }
+  .px-corner.bottom {
+    left: auto;
+    top: auto;
+    right: calc(var(--k) * 1);
+    bottom: calc(var(--k) * 2);
+    scale: -1 -1;
+  }
+
+  /* Piles: stepped card edges instead of a soft stack. */
+  .stock {
+    border-radius: 0;
+    box-shadow:
+      var(--u) var(--u) 0 var(--px-cream),
+      calc(var(--u) * 2) calc(var(--u) * 2) 0 var(--px-ink),
+      calc(var(--u) * 3) calc(var(--u) * 3) 0 var(--px-cream),
+      calc(var(--u) * 4) calc(var(--u) * 4) 0 var(--px-ink),
+      calc(var(--u) * 7) calc(var(--u) * 7) 0 #0b24158c;
+  }
+  .stock:hover:enabled {
+    transform: none;
+    translate: 0 calc(var(--u) * -2);
+  }
+  .stock:enabled .card {
+    box-shadow:
+      0 0 0 var(--u) var(--px-ink),
+      0 0 0 calc(var(--u) * 2) var(--gold);
+    animation: uno-px-ready 0.9s steps(1) infinite;
+  }
+  .penalty {
+    right: calc(var(--u) * -6);
+    top: calc(var(--u) * -6);
+    border-radius: 0;
+    border: var(--px) solid var(--px-ink);
+    background: var(--px-red);
+    font-weight: 400;
+    font-size: 30px;
+    line-height: 1;
+    padding: 2px 10px 4px;
+    text-shadow: 2px 2px 0 var(--px-ink);
+    box-shadow: 0 var(--px) 0 var(--px-ink);
+    animation: uno-px-ready 0.5s steps(1) infinite;
+  }
+  .discard-stack {
+    border-radius: 0;
+    box-shadow:
+      calc(var(--u) * -2) var(--u) 0 var(--px-cream),
+      calc(var(--u) * -3) calc(var(--u) * 2) 0 var(--px-ink),
+      calc(var(--u) * -4) calc(var(--u) * 3) 0 var(--px-cream),
+      calc(var(--u) * -5) calc(var(--u) * 4) 0 var(--px-ink),
+      calc(var(--u) * -4) calc(var(--u) * 7) 0 #0b24158c;
+    &::before,
+    &::after {
+      display: none;
+    }
+  }
+  .discard {
+    transform: none;
+    box-shadow: none;
+  }
+  .discard .px-art,
+  .uno-flight .px-art {
+    animation: none;
+  }
+
+  /* Wild colour pick: four gems in a wooden tray. */
+  .color-choice {
+    top: calc(var(--card-h) * 0.45);
+    z-index: 6;
+    border-radius: 0;
+    background: var(--px-wood);
+    border: calc(var(--px) + 1px) solid var(--px-ink);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--px-wood-edge),
+      0 calc(var(--px) * 2) 0 var(--px-ink);
+    animation: uno-px-pop 0.32s steps(4, jump-end) both;
+    p {
+      font-size: 22px;
+      text-shadow: 2px 2px 0 var(--px-ink);
+    }
+    button {
+      display: grid;
+      place-items: center;
+      width: 72px;
+      height: 68px;
+      border-radius: 0;
+      border: var(--px) solid var(--px-ink);
+      background: var(--px-wood-dark);
+      box-shadow:
+        inset 0 calc(var(--px) * -2) 0 var(--swatch),
+        0 var(--px) 0 var(--px-ink);
+    }
+    button:hover:enabled {
+      background: #4c2e19;
+      transform: none;
+      translate: 0 calc(var(--px) * -2);
+    }
+    button:active:enabled {
+      translate: 0 var(--px);
+    }
+    .px-gem {
+      width: 64px;
+      height: 58px;
+      background: var(--sheet-fx) calc(var(--gem) * -78px - 240px) -22px / 624px
+        80px no-repeat;
+    }
+    button:hover:enabled .px-gem {
+      animation: uno-px-bob 0.5s steps(2) infinite;
+    }
+  }
+  .px-gem {
+    display: inline-block;
+    width: 32px;
+    height: 29px;
+    background: var(--sheet-fx) calc(var(--gem) * -39px - 120px) -11px / 312px
+      40px no-repeat;
+  }
+  .catch {
+    border-radius: 0;
+    border: var(--px) solid var(--px-ink);
+    background: #e07b24;
+    font-weight: 400;
+    font-size: 22px;
+    text-shadow: 2px 2px 0 var(--px-ink);
+    box-shadow:
+      inset calc(var(--px) * -1) calc(var(--px) * -1) 0 #0000004d,
+      inset var(--px) var(--px) 0 #ffffff66,
+      0 var(--px) 0 var(--px-ink);
+    animation: uno-px-ready 0.6s steps(1) infinite;
+  }
+
+  /* Table effects for action cards, over the playing pile. */
+  .px-fx {
+    position: absolute;
+    z-index: 5;
+    left: calc(50% + var(--card-w) * 0.875);
+    top: calc(var(--card-h) / 2);
+    width: 0;
+    height: 0;
+    pointer-events: none;
+  }
+  .px-fx-ring {
+    position: absolute;
+    left: calc(var(--card-w) * -0.7);
+    top: calc(var(--card-h) * -0.6);
+    width: calc(var(--card-w) * 1.4);
+    height: calc(var(--card-h) * 1.2);
+    border: calc(var(--u) * 2) solid var(--gold);
+    box-shadow:
+      0 0 0 var(--u) var(--px-ink),
+      inset 0 0 0 var(--u) var(--px-ink);
+    animation: uno-px-ring 0.6s steps(5, jump-end) both;
+  }
+  .wild .px-fx-ring {
+    border-color: var(--ring);
+    animation-duration: 0.8s;
+  }
+  .hit .px-fx-ring {
+    border-color: var(--px-red);
+  }
+  .px-fx-glyph {
+    position: absolute;
+    left: calc(var(--u) * -28);
+    top: calc(var(--u) * -24);
+    width: calc(var(--u) * 56);
+    height: calc(var(--u) * 48);
+    background: var(--sheet-glyphs) calc(var(--gx) * var(--u) * -56)
+      calc(var(--u) * -192) / calc(var(--u) * 840) calc(var(--u) * 260)
+      no-repeat;
+    animation: uno-px-stamp 0.9s steps(6, jump-end) both;
+  }
+  .reverse .px-fx-glyph {
+    animation-name: uno-px-stamp, uno-px-flip;
+    animation-duration: 0.9s, 0.45s;
+    animation-timing-function: steps(6, jump-end), steps(4, jump-end);
+    animation-iteration-count: 1, 2;
+  }
+  .center-table.px-shake {
+    animation: uno-px-shake 0.36s steps(6) both;
+  }
+
+  /* The UNO! callout: an arcade starburst with the word punched on top. */
+  /* Above card flights (z 100), which fly under the callout. */
+  .burst {
+    z-index: 120;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    font-size: clamp(80px, 11vw, 150px);
+    color: #fffaf0;
+    -webkit-text-stroke: 0;
+    text-shadow:
+      0 calc(var(--px) * -1) 0 var(--px-ink),
+      calc(var(--px) * -1) 0 0 var(--px-ink),
+      var(--px) 0 0 var(--px-ink),
+      0 var(--px) 0 var(--px-ink),
+      var(--px) var(--px) 0 var(--px-ink),
+      calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--px-red-dark),
+      calc(var(--px) * 3) calc(var(--px) * 3) 0 var(--px-red-dark),
+      calc(var(--px) * 4) calc(var(--px) * 4) 0 var(--px-ink);
+    animation: uno-px-burst 1.4s steps(14, jump-end) both;
+  }
+  .burst-word {
+    position: relative;
+  }
+  .px-burst-art {
+    position: absolute;
+    left: 50%;
+    top: 44%;
+    width: 390px;
+    height: 400px;
+    translate: -50% -50%;
+    background: var(--sheet-fx) 0 0 / 3120px 400px no-repeat;
+    animation: uno-px-spin 0.3s steps(2) infinite;
+  }
+  .burst small {
+    position: relative;
+    margin-top: 6px;
+    padding: 2px 12px 4px;
+    font-size: 26px;
+    border: var(--px) solid var(--px-ink);
+    background: var(--px-wood-dark);
+    color: var(--px-cream);
+    text-shadow: 2px 2px 0 var(--px-ink);
+  }
+  .px-spark {
+    position: absolute;
+    left: 50%;
+    top: 44%;
+    width: 12px;
+    height: 12px;
+    background: var(--px-cream);
+    box-shadow: 0 0 0 3px var(--px-ink);
+    --a: calc(var(--i) * 45deg);
+    animation: uno-px-spark 0.7s steps(6, jump-end) both;
+  }
+  .px-spark:nth-child(odd) {
+    background: var(--gold);
+  }
+
+  /* Turn line and the UNO button. */
+  .turn-pill {
+    border-radius: 0;
+    border: var(--px) solid var(--px-ink);
+    background: var(--px-wood-dark);
+    color: var(--px-cream);
+    font-weight: 400;
+    font-size: 28px;
+    padding: 2px 26px 5px;
+    text-shadow: 2px 2px 0 var(--px-ink);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--px-wood-edge),
+      0 var(--px) 0 var(--px-ink);
+  }
+  .turn-pill.mine {
+    background: var(--px-green);
+    color: #fff;
+    box-shadow:
+      inset 0 0 0 var(--px) #7fd36c,
+      0 var(--px) 0 var(--px-ink);
+  }
+  .turn-pill.mine::before,
+  .turn-pill.mine::after {
+    width: 12px;
+    height: 21px;
+    rotate: none;
+    transform: none;
+    translate: 0 -50%;
+    background: var(--gold);
+    clip-path: polygon(
+      0 0,
+      25% 0,
+      25% 14%,
+      50% 14%,
+      50% 29%,
+      75% 29%,
+      75% 43%,
+      100% 43%,
+      100% 57%,
+      75% 57%,
+      75% 71%,
+      50% 71%,
+      50% 86%,
+      25% 86%,
+      25% 100%,
+      0 100%
+    );
+    animation: uno-px-nudge 0.6s steps(2) infinite;
+  }
+  .turn-pill.mine::after {
+    scale: -1 1;
+  }
+  .turn-pill.done {
+    background: var(--gold);
+    color: var(--px-ink);
+    text-shadow: none;
+  }
+  .rematch,
+  .px-result-actions button {
+    white-space: nowrap;
+    border-radius: 0;
+    border: var(--px) solid var(--px-ink);
+    background: var(--px-green);
+    color: #fff;
+    font-weight: 400;
+    font-size: 24px;
+    padding: 4px 18px 6px;
+    text-shadow: 2px 2px 0 var(--px-ink);
+    box-shadow:
+      inset calc(var(--px) * -1) calc(var(--px) * -1) 0 #0000004d,
+      inset var(--px) var(--px) 0 #ffffff55,
+      0 var(--px) 0 var(--px-ink);
+  }
+  .declare {
+    border-radius: 0;
+    border: calc(var(--px) + 1px) solid var(--px-ink);
+    background: var(--px-red);
+    color: var(--gold);
+    font-weight: 400;
+    font-size: 40px;
+    letter-spacing: 0.02em;
+    -webkit-text-stroke: 0;
+    text-shadow:
+      var(--px) var(--px) 0 var(--px-ink),
+      calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--px-red-dark);
+    box-shadow:
+      inset calc(var(--px) * -2) calc(var(--px) * -2) 0 var(--px-red-dark),
+      inset calc(var(--px) * 2) calc(var(--px) * 2) 0 #ff8a7a,
+      0 calc(var(--px) * 2) 0 var(--px-ink);
+  }
+  .declare:hover:enabled {
+    transform: none;
+    translate: 0 calc(var(--px) * -1);
+  }
+  .declare:active:enabled {
+    translate: 0 calc(var(--px) * 2);
+    box-shadow:
+      inset calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--px-red-dark),
+      0 0 0 var(--px-ink);
+  }
+  .declare:disabled {
+    filter: none;
+    background: #6a4a3a;
+    color: #b59c80;
+    text-shadow: var(--px) var(--px) 0 var(--px-ink);
+    box-shadow:
+      inset calc(var(--px) * -2) calc(var(--px) * -2) 0 #4a3024,
+      0 calc(var(--px) * 2) 0 var(--px-ink);
+  }
+  .declare.armed {
+    animation: uno-px-armed 0.5s steps(1) infinite;
+  }
+
+  /* Result screen. */
+  .px-result {
+    position: absolute;
+    z-index: 130;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: #0a0604a6;
+    overflow: hidden;
+  }
+  .px-result-card {
+    position: relative;
+    min-width: min(420px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+    padding: 20px 24px 22px;
+    text-align: center;
+    background: var(--px-wood);
+    color: var(--px-cream);
+    border: calc(var(--px) + 1px) solid var(--px-ink);
+    box-shadow:
+      inset 0 0 0 var(--px) var(--px-wood-edge),
+      0 calc(var(--px) * 3) 0 var(--px-ink);
+    animation: uno-px-drop 0.5s steps(5, jump-end) both;
+    h2,
+    p {
+      font-family: var(--px-font);
+    }
+    h2 {
+      margin: 8px 0 0;
+      font-weight: 400;
+      font-size: 64px;
+      line-height: 1;
+      color: var(--gold);
+      text-shadow:
+        var(--px) var(--px) 0 var(--px-ink),
+        calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--px-red-dark);
+    }
+    p {
+      margin: 6px 0 0;
+      font-size: 26px;
+      text-shadow: 2px 2px 0 var(--px-ink);
+    }
+  }
+  .px-result:not(.won) h2 {
+    color: #b9c4d6;
+    text-shadow:
+      var(--px) var(--px) 0 var(--px-ink),
+      calc(var(--px) * 2) calc(var(--px) * 2) 0 #2c3548;
+  }
+  .px-result-art {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 22px;
+  }
+  .px-fx-sprite {
+    display: block;
+    width: 117px;
+    height: 120px;
+    background: var(--sheet-fx) calc(var(--fx) * -117px) 0 / 936px 120px
+      no-repeat;
+    animation: uno-px-bob 0.8s steps(2) infinite;
+  }
+  .px-result-winner {
+    position: relative;
+    display: block;
+    padding-top: 40px;
+  }
+  .px-result-winner .px-avatar {
+    position: relative;
+    display: block;
+    width: 164px;
+    height: 160px;
+    --as: 4px;
+    border: var(--px) solid var(--px-ink);
+    background-color: #f3dfb4;
+    box-shadow:
+      0 0 0 var(--px) var(--gold),
+      0 calc(var(--px) * 2) 0 var(--px-ink);
+  }
+  .px-fx-sprite.crown {
+    position: absolute;
+    z-index: 1;
+    left: 50%;
+    top: 0;
+    width: 78px;
+    height: 54px;
+    translate: -50% 0;
+    background-position: calc(7 * -78px) -26px;
+    background-size: 624px 80px;
+    animation-delay: 0.4s;
+  }
+  .px-result-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .px-result-actions button:not(.rematch) {
+    background: var(--px-wood-edge);
+  }
+  .px-confetti {
+    position: absolute;
+    top: -24px;
+    left: calc(var(--i) * 4.1% + 1%);
+    width: 12px;
+    height: 12px;
+    background: var(--px-red);
+    box-shadow: 3px 3px 0 #0006;
+    animation: uno-px-fall calc(1.6s + mod(var(--i), 5) * 0.35s) steps(16)
+      calc(mod(var(--i), 7) * 0.18s) infinite;
+  }
+  .px-confetti:nth-child(4n + 1) {
+    background: var(--gold);
+  }
+  .px-confetti:nth-child(4n + 2) {
+    background: var(--px-green);
+  }
+  .px-confetti:nth-child(4n + 3) {
+    background: var(--px-blue);
+  }
+}
+
+/* Character portraits (seats and the result screen). */
+.uno-pixel .px-avatar {
+  position: absolute;
+  inset: 0;
+  background: url('/games/uno/pixel/avatars.webp')
+    calc(var(--av) * var(--as) * -41) 0 / calc(var(--as) * 328)
+    calc(var(--as) * 40) no-repeat;
+  image-rendering: pixelated;
+}
+
+/* Flights are appended to the table root, outside the hand. */
+.uno-table.uno-pixel.px-tokens .uno-flight {
+  transition: none;
+  box-shadow: calc(var(--k) * 3) calc(var(--k) * 3) 0 #0b24158c;
+}
+
+.settings.uno-pixel.px-tokens {
+  font-family: var(--px-font);
+  font-size-adjust: ex-height 0.6;
+  background: var(--px-wood-dark);
+  color: var(--px-cream);
+  border: calc(var(--px) + 1px) solid var(--px-ink);
+  border-radius: 0;
+  box-shadow:
+    inset 0 0 0 var(--px) var(--px-wood-edge),
+    0 calc(var(--px) * 3) 0 #000a;
+  &::backdrop {
+    background: #120c08b3;
+  }
+  h2 {
+    font-family: var(--px-font);
+    font-weight: 400;
+    font-size: 32px;
+    color: var(--px-gold);
+    text-shadow: 2px 2px 0 var(--px-ink);
+  }
+  .close {
+    font-family: var(--px-font);
+    border-radius: 0;
+    font-size: 30px;
+  }
+  .skin-choice {
+    border-radius: 0;
+    border: var(--px) solid var(--px-wood-edge);
+    legend {
+      font-size: 18px;
+      color: var(--px-gold);
+    }
+    label {
+      border-radius: 0;
+      border: var(--px) solid var(--px-ink);
+      background: var(--px-wood);
+      font-size: 22px;
+    }
+    label:has(:checked) {
+      background: var(--px-gold);
+      color: var(--px-ink);
+    }
+    input {
+      appearance: none;
+      width: 15px;
+      height: 15px;
+      border: var(--px) solid var(--px-ink);
+      background: var(--px-cream);
+    }
+    input:checked {
+      background: var(--px-ink);
+      box-shadow: inset 0 0 0 2px var(--px-cream);
+    }
+  }
+  .settings-body :is(a, button, select) {
+    border-radius: 0;
+    border: var(--px) solid var(--px-ink);
+    background: var(--px-wood);
+    font-family: var(--px-font);
+    font-weight: 400;
+    font-size: 22px;
+    box-shadow:
+      inset calc(var(--px) * -1) calc(var(--px) * -1) 0 #0000004d,
+      inset var(--px) var(--px) 0 #ffffff33,
+      0 var(--px) 0 var(--px-ink);
+  }
+  .settings-body [role='status'] {
+    font-size: 17px;
+  }
+  :focus-visible {
+    outline: var(--px) solid var(--px-gold);
+  }
+}
+
+/* Tall screens use the portrait table and the classic's portrait sizes. */
+@media (max-aspect-ratio: 3/4) {
+  .uno-table.uno-pixel.px-tokens {
+    background-image: url('/games/uno/pixel/table-tall.webp');
+    --u: max(1px, round(nearest, calc(min(17vh, 30vw) / 64), 1px));
+    --hu: max(2px, round(nearest, calc(min(22vh, 40vw) / 64), 1px));
+    --as: max(1px, round(down, calc(min(9.4vh, 13vw) / 40), 1px));
+  }
+}
+@media (max-width: 700px) {
+  .uno-table.uno-pixel.px-tokens {
+    --as: 1px;
+    .plate {
+      padding: 0 6px 3px;
+    }
+    .plate b {
+      font-size: 17px;
+    }
+    .plate span {
+      font-size: 13px;
+    }
+    .seat-cards {
+      transform: none;
+      margin-top: 2px;
+      height: 30px;
+    }
+    .mini-back {
+      width: 18px;
+      height: 26px;
+      left: calc(38px + var(--fan) * 5px);
+      top: 0;
+    }
+    .center-table {
+      top: 45%;
+    }
+    .piles {
+      gap: calc(var(--card-w) * 0.2);
+    }
+    .px-result-actions button {
+      font-size: 20px;
+      padding: 4px 10px 6px;
+    }
+    .px-count {
+      left: 76px;
+      right: auto;
+      bottom: -2px;
+      font-size: 16px;
+      line-height: 16px;
+      min-width: 20px;
+    }
+    .bubble {
+      font-size: 20px;
+      translate: -50% 0;
+    }
+    .pile-group > small {
+      font-size: 18px;
+    }
+    .color-pill,
+    .flow-label {
+      font-size: 17px;
+    }
+    .turn-pill {
+      font-size: 22px;
+    }
+    .declare {
+      font-size: 30px;
+    }
+    .color-choice button {
+      width: 60px;
+      height: 56px;
+    }
+    .color-choice .px-gem {
+      width: 32px;
+      height: 29px;
+      background-position: calc(var(--gem) * -39px - 120px) -11px;
+      background-size: 312px 40px;
+    }
+    .px-result-card h2 {
+      font-size: 48px;
+    }
+    .px-fx-sprite {
+      width: 78px;
+      height: 80px;
+      background-position: calc(var(--fx) * -78px) 0;
+      background-size: 624px 80px;
+    }
+    .px-fx-sprite.crown {
+      width: 39px;
+      height: 27px;
+      background-position: calc(7 * -39px) -13px;
+      background-size: 312px 40px;
+    }
+    .px-result-winner {
+      padding-top: 20px;
+    }
+    .px-result-winner .px-avatar {
+      width: 82px;
+      height: 80px;
+      --as: 2px;
+    }
+    .px-burst-art {
+      width: 234px;
+      height: 240px;
+      background-size: 1872px 240px;
+    }
+    .burst {
+      font-size: 72px;
+    }
+  }
+}
+@media (max-height: 620px) {
+  .uno-table.uno-pixel.px-tokens {
+    .declare {
+      font-size: 30px;
+    }
+    .color-choice {
+      top: 0;
+    }
+  }
+}
+
+/* Motion off: everything holds still. */
+.uno-table.uno-pixel[data-motion='false'] {
+  .flow,
+  .seat.active .portrait,
+  .stock:enabled .card,
+  .penalty,
+  .catch,
+  .turn-pill.mine::before,
+  .turn-pill.mine::after,
+  .declare.armed,
+  .px-burst-art,
+  .px-fx-sprite,
+  .color-choice,
+  .color-choice .px-gem,
+  .bubble,
+  .px-result-card {
+    animation: none;
+  }
+  .seat.active .portrait {
+    box-shadow:
+      0 0 0 var(--px) var(--gold),
+      0 calc(var(--px) * 2) 0 var(--px-ink);
+  }
+  .declare.armed {
+    background: var(--gold);
+    color: var(--px-red);
+  }
+}
+
+@keyframes uno-px-turn {
+  0% {
+    box-shadow:
+      inset 0 calc(var(--as) * -10) 0 #e2c48e,
+      0 0 0 var(--px) var(--gold),
+      0 calc(var(--px) * 2) 0 var(--px-ink);
+  }
+  50% {
+    box-shadow:
+      inset 0 calc(var(--as) * -10) 0 #e2c48e,
+      0 0 0 calc(var(--px) * 2) #fff4c4,
+      0 calc(var(--px) * 3) 0 var(--px-ink);
+  }
+}
+@keyframes uno-px-pop {
+  0% {
+    scale: 0.25;
+    opacity: 0;
+  }
+  50% {
+    scale: 1.25;
+    opacity: 1;
+  }
+  100% {
+    scale: 1;
+  }
+}
+@keyframes uno-px-fade {
+  to {
+    opacity: 0;
+    translate: 0 -12px;
+  }
+}
+@keyframes uno-px-march {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+@keyframes uno-px-ready {
+  50% {
+    box-shadow:
+      0 0 0 var(--u) var(--px-ink),
+      0 0 0 calc(var(--u) * 2) #fff4c4;
+  }
+}
+@keyframes uno-px-bob {
+  50% {
+    translate: 0 -3px;
+  }
+}
+@keyframes uno-px-nudge {
+  50% {
+    margin-inline: 4px;
+  }
+}
+@keyframes uno-px-ring {
+  0% {
+    scale: 0.6;
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    scale: 1.35;
+    opacity: 0;
+  }
+}
+@keyframes uno-px-stamp {
+  0% {
+    scale: 2.2;
+    opacity: 0;
+  }
+  20% {
+    scale: 1;
+    opacity: 1;
+  }
+  80% {
+    scale: 1;
+    opacity: 1;
+  }
+  100% {
+    scale: 1;
+    opacity: 0;
+    translate: 0 -12px;
+  }
+}
+@keyframes uno-px-flip {
+  50% {
+    scale: -1 1;
+  }
+}
+@keyframes uno-px-shake {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  20% {
+    translate: -9px 3px;
+  }
+  40% {
+    translate: 9px -3px;
+  }
+  60% {
+    translate: -6px 0;
+  }
+  80% {
+    translate: 3px 0;
+  }
+}
+@keyframes uno-px-burst {
+  0% {
+    transform: translate(-50%, -50%) scale(0.2);
+    opacity: 0;
+  }
+  15% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 1;
+  }
+  25%,
+  80% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -58%) scale(1);
+    opacity: 0;
+  }
+}
+@keyframes uno-px-spin {
+  50% {
+    scale: -1 1;
+  }
+}
+@keyframes uno-px-spark {
+  0% {
+    transform: rotate(var(--a)) translateX(0) rotate(calc(var(--a) * -1));
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(var(--a)) translateX(220px) rotate(calc(var(--a) * -1));
+    opacity: 0;
+  }
+}
+@keyframes uno-px-armed {
+  50% {
+    background: var(--gold);
+    color: var(--px-red);
+  }
+}
+@keyframes uno-px-drop {
+  0% {
+    translate: 0 -60px;
+    opacity: 0;
+  }
+  60% {
+    translate: 0 8px;
+    opacity: 1;
+  }
+  100% {
+    translate: 0 0;
+  }
+}
+@keyframes uno-px-fall {
+  to {
+    translate: 0 calc(100vh + 48px);
+  }
+}

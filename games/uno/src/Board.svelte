@@ -2,6 +2,11 @@
   import { onMount, tick, untrack, type Snippet } from 'svelte';
   import { prefersReducedMotion } from 'svelte/motion';
   import { modal, read, write } from '@board-games/shared/ui';
+  import {
+    gameSkin,
+    setGameSkin,
+    type Skin,
+  } from '@board-games/shared/ui/pixel';
   import { m } from '@board-games/shared/messages';
   import type { Locale } from '@board-games/shared/runtime';
   import type { Player } from '@board-games/game-core';
@@ -13,6 +18,7 @@
     type UnoView,
   } from './presentation.js';
   import { cardMotion, cardAudio } from './motion.js';
+  import type { Cue } from './pixel/sound.js';
   let {
     view,
     playerId,
@@ -48,6 +54,23 @@
     called = $state<Record<string, boolean>>({}),
     pops = $state<{ key: number; id: string; count: number }[]>([]),
     burst = $state<{ key: number; id: string } | null>(null);
+  // The 8-bit skin is per viewer; its CSS and chiptune pack load only when chosen.
+  let skin = $state<Skin>(gameSkin('uno')),
+    pixelReady = $state(false),
+    chiptune = $state<(cue: Cue) => void>(),
+    fx = $state<{ key: number; kind: string } | null>(null),
+    dismissed = $state(-1);
+  $effect(() => {
+    if (skin === 'pixel' && !pixelReady)
+      void Promise.all([
+        import('./pixel.css'),
+        import('./pixel/sound.js'),
+      ]).then(([, sound]) => {
+        chiptune = sound.chiptune(audio.audio);
+        pixelReady = true;
+      });
+  });
+  const pixel = $derived(skin === 'pixel' && pixelReady);
   const motionEnabled = $derived(
     motionSetting ? motionSetting !== 'off' : !prefersReducedMotion.current,
   );
@@ -83,6 +106,66 @@
     wild: m.uno_wild({}, { locale }),
   });
   const name = (id: string) => players.find((p) => p.id === id)?.name ?? id;
+  /** 8-bit portrait: one of eight characters, stable per roster seat. */
+  const avatar = (id: string) =>
+    Math.max(
+      0,
+      pub.players.findIndex((p) => p.id === id),
+    ) % 8;
+  /** Column of a card's numeral or icon in the 8-bit glyph sheet. */
+  const glyph = (card: Card) =>
+    /^\d$/.test(card.symbol)
+      ? Number(card.symbol)
+      : ['skip', 'reverse', '+2', '+4', 'wild'].indexOf(card.symbol) + 10;
+  const tint = (card: Card) => (card.color ? colors.indexOf(card.color) : 4);
+  function cue(sound: Cue) {
+    if (pixel && soundEnabled && !document.hidden) chiptune?.(sound);
+  }
+  /** 8-bit juice for one accepted revision: a chiptune cue and a table effect. */
+  function react(before: UnoView, next: UnoView) {
+    const b = before.public,
+      n = next.public;
+    if (n.revision !== b.revision + 1) return;
+    let kind = '';
+    if (n.top.id !== b.top.id) {
+      const symbol = n.top.symbol;
+      kind =
+        symbol === 'skip' || symbol === 'reverse'
+          ? symbol
+          : symbol === '+2' || symbol === '+4'
+            ? 'hit'
+            : '';
+      cue(
+        symbol === 'skip' || symbol === 'reverse'
+          ? symbol
+          : symbol === '+2'
+            ? 'hit2'
+            : symbol === '+4'
+              ? 'hit4'
+              : 'play',
+      );
+    } else if (b.phase === 'color' && n.phase !== 'color') {
+      kind = 'wild';
+      cue('wild');
+    } else if (
+      n.players.some(
+        (seat) =>
+          seat.count > (b.players.find((p) => p.id === seat.id)?.count ?? 99),
+      )
+    )
+      cue('draw');
+    if (n.phase === 'finished' && b.phase !== 'finished')
+      later(() => cue(n.winner === playerId ? 'win' : 'lose'), 350);
+    else if (n.turn === playerId && n.phase === 'turn' && b.turn !== playerId)
+      later(() => cue('turn'), 260);
+    if (kind && motionEnabled) {
+      const key = Math.random();
+      fx = { key, kind };
+      later(() => {
+        if (fx?.key === key) fx = null;
+      }, 1000);
+    }
+  }
   const symbol = (card: Card) =>
     card.symbol === 'skip'
       ? '⊘'
@@ -155,9 +238,13 @@
         if (seat.count !== 1 && called[seat.id]) delete called[seat.id];
       if (!before) return;
       const fresh = !document.hidden;
+      if (pixel && fresh) react(before, next);
       for (const id of unoCalls(before, next)) {
         called[id] = true;
-        if (fresh) audio.call();
+        if (fresh) {
+          if (pixel) cue('uno');
+          else audio.call();
+        }
         if (fresh && motionEnabled) {
           const key = Date.now();
           burst = { key, id };
@@ -178,9 +265,14 @@
   });
   onMount(() => {
     audio.setEnabled(soundEnabled);
-    motion = cardMotion(root, playerId, () => {
-      if (!document.hidden) audio.play();
-    });
+    motion = cardMotion(
+      root,
+      playerId,
+      () => {
+        if (!document.hidden && !pixel) audio.play();
+      },
+      () => pixel,
+    );
     const unlock = () => audio.unlock();
     const reset = () => motion?.reset();
     const resize = () => motion?.clear();
@@ -201,6 +293,21 @@
 </script>
 
 {#snippet cardFace(card: Card)}
+  {#if pixel}{@render pixelFace(card)}{:else}{@render classicFace(card)}{/if}
+{/snippet}
+
+{#snippet pixelFace(card: Card)}
+  <span class="px-art" style:--face={tint(card)}></span>
+  {#if card.symbol !== 'wild'}<span
+      class="px-glyph"
+      style:--gx={glyph(card)}
+      style:--gy={tint(card)}
+    ></span>{/if}
+  <span class="px-corner" style:--gx={glyph(card)}></span>
+  <span class="px-corner bottom" style:--gx={glyph(card)}></span>
+{/snippet}
+
+{#snippet classicFace(card: Card)}
   <span class="corner">{symbol(card)}</span>
   {#if !card.color}
     <svg class="wild-art" viewBox="0 0 80 100" aria-hidden="true">
@@ -235,6 +342,8 @@
 <section
   bind:this={root}
   class="uno-table"
+  class:px-tokens={pixel}
+  class:uno-pixel={pixel}
   aria-label="UNO"
   data-round={round}
   data-revision={pub.revision}
@@ -293,7 +402,8 @@
       >
         <div class="plate">
           <div class="portrait" aria-hidden="true">
-            {name(seat.id).slice(0, 1).toUpperCase()}
+            {#if pixel}<span class="px-avatar" style:--av={avatar(seat.id)}
+              ></span>{:else}{name(seat.id).slice(0, 1).toUpperCase()}{/if}
           </div>
           <b>{name(seat.id)}</b>
           {#if member?.bot || member?.connected === false}<span
@@ -307,12 +417,13 @@
               class="mini-back"
               style={`--fan:${i - (Math.min(seat.count, 7) - 1) / 2}`}
             ></span>{/each}
+          {#if pixel}<span class="px-count">{seat.count}</span>{/if}
         </div>
         {@render bubbles(seat.id)}
       </div>
     {/each}
   </div>
-  <div class="center-table">
+  <div class="center-table" class:px-shake={fx?.kind === 'hit'}>
     <svg
       class="flow"
       class:counter={pub.direction === -1}
@@ -365,7 +476,10 @@
         </div>
         <small>{m.uno_discard_pile({}, { locale })}</small>
         <span class="color-pill" style:--active-color={palette[pub.activeColor]}
-          >{t[pub.activeColor]}</span
+          >{#if pixel}<span
+              class="px-gem"
+              style:--gem={colors.indexOf(pub.activeColor)}
+            ></span>{/if}{t[pub.activeColor]}</span
         >
       </div>
     </div>
@@ -379,13 +493,15 @@
       >
         <p>{m.uno_choose({}, { locale })}</p>
         <div>
-          {#each colors as color}<button
+          {#each colors as color, i}<button
               style:--swatch={palette[color]}
               aria-label={t[color]}
               title={t[color]}
               disabled={pending || !connected}
               onclick={() => act({ type: 'CHOOSE_COLOR', color })}
-            ></button>{/each}
+              >{#if pixel}<span class="px-gem" style:--gem={i}
+                ></span>{/if}</button
+            >{/each}
         </div>
       </div>{/if}
     {#each legal.filter((a) => a.type === 'CATCH_UNO') as action}<button
@@ -396,10 +512,62 @@
           (action as Extract<Action, { type: 'CATCH_UNO' }>).player,
         )}</button
       >{/each}
+    {#if fx}{#key fx.key}<div
+          class="px-fx {fx.kind}"
+          style:--gx={glyph(pub.top)}
+          style:--ring={palette[pub.activeColor]}
+          aria-hidden="true"
+        >
+          <span class="px-fx-ring"></span>{#if fx.kind !== 'wild'}<span
+              class="px-fx-glyph"
+            ></span>{/if}
+        </div>{/key}{/if}
   </div>
   {#if burst}{#key burst.key}<div class="burst" aria-hidden="true">
-        UNO!<small>{name(burst.id)}</small>
+        {#if pixel}<span class="px-burst-art"
+          ></span>{#each Array(8) as _, i}<span class="px-spark" style:--i={i}
+            ></span>{/each}{/if}<span class="burst-word">UNO!</span><small
+          >{name(burst.id)}</small
+        >
       </div>{/key}{/if}
+  {#if pixel && pub.phase === 'finished' && dismissed !== round}
+    {@const won = pub.winner === playerId}
+    <div class="px-result" class:won aria-live="polite">
+      {#if won && motionEnabled}{#each Array(24) as _, i}<span
+            class="px-confetti"
+            style:--i={i}
+          ></span>{/each}{/if}
+      <div class="px-result-card">
+        <div class="px-result-art" aria-hidden="true">
+          <span class="px-fx-sprite" style:--fx={won ? 1 : 2}></span>
+          {#if pub.winner}<span class="px-result-winner"
+              ><span class="px-fx-sprite crown" style:--fx={7}></span><span
+                class="px-avatar"
+                style:--av={avatar(pub.winner)}
+              ></span></span
+            >{/if}
+        </div>
+        <h2>
+          {won
+            ? m.uno_you_win({}, { locale })
+            : pub.winner
+              ? m.uno_game_over({}, { locale })
+              : m.uno_tie({}, { locale })}
+        </h2>
+        {#if pub.winner && !won}<p>
+            {name(pub.winner)}
+            {m.uno_won({}, { locale })}
+          </p>{/if}
+        <div class="px-result-actions">
+          {#if canRematch}<button class="rematch" onclick={() => rematch?.()}
+              >{m.rematch({}, { locale })}</button
+            >{/if}<button onclick={() => (dismissed = round)}
+            >{m.uno_view_table({}, { locale })}</button
+          >
+        </div>
+      </div>
+    </div>
+  {/if}
   <div class="hand-area" class:mine={myTurn}>
     <div class="turn-row" aria-live="polite">
       {#if pub.phase === 'finished'}<p class="turn-pill done">
@@ -453,6 +621,8 @@
   >
   <dialog
     class="settings"
+    class:px-tokens={pixel}
+    class:uno-pixel={pixel}
     aria-label={m.uno_settings({}, { locale })}
     {@attach modal(() => settingsOpen)}
     onclose={() => (settingsOpen = false)}
@@ -468,7 +638,25 @@
         onclick={() => (settingsOpen = false)}>×</button
       >
     </header>
-    <div class="settings-body">{@render settingsContent?.()}</div>
+    <div class="settings-body">
+      <fieldset class="skin-choice">
+        <legend>{m.skin({}, { locale })}</legend>
+        {#each [['classic', m.skin_classic({}, { locale })], ['pixel', m.skin_pixel({}, { locale })]] as [value, text]}<label
+            ><input
+              type="radio"
+              name="uno-skin"
+              {value}
+              checked={skin === value}
+              onchange={() => {
+                skin = value as Skin;
+                setGameSkin('uno', skin);
+                motion?.clear();
+              }}
+            />{text}</label
+          >{/each}
+      </fieldset>
+      {@render settingsContent?.()}
+    </div>
   </dialog>
 </section>
 
@@ -1245,6 +1433,37 @@
     font-size: 13px;
     color: #d8c9b5;
     text-align: center;
+  }
+  .skin-choice {
+    display: flex;
+    gap: 8px;
+    margin: 0 0 4px;
+    padding: 6px 10px 10px;
+    border: 1px solid #ffffff26;
+    border-radius: 14px;
+  }
+  .skin-choice legend {
+    padding: 0 6px;
+    font-size: 13px;
+    color: #d8c9b5;
+  }
+  .skin-choice label {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px;
+    border-radius: 10px;
+    background: #33251a;
+    cursor: pointer;
+  }
+  .skin-choice label:has(:checked) {
+    background: #4a3524;
+  }
+  .skin-choice input {
+    margin: 0;
+    accent-color: #f7d43c;
   }
   :focus-visible {
     outline: 3px solid #f7d43c;

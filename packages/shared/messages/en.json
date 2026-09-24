@@ -1807,5 +1807,8 @@
   "cn_jev_locked": "Locked until the next match",
   "cn_skin": "Table style",
   "cn_skin_classic": "Classic",
-  "cn_skin_pixel": "8-bit"
+  "cn_skin_pixel": "8-bit",
+  "uno_you_win": "You win!",
+  "uno_game_over": "Game over",
+  "uno_view_table": "View table"
 }
