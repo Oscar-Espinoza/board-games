@@ -1,6 +1,6 @@
 # Codenames
 
-Authoritative clue-and-turn Codenames for 4–8 friends. Bun owns in-memory rules;
+Authoritative clue-and-turn Codenames for 4–12 friends. Bun owns in-memory rules;
 Svelte renders a fixed 5×5 paper table with real room information, team counts,
 turn banner, public history, players and a private spymaster panel.
 

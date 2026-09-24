@@ -1,4 +1,5 @@
 <script lang="ts">
+  import '@board-games/shared/ui/pixel.css';
   import { untrack } from 'svelte';
   import { prefersReducedMotion } from 'svelte/motion';
   import { catalog } from '@board-games/shared';
@@ -284,18 +285,6 @@
   >{/snippet}
 
 <style>
-  @font-face {
-    font-family: 'Pixelify Sans';
-    src: url('/fonts/pixel-store/pixelify-sans-400.woff2') format('woff2');
-    font-weight: 400;
-    font-display: swap;
-  }
-  @font-face {
-    font-family: 'Pixelify Sans';
-    src: url('/fonts/pixel-store/pixelify-sans-700.woff2') format('woff2');
-    font-weight: 700;
-    font-display: swap;
-  }
   :global(html:has(.pixel-store)),
   :global(body:has(.pixel-store)) {
     background: #2a1a10;

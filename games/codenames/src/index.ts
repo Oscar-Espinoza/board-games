@@ -33,7 +33,7 @@ export function create(
 ): State {
   if (
     players.length < 4 ||
-    players.length > 8 ||
+    players.length > 12 ||
     new Set(players).size !== players.length ||
     players.some((p) => typeof p !== 'string' || !p)
   )
@@ -378,7 +378,7 @@ export function view(s: State, player: string): View {
 export const codenames: GameDefinition<State> = {
   id: 'codenames',
   minPlayers: 4,
-  maxPlayers: 8,
+  maxPlayers: 12,
   create,
   apply,
   view,

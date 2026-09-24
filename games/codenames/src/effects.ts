@@ -1,4 +1,5 @@
 import { createAudio } from '@board-games/shared/ui';
+import { playChiptune } from '@board-games/shared/ui/pixel';
 /** Public feedback only. No context is created before an explicit user gesture. */
 export function soundEffects() {
   const audio = createAudio();
@@ -6,7 +7,12 @@ export function soundEffects() {
   const cues = { reveal: [150, 75, 0.16], finish: [440, 660, 0.28] } as const;
   return {
     unlock: audio.unlock,
-    play(volume: number, cue: keyof typeof cues) {
+    /** `chiptune` swaps in the 8-bit skin's ZzFX cues. */
+    play(volume: number, cue: keyof typeof cues, chiptune = false) {
+      if (chiptune) {
+        playChiptune(audio, cue === 'reveal' ? 'stamp' : 'win', volume);
+        return;
+      }
       const [from, to, duration] = cues[cue];
       audio.tone({
         from,

@@ -40,7 +40,7 @@ export const catalog = [
     id: 'codenames',
     name: 'Codenames',
     minPlayers: 4,
-    maxPlayers: 8,
+    maxPlayers: 12,
     description: m.cn_description,
     preview: 'dossiers',
   },

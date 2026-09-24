@@ -12,7 +12,8 @@
     "start": "bun apps/server/dist/index.js",
     "check": "bun run --filter @board-games/web check && bun --bun tsc --noEmit",
     "format": "bun --bun prettier --write .",
-    "format:check": "bun --bun prettier --check ."
+    "format:check": "bun --bun prettier --check .",
+    "lab:codenames": "bun packages/jev-lab/src/codenames/run.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",

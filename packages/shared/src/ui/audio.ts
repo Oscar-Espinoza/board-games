@@ -121,6 +121,22 @@ export function createAudio() {
         start(source, at, s.duration, [filter, gain]);
       } catch {}
     },
+    /** Play prebuilt mono samples (e.g. from ZzFX) at `volume` (0–1). */
+    samples(data: ArrayLike<number>, sampleRate: number, volume: number) {
+      const ctx = running();
+      if (!ctx || !data.length) return;
+      try {
+        const buffer = ctx.createBuffer(1, data.length, sampleRate),
+          channel = buffer.getChannelData(0);
+        for (let i = 0; i < data.length; i++) channel[i] = data[i]!;
+        const source = ctx.createBufferSource(),
+          gain = ctx.createGain();
+        source.buffer = buffer;
+        gain.gain.value = volume;
+        source.connect(gain).connect(ctx.destination);
+        start(source, ctx.currentTime, buffer.duration, [gain]);
+      } catch {}
+    },
     stop,
     close() {
       stop();

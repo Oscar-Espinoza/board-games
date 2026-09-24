@@ -9,6 +9,7 @@ import { uno } from '@board-games/uno/server';
 import { carcassonne } from '@board-games/carcassonne/server';
 import { catan } from '@board-games/catan/server';
 import { domino } from '@board-games/domino/server';
+import { plan } from '@board-games/jev-lab/codenames';
 import type { GameDefinition } from '@board-games/game-core';
 import { Rooms } from './rooms.js';
 import { attachSockets } from './socket.js';
@@ -43,6 +44,41 @@ const server = createServer((req, res) => {
   if (req.url === '/health') {
     res.setHeader('content-type', 'application/json');
     res.end('{"ok":true}');
+    return;
+  }
+  // Local training only: Jev guesses from public clue/board data; the API key stays here.
+  if (req.url === '/api/codenames/guess' && req.method === 'POST') {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk;
+      if (body.length > 64_000) req.destroy();
+    });
+    req.on('end', async () => {
+      res.setHeader('content-type', 'application/json');
+      try {
+        const { view, unlimited, score, personality } = JSON.parse(body);
+        if (!Array.isArray(view?.board) || typeof view?.clue?.word !== 'string')
+          throw new Error('Bad request');
+        const valid =
+          Number.isInteger(score?.ours) && Number.isInteger(score?.theirs);
+        res.end(
+          JSON.stringify(
+            await plan(
+              view,
+              unlimited === true,
+              valid ? score : undefined,
+              ['conservative', 'normal', 'risky'].includes(personality)
+                ? personality
+                : 'normal',
+            ),
+          ),
+        );
+      } catch (error) {
+        console.error('[jev] guess failed:', error);
+        res.statusCode = 502;
+        res.end(JSON.stringify({ error: String(error) }));
+      }
+    });
     return;
   }
   assets(req, res, () => {

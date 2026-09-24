@@ -21,6 +21,7 @@
         "@board-games/codenames": "workspace:*",
         "@board-games/domino": "workspace:*",
         "@board-games/game-core": "workspace:*",
+        "@board-games/jev-lab": "workspace:*",
         "@board-games/little-secret": "workspace:*",
         "@board-games/shared": "workspace:*",
         "@board-games/sushi-go-party": "workspace:*",
@@ -148,6 +149,9 @@
     "packages/game-core": {
       "name": "@board-games/game-core",
     },
+    "packages/jev-lab": {
+      "name": "@board-games/jev-lab",
+    },
     "packages/shared": {
       "name": "@board-games/shared",
       "dependencies": {
@@ -167,6 +171,8 @@
     "@board-games/domino": ["@board-games/domino@workspace:games/domino"],
 
     "@board-games/game-core": ["@board-games/game-core@workspace:packages/game-core"],
+
+    "@board-games/jev-lab": ["@board-games/jev-lab@workspace:packages/jev-lab"],
 
     "@board-games/little-secret": ["@board-games/little-secret@workspace:games/little-secret"],
 

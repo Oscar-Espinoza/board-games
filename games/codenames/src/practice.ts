@@ -21,10 +21,15 @@ export function practice(
   language: 'en' | 'es' = 'en',
   size = 4,
 ) {
-  const random = seeded(260912);
+  // Preset positions need a known board; a full game deals a fresh one each time.
+  const random = seeded(
+    scenario === 'match' || scenario === 'setup'
+      ? Math.floor(Math.random() * 2 ** 31)
+      : 260912,
+  );
   const roster = [
     ...seats,
-    ...Array.from({ length: Math.max(0, Math.min(8, size) - 4) }, (_, i) => ({
+    ...Array.from({ length: Math.max(0, Math.min(12, size) - 4) }, (_, i) => ({
       id: `training-${i + 4}`,
       name: `Player ${i + 5}`,
       connected: true,
