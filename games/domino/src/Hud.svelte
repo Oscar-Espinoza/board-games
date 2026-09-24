@@ -760,13 +760,13 @@
   /* 8-bit skin: Pixelify Sans, hard ink borders, stepped shadows, store palette. */
   @font-face {
     font-family: 'Pixelify Sans';
-    src: url('/fonts/pixel-store/pixelify-sans-400.woff2') format('woff2');
+    src: url('/fonts/pixel/pixelify-sans-400.woff2') format('woff2');
     font-display: swap;
   }
   @font-face {
     font-family: 'Pixelify Sans';
     font-weight: 700;
-    src: url('/fonts/pixel-store/pixelify-sans-700.woff2') format('woff2');
+    src: url('/fonts/pixel/pixelify-sans-700.woff2') format('woff2');
     font-display: swap;
   }
   .pixel {

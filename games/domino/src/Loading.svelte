@@ -161,7 +161,7 @@
   /* 8-bit: the pixel patio, hard shadows and stepped motion. */
   @font-face {
     font-family: 'Pixelify Sans';
-    src: url('/fonts/pixel-store/pixelify-sans-400.woff2') format('woff2');
+    src: url('/fonts/pixel/pixelify-sans-400.woff2') format('woff2');
     font-display: swap;
   }
   .pixel {
