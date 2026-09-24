@@ -1,5 +1,5 @@
 <script lang="ts">
-  let { notes }: { notes?: string[] } = $props();
+  let { notes }: { notes: string[] } = $props();
   const leaves = Array.from({ length: 24 }, (_, i) => ({
     x: 12 + ((i * 43) % 146),
     y: 5 + ((i * 61) % 145),
@@ -42,19 +42,13 @@
       >{/each}
   </svg>
   <div class="note top-note">
-    {#if notes}{#each notes[0].split('|') as line}{line}<br
-        />{/each}{:else}Different<br />dishes<br />brighter<br />together{/if}
-    <span>♥</span>
+    {#each notes[0].split('|') as line}{line}<br />{/each}
   </div>
   <div class="note right-note">
-    {#if notes}{#each notes[1].split('|') as line}{line}<br
-        />{/each}{:else}SAME<br />TABLE.<br />MORE<br />HAPPINESS{/if}
-    <span>♥</span>
+    {#each notes[1].split('|') as line}{line}<br />{/each}
   </div>
   <div class="note bottom-note">
-    {#if notes}{#each notes[2].split('|') as line}{line}<br
-        />{/each}{:else}GOOD<br />GAMES<br />TASTY<br />PEOPLE{/if}
-    <span>♥</span>
+    {#each notes[2].split('|') as line}{line}<br />{/each}
   </div>
   <div class="chopsticks"><i></i><i></i></div>
   <div class="sauce"><div><span>⌣</span><i></i><i></i></div></div>
@@ -123,12 +117,6 @@
       2px 12px 12px #21473755,
       inset 5px 0 1px #fff4d733;
     text-align: center;
-  }
-  .note span {
-    display: block;
-    margin-top: 9px;
-    color: #c76f65;
-    font-size: 25px;
   }
   .top-note {
     left: 162px;

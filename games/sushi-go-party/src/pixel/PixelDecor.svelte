@@ -26,13 +26,13 @@
       style={`${prop(p.name)};${p.style}`}
     ></i>{/each}
   <p class="px-note top">
-    {#each notes[0].split('|') as line}<span>{line}</span>{/each}<b>♥</b>
+    {#each notes[0].split('|') as line}<span>{line}</span>{/each}
   </p>
   <p class="px-note right">
-    {#each notes[1].split('|') as line}<span>{line}</span>{/each}<b>♥</b>
+    {#each notes[1].split('|') as line}<span>{line}</span>{/each}
   </p>
   <p class="px-note bottom">
-    {#each notes[2].split('|') as line}<span>{line}</span>{/each}<b>♥</b>
+    {#each notes[2].split('|') as line}<span>{line}</span>{/each}
   </p>
 </div>
 
@@ -83,11 +83,6 @@
     height: 12px;
     background: #c8453a;
     border: 3px solid #1a0f08;
-  }
-  .px-note b {
-    color: #c8453a;
-    font-weight: 400;
-    margin-top: 4px;
   }
   .top {
     left: 150px;
