@@ -1,12 +1,23 @@
 <script lang="ts">
   import WoodenPiece from './WoodenPiece.svelte';
   import { spriteRoot } from './sprites.js';
+  import { figureImage } from '../pixel/atlas.svelte.js';
   // Painted neutral figures tinted per player; same space as WoodenPiece.
   let {
     color,
     type = 'meeple',
     shadow = true,
-  }: { color: string; type?: string; shadow?: boolean } = $props();
+    pixel = false,
+  }: {
+    color: string;
+    type?: string;
+    shadow?: boolean;
+    /** 8-bit skin: a recoloured pixel sprite instead of the tinted painting. */
+    pixel?: boolean;
+  } = $props();
+  // Pixel figures: one sprite pixel is 1.15 figure units, feet on y = 14.
+  const k = 1.15;
+  const fig = $derived(pixel ? figureImage(type, color) : null);
   const uid = $props.id();
   const sprite = $derived(
     type === 'large' ? 'meeple' : type === 'pig' ? 'pig' : type,
@@ -14,7 +25,21 @@
   const painted = ['meeple', 'abbot', 'builder', 'pig'];
 </script>
 
-{#if painted.includes(sprite)}
+{#if pixel}
+  {#if shadow}<path
+      d="M-7 12h16v1h2v2h-2v1h-16v-1h-2v-2h2z"
+      fill="#160a03"
+      opacity=".4"
+    />{/if}
+  {#if fig}<image
+      href={fig.url}
+      x={-(fig.w * k) / 2}
+      y={14 - fig.h * k}
+      width={fig.w * k}
+      height={fig.h * k}
+      style="image-rendering:pixelated"
+    />{/if}
+{:else if painted.includes(sprite)}
   <defs>
     <filter
       id={`${uid}-tint`}
