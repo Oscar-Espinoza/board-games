@@ -57,6 +57,8 @@ function matches(a: string, b: unknown) {
 /** In-memory authority. Tokens and canonical state never appear in a room projection. */
 export class Rooms {
   readonly rooms = new Map<string, Room>();
+  // Server-wide, so fresh sockets cannot bypass the per-socket limiter.
+  private created: number[] = [];
   constructor(
     readonly games: Map<string, GameDefinition>,
     readonly graceMs = 120_000,
@@ -96,6 +98,9 @@ export class Rooms {
   ): Credentials {
     this.ensureUnbound(socketId);
     if (this.rooms.size >= 64) fail('Too many rooms');
+    this.created = this.created.filter((at) => this.now() - at < 60_000);
+    if (this.created.length >= 12)
+      fail('Too many new rooms; try again in a minute');
     const definition =
       this.games.get(text(request.gameId, 32)) ?? fail('Unknown game');
     const practice = !!(
@@ -144,6 +149,7 @@ export class Rooms {
       room.revision = 1;
     }
     this.rooms.set(room.id, room);
+    this.created.push(this.now());
     return this.credentials(room, seat);
   }
   join(
@@ -159,10 +165,13 @@ export class Rooms {
         room.seats.find((s) => matches(s.token, request.token)) ??
         fail('Reconnect token expired or invalid');
       const replacedSocket = seat.socketId;
+      const host = room.hostId;
       seat.socketId = socketId;
       seat.reservedUntil = null;
       room.touched = this.now();
       this.syncPresence(room);
+      this.promoteHost(room);
+      if (!replacedSocket || room.hostId !== host) room.revision++;
       return { credentials: this.credentials(room, seat), replacedSocket };
     }
     if (room.practice) fail('Practice rooms are private');
@@ -338,10 +347,12 @@ export class Rooms {
     const changed: string[] = [];
     for (const room of this.rooms.values()) {
       if (this.expire(room)) changed.push(room.id);
-      // Empty abandoned games are collected, even when browser tabs stay open elsewhere.
+      // Lobbies go once expire() leaves no seats; abandoned games after an
+      // hour, even when browser tabs stay open elsewhere.
       if (
-        !room.seats.some((s) => s.socketId) &&
-        this.now() - room.touched > Math.max(this.graceMs, 3_600_000)
+        (room.state === null && !room.seats.length) ||
+        (!room.seats.some((s) => s.socketId) &&
+          this.now() - room.touched > Math.max(this.graceMs, 3_600_000))
       )
         this.rooms.delete(room.id);
     }

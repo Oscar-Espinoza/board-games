@@ -28,7 +28,7 @@ A socket joins a Socket.IO room and is bound to a verified seat. Action envelope
 
 Bun generates seat IDs, unguessable room IDs and private reconnect tokens. The client keeps credentials under a room-specific localStorage key. Names are labels, never credentials. Socket.IO reconnect or reopening a room presents the token to restore its existing seat. Claiming an already connected seat with its valid token replaces the old connection.
 
-Disconnect reserves a seat for `RECONNECT_GRACE_MS` (default 120000). Expiration invalidates the old token. Lobby vacancies are removed; an active game's seat remains available for a replacement, preserving its game identity and position while assigning a new name and secret. Host metadata moves to a connected seat when needed. Abandoned rooms are eventually collected; no state survives a Bun restart.
+Disconnect reserves a seat for `RECONNECT_GRACE_MS` (default 120000). Expiration invalidates the old token. Lobby vacancies are removed; an active game's seat remains available for a replacement, preserving its game identity and position while assigning a new name and secret. Host metadata moves to a connected seat when needed, including when a token reconnect is the first seat back. Empty lobbies are collected once their last reservation expires; abandoned games after an hour. Room creation is capped at 64 rooms and 12 new rooms per minute server-wide. No state survives a Bun restart.
 
 ## Browser delivery and languages
 
