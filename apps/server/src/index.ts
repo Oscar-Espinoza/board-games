@@ -9,7 +9,7 @@ import { uno } from '@board-games/uno/server';
 import { carcassonne } from '@board-games/carcassonne/server';
 import { catan } from '@board-games/catan/server';
 import { domino } from '@board-games/domino/server';
-import { plan } from '@board-games/jev-lab/codenames';
+import { parseView, plan } from '@board-games/jev-lab/codenames';
 import type { GameDefinition } from '@board-games/game-core';
 import { Rooms } from './rooms.js';
 import { attachSockets } from './socket.js';
@@ -40,6 +40,19 @@ const assets = sirv(resolve('apps/web/build'), {
       res.setHeader('cache-control', 'public, max-age=31536000, immutable');
   },
 });
+// Opt-in (JEV_LAB=1): anyone who reaches this origin spends the operator's TypeSafe key.
+const lab = process.env.JEV_LAB === '1';
+const recent: number[] = [];
+let planned = 0;
+/** Global Jev budget: 20 plans per rolling minute and 500 per process run. */
+function budget() {
+  const now = Date.now();
+  while (recent.length && recent[0]! <= now - 60_000) recent.shift();
+  if (recent.length >= 20 || planned >= 500) return false;
+  recent.push(now);
+  planned++;
+  return true;
+}
 const server = createServer((req, res) => {
   if (req.url === '/health') {
     res.setHeader('content-type', 'application/json');
@@ -48,19 +61,32 @@ const server = createServer((req, res) => {
   }
   // Local training only: Jev guesses from public clue/board data; the API key stays here.
   if (req.url === '/api/codenames/guess' && req.method === 'POST') {
+    res.setHeader('content-type', 'application/json');
+    const fail = (status: number, error: string) => {
+      res.statusCode = status;
+      res.end(JSON.stringify({ error }));
+    };
+    if (!lab) return fail(404, 'Jev lab is off');
     let body = '';
     req.on('data', (chunk) => {
       body += chunk;
       if (body.length > 64_000) req.destroy();
     });
     req.on('end', async () => {
-      res.setHeader('content-type', 'application/json');
+      let input;
       try {
-        const { view, unlimited, score, personality } = JSON.parse(body);
-        if (!Array.isArray(view?.board) || typeof view?.clue?.word !== 'string')
-          throw new Error('Bad request');
-        const valid =
-          Number.isInteger(score?.ours) && Number.isInteger(score?.theirs);
+        input = JSON.parse(body);
+      } catch {}
+      const view = parseView(input?.view);
+      if (!view) return fail(400, 'Bad request');
+      if (!budget()) return fail(429, 'Jev lab budget spent');
+      const { unlimited, score, personality } = input;
+      const valid =
+        Number.isInteger(score?.ours) && Number.isInteger(score?.theirs);
+      // A client that leaves drops its queued Jev call.
+      const gone = new AbortController();
+      res.on('close', () => gone.abort());
+      try {
         res.end(
           JSON.stringify(
             await plan(
@@ -70,21 +96,34 @@ const server = createServer((req, res) => {
               ['conservative', 'normal', 'risky'].includes(personality)
                 ? personality
                 : 'normal',
+              gone.signal,
             ),
           ),
         );
       } catch (error) {
         console.error('[jev] guess failed:', error);
-        res.statusCode = 502;
-        res.end(JSON.stringify({ error: String(error) }));
+        fail(502, String(error));
       }
     });
     return;
   }
-  assets(req, res, () => {
-    res.statusCode = 404;
-    res.end('Build the frontend with bun run build, or use bun run dev.');
-  });
+  // sirv 3.0.2 streams any parsed range, and a reversed one throws; serve the whole file instead.
+  const range = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range ?? '');
+  if (req.headers.range && (!range || (range[2] && +range[1]! > +range[2])))
+    delete req.headers.range;
+  try {
+    assets(req, res, () => {
+      res.statusCode = 404;
+      res.end('Build the frontend with bun run build, or use bun run dev.');
+    });
+  } catch (error) {
+    console.error('[static]', error);
+    if (res.headersSent) res.destroy();
+    else {
+      res.statusCode = 500;
+      res.end();
+    }
+  }
 });
 const io = attachSockets(server, rooms);
 const port = Number(process.env.PORT ?? 3000);

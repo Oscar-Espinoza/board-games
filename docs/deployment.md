@@ -15,6 +15,9 @@ The Bun process serves the built SvelteKit SPA and Socket.IO at http://127.0.0.1
 | `HOST`               | `127.0.0.1` | Listener address; set `0.0.0.0` only when direct LAN access or the chosen tunnel requires it |
 | `PORT`               | `3000`      | Bun HTTP and Socket.IO port                                                                  |
 | `RECONNECT_GRACE_MS` | `120000`    | How long disconnected seats retain their reconnect secret                                    |
+| `JEV_LAB`            | unset       | `1` enables `POST /api/codenames/guess` for Codenames local training with Jev                |
+
+`JEV_LAB=1` spends the `TYPESAFE_API_KEY` from `.env` for anyone who can reach the origin, tunnel included; the route has no login. Leave it unset while a tunnel is up. When on, the server caps Jev at 20 turns per rolling minute and 500 per run (then 429), and accepts only views a real Codenames game can produce. When off, the route returns 404 and local training lets you guess yourself.
 
 `bun run dev` starts Bun and Vite; open port 5173 during development. Its Vite proxy targets the Bun `PORT` (3000 by default). Set `WEB_PORT` to change the initial Vite port; Vite chooses the next available port if it is occupied. Ctrl+C terminates the frontend runner and backend watcher, with a 1.2-second forced-stop fallback for lingering development process groups. This supervisor is used only for development.
 

@@ -1795,6 +1795,7 @@
   "cn_jev_thinking": "Jev is thinking…",
   "cn_jev_guessed": "Jev guessed {words} · ${usd}",
   "cn_jev_error": "Jev could not guess",
+  "cn_jev_off": "Jev is off on this server (set JEV_LAB=1 to enable)",
   "cn_layout": "Board position",
   "cn_layout_left": "Left",
   "cn_layout_center": "Center",

@@ -71,6 +71,65 @@ const personalities: Record<
 
 const prompt = prompts.v2!;
 
+/** Codenames bounds (games/codenames): 25 cards, clues of at most 80 graphemes (≤ 320 UTF-16 units here) counting 0–9,
+ * and every turn reveals a card, so board + revealed and board + past clues stay within 25. */
+const cards = 25;
+const text = (x: unknown) =>
+  typeof x === 'string' && x.length > 0 && x.length <= 320;
+const words = (x: unknown) =>
+  Array.isArray(x) && x.length <= cards && x.every(text);
+const number = (x: unknown) =>
+  typeof x === 'number' && Number.isInteger(x) && x >= 0 && x <= 9;
+
+/** Guards the HTTP route: a view a real game can produce, rebuilt so extra fields never reach Jev. */
+export function parseView(x: unknown): View | null {
+  const v = x as View;
+  const valid =
+    !!v &&
+    (v.lang === 'en' || v.lang === 'es') &&
+    text(v.clue?.word) &&
+    number(v.clue.count) &&
+    words(v.board) &&
+    v.board.length > 0 &&
+    Array.isArray(v.revealed) &&
+    v.board.length + v.revealed.length <= cards &&
+    v.revealed.every(
+      (r) =>
+        text(r?.word) && ['ours', 'theirs', 'civilian'].includes(r.identity),
+    ) &&
+    Array.isArray(v.history) &&
+    v.board.length + v.history.length <= cards &&
+    v.history.every(
+      (h) =>
+        (h?.team === 'ours' || h?.team === 'theirs') &&
+        text(h.word) &&
+        number(h.count) &&
+        words(h.guessed),
+    ) &&
+    v.history.reduce((n, h) => n + h.guessed.length, 0) <= cards &&
+    words(v.guessedThisTurn);
+  return valid
+    ? {
+        lang: v.lang,
+        clue: { word: v.clue.word, count: v.clue.count },
+        board: v.board,
+        revealed: v.revealed.map(({ word, identity }) => ({ word, identity })),
+        history: v.history.map(({ team, word, count, guessed }) => ({
+          team,
+          word,
+          count,
+          guessed,
+        })),
+        guessedThisTurn: v.guessedThisTurn,
+      }
+    : null;
+}
+
+/** Board × clues peaks at 13 × 13 for a valid view; anything larger is not a real game. */
+const maxQuestions = 169;
+/** Server callers waiting for a Jev slot; more are refused instead of queued. */
+const queue = 16;
+
 function combinations<T>(items: T[], k: number): T[][] {
   if (k === 0) return [[]];
   return items.flatMap((x, i) =>
@@ -84,6 +143,7 @@ export async function plan(
   unlimited = false,
   score?: Score,
   personality: Personality = 'normal',
+  signal?: AbortSignal,
 ): Promise<Plan> {
   const style = personalities[personality];
   const started = performance.now();
@@ -96,6 +156,8 @@ export async function plan(
       : [],
   );
   const refs = ['clue', ...leftovers];
+  if (refs.length * view.board.length > maxQuestions)
+    throw new Error('Too many questions');
   const first = await ask(
     view,
     Object.fromEntries(
@@ -103,6 +165,7 @@ export async function plan(
         view.board.map((_, i) => [`r${r}w${i}`, prompt.card(ref, i)]),
       ),
     ),
+    { queue, signal },
   );
   tokens += first.inputTokens;
   const scores = refs.map((_, r) =>
@@ -133,7 +196,11 @@ export async function plan(
       ranked.slice(0, 6).map((c) => c.word),
       count,
     ).map((g) => g.join(' + '));
-    const second = await ask(view, { group: prompt.group(view, groups) });
+    const second = await ask(
+      view,
+      { group: prompt.group(view, groups) },
+      { queue, signal },
+    );
     tokens += second.inputTokens;
     const a = second.answers.group!;
     if (a.type !== 'choice') throw new Error('Expected a Choice answer');

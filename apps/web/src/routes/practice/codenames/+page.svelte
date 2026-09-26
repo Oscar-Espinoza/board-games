@@ -21,6 +21,8 @@
     seatCount = $state(4),
     // You give every clue for both teams; Jev plays each team's operative.
     jev = $state(true),
+    // False once the server answers that its Jev lab (JEV_LAB=1) is off.
+    lab = $state(true),
     jevStatus = $state(''),
     personality = $state<'conservative' | 'normal' | 'risky'>('normal'),
     busy = false;
@@ -115,6 +117,11 @@
       if (!res || res.status >= 500) {
         await new Promise((r) => setTimeout(r, 1500));
         res = await request();
+      }
+      if (res.status === 404) {
+        // No lab on this server: you play the operatives yourself.
+        lab = jev = false;
+        return;
       }
       if (!res.ok) {
         const detail = await res.text();
@@ -225,11 +232,13 @@
           ><input
             type="checkbox"
             bind:checked={jev}
+            disabled={!lab}
             onchange={() => {
               refresh();
               void jevTurn();
             }}
-          />{m.cn_jev_mode()}</label
+          />{m.cn_jev_mode()}{#if !lab}<small>{m.cn_jev_off()}</small
+            >{/if}</label
         ><label
           >{m.cn_jev_personality()}<select
             aria-label={m.cn_jev_personality()}

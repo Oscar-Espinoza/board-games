@@ -27,6 +27,8 @@ Options:
 
 It must run from the repo root, so Bun loads `TYPESAFE_API_KEY` from `.env`.
 
+Local training (`/practice/codenames`) plays the same guesser through the Bun server's `POST /api/codenames/guess`. That route is off unless the server starts with `JEV_LAB=1`, which lets anyone who reaches the origin spend the key; see [deployment](../deployment.md).
+
 Each run does three things, and records spend: calls, tokens and cost per turn, plus the running lab total.
 
 - Prints one line per scenario: guesses, with ✓ for ours, ✗opp, ✗civ and ☠ for the assassin, plus the top 5 probabilities and the assassin's rank.

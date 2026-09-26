@@ -1795,6 +1795,7 @@
   "cn_jev_thinking": "Jev está pensando…",
   "cn_jev_guessed": "Jev adivinó {words} · ${usd}",
   "cn_jev_error": "Jev no pudo adivinar",
+  "cn_jev_off": "Jev está desactivado en este servidor (activa JEV_LAB=1)",
   "cn_layout": "Posición del tablero",
   "cn_layout_left": "Izquierda",
   "cn_layout_center": "Centro",
