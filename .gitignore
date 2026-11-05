@@ -6,3 +6,4 @@ packages/shared/src/paraglide/
 packages/shared/project.inlang/.cache/
 .env
 .env.local
+.dashboard/
