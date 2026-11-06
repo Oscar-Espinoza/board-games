@@ -10,26 +10,28 @@ import { carcassonne } from '@board-games/carcassonne/server';
 import { catan } from '@board-games/catan/server';
 import { domino } from '@board-games/domino/server';
 import type { GameDefinition } from '@board-games/game-core';
+import { games, type GameId } from '@board-games/shared/games';
 import { Rooms } from './rooms.js';
 import { attachSockets } from './socket.js';
 const grace = Number(process.env.RECONNECT_GRACE_MS ?? 120_000);
 if (!Number.isFinite(grace) || grace < 0)
   throw new Error('Invalid RECONNECT_GRACE_MS');
+const definitions: GameDefinition[] = [
+  uno,
+  catan,
+  carcassonne,
+  azul,
+  codenames,
+  sushiGoParty,
+  littleSecret,
+  domino,
+];
+// The catalog offers bot practice rooms exactly where the rules can play the bots.
+for (const { id, botAction } of definitions)
+  if ((games[id as GameId].practice === 'room') !== !!botAction)
+    throw new Error(`${id}: catalog practice and botAction disagree`);
 const rooms = new Rooms(
-  new Map(
-    (
-      [
-        uno,
-        catan,
-        carcassonne,
-        azul,
-        codenames,
-        sushiGoParty,
-        littleSecret,
-        domino,
-      ] as GameDefinition[]
-    ).map((definition) => [definition.id, definition]),
-  ),
+  new Map(definitions.map((definition) => [definition.id, definition])),
   grace,
 );
 const assets = sirv(resolve('apps/web/build'), {

@@ -460,7 +460,8 @@ export function applyAction(
         action.strength >= 0 &&
         action.strength <= 1,
     );
-    intention = { type: 'ROLL_DICE' };
+    const { strength: _, ...rest } = action;
+    intention = rest;
   }
   // Check every ordinary action against server-derived choices before consuming randomness.
   // Offers and discards carry open-ended quantities, so their cases validate them.

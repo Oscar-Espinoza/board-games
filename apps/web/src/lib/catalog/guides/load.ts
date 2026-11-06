@@ -1,5 +1,4 @@
-import type { GameId } from '../types';
-import type { Guide } from '../types';
+import type { GameId, Guide } from '../types';
 export const guideLoaders = {
   'little-secret': () => import('@board-games/little-secret/guide'),
   azul: () => import('./azul'),

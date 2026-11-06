@@ -4,7 +4,6 @@ import { games, seats } from '@board-games/shared/games';
 import { botAction } from './bot.js';
 import { colors, deck, type Card, type Color } from './cards.js';
 
-export type { Card, Color };
 export type Action =
   | { type: 'PLAY_CARD'; cardId: number; uno?: boolean }
   | { type: 'DRAW' }

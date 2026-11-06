@@ -17,6 +17,9 @@ export class SocketReplyError extends Error {
   }
 }
 
+const isRecord = (value: unknown) =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
 /** Only still-uncommitted intentions the game itself vouches for are safe to retry. */
 export function canRetryIntention(
   initial: RoomView,
@@ -32,15 +35,13 @@ export function canRetryIntention(
     current.round === initial.round &&
     current.status === 'playing' &&
     current.players.every((player) => player.connected) &&
-    intention !== null &&
-    typeof intention === 'object' &&
-    !Array.isArray(intention) &&
-    !!initial.game &&
-    !!current.game &&
+    isRecord(intention) &&
+    isRecord(initial.game?.public) &&
+    isRecord(current.game?.public) &&
     retryable(
       intention as Intention,
-      initial.game,
-      current.game,
+      initial.game!,
+      current.game!,
       current.playerId,
     )
   );

@@ -9,7 +9,7 @@
   import wood from './table/wood.webp';
   import {
     createAudio,
-    errorText,
+    message,
     eventGate,
     modal,
     viewerPreferences,
@@ -166,7 +166,8 @@
         clueWord = '';
       }
     } catch (error) {
-      localError = errorText((error as Error).message, locale);
+      localError =
+        message((error as Error).message, {}, locale) ?? m.cn_error();
     } finally {
       selected = null;
     }

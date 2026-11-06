@@ -28,8 +28,9 @@ export function viewerPreferences<T extends Record<string, Preference>>(
   for (const name in defaults) {
     const value = saved[name];
     if (
-      typeof value === typeof defaults[name] ||
-      (defaults[name] === null && typeof value === 'boolean')
+      defaults[name] === null
+        ? value === null || typeof value === 'boolean'
+        : typeof value === typeof defaults[name]
     )
       initial[name] = value as Saved<T>[typeof name];
   }

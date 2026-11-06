@@ -33,7 +33,7 @@
     RevisionGate,
     ViewerSkin,
     clamp01,
-    errorText,
+    message,
     viewerPreferences,
     type BoardProps,
   } from '@board-games/shared/ui';
@@ -168,11 +168,11 @@
       ? Math.max(0, FLOOR_SIZE - ownBoard.floor.length - (claimsMarker ? 1 : 0))
       : 0,
   );
-  function clear(message = '') {
+  function clear(text = '') {
     picker = null;
     selection = null;
     destination = null;
-    notice = message;
+    notice = text;
   }
   function settle() {
     epoch++;
@@ -268,7 +268,7 @@
       await send(action);
     } catch (error) {
       awaitingPresentation = false;
-      notice = errorText((error as Error).message, locale);
+      notice = message((error as Error).message, {}, locale) ?? m.azul_error();
     } finally {
       submitting = false;
       if (view.public.revision === revision) awaitingPresentation = false;

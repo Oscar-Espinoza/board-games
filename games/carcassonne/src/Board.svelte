@@ -89,9 +89,10 @@
     overviewScope = $state<FeatureScope>('mine');
   const prefs = viewerPreferences('carcassonne', {
     sound: true,
-    motion: null,
+    motion: true,
   });
-  const motion = $derived(prefs.motion ?? !prefersReducedMotion.current);
+  // Reduced motion always wins (ADR 025); the setting only turns ambient motion off.
+  const motion = $derived(prefs.motion && !prefersReducedMotion.current);
   let cx = $state(50),
     cy = $state(50),
     scale = $state(1.5),
@@ -2044,7 +2045,9 @@
     <div class="settings-grid">
       <button onclick={toggleSound} aria-pressed={prefs.sound}
         >{t('sound')} · {prefs.sound ? t('on') : t('off')}</button
-      ><button onclick={() => (prefs.motion = !motion)} aria-pressed={motion}
+      ><button
+        onclick={() => (prefs.motion = !prefs.motion)}
+        aria-pressed={motion}
         >{t('motion')} · {motion ? t('on') : t('off')}</button
       ><button
         onclick={() => {

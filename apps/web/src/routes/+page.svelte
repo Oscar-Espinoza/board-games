@@ -4,7 +4,13 @@
   import { catalog } from '@board-games/shared';
   import { m } from '@board-games/shared/messages';
   import { modal, read, write } from '@board-games/shared/ui';
-  import { connect, create, leave, session } from '$lib/session.svelte';
+  import {
+    connect,
+    create,
+    leave,
+    nameKey,
+    session,
+  } from '$lib/session.svelte';
   import BoxArt from '$lib/catalog/BoxArt.svelte';
   import SummaryStep from '$lib/catalog/SummaryStep.svelte';
   import Rulebook from '$lib/catalog/Rulebook.svelte';
@@ -13,7 +19,6 @@
   import type { GameId } from '$lib/catalog/types';
   import { joinRequest, type Panel } from '$lib/home/state.svelte';
   import { theme } from '$lib/theme.svelte';
-  const nameKey = 'board-games:name';
   const setupModes = ['variable', 'beginner'] as const;
   let selected = $state<GameId>('uno');
   let panel = $state<Panel | null>(null);

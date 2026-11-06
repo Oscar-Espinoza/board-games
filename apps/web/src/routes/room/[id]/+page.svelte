@@ -14,6 +14,7 @@
     leave,
     request,
     send,
+    nameKey,
   } from '$lib/session.svelte';
   import { m } from '@board-games/shared/messages';
   import {
@@ -33,7 +34,7 @@
   const gameId = $derived(room?.gameId as GameId | undefined);
   const metadata = $derived(gameId && games[gameId]);
   onMount(() => {
-    name = read('board-games:name') ?? '';
+    name = read(nameKey) ?? '';
   });
   // Runs again when navigating straight from one room link to another.
   $effect(() => {

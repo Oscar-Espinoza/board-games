@@ -263,7 +263,10 @@ export function playEffects(
       const tableBox = root.querySelector('.table'),
         shore = root.querySelector('.shore'),
         tray = root.querySelector<HTMLElement>('.board-dice');
-      if (!tableBox || !shore || !tray) continue;
+      if (!tableBox || !shore || !tray) {
+        onRollSettled();
+        continue;
+      }
       const table = tableBox.getBoundingClientRect();
       const island = shore.getBoundingClientRect();
       const rx = Math.max(30, Math.min(island.width, table.width) / 2 - 26);

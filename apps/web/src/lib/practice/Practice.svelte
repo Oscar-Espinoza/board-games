@@ -40,6 +40,7 @@
   } = $props();
 
   let Board = $state<Component<any> | null>(null),
+    loadingError = $state(''),
     error = $state(''),
     round = $state(0),
     version = $state(0),
@@ -56,12 +57,16 @@
     void version;
     return table!.view(seat);
   });
+  const finished = $derived.by(() => {
+    void version;
+    return table!.finished;
+  });
 
   onMount(() => {
     gameClients[game]
       .load()
       .then((module) => (Board = module.default))
-      .catch((e: Error) => (error = e.message));
+      .catch((e: Error) => (loadingError = e.message));
   });
   let shown = table;
   /** Show the seat that must act next; call it after changing the table yourself. */
@@ -100,7 +105,13 @@
 
 <svelte:head><title>{title}</title></svelte:head>
 <main class="practice-route">
-  {#if error}<p class="practice-error" role="alert">{error}</p>{/if}
+  {#if error}<p class="practice-error" role="alert">
+      {error}<button
+        type="button"
+        aria-label={m.catan_dismiss_error()}
+        onclick={() => (error = '')}>×</button
+      >
+    </p>{/if}
   {#if Board}{#key locale}<Board
         {view}
         playerId={seat}
@@ -110,7 +121,7 @@
         {locale}
         practice={true}
         canConfigure={true}
-        canRematch={table!.finished}
+        canRematch={finished}
         rematch={reset}
         {chooseSeat}
         {...boardProps}
@@ -142,7 +153,14 @@
                 >{/each}</select
             >
           </nav>{/snippet}
-      </Board>{/key}{:else if !error}<p role="status">{m.loading()}</p>{/if}
+      </Board>{/key}{:else if loadingError}<p
+      class="practice-error"
+      role="alert"
+    >
+      {loadingError}<button onclick={() => location.reload()}
+        >{m.retry()}</button
+      >
+    </p>{:else}<p role="status">{m.loading()}</p>{/if}
 </main>
 
 <style>
@@ -161,6 +179,9 @@
   .practice-controls :is(select, button) {
     min-height: 44px;
     font: inherit;
+  }
+  .practice-error button {
+    margin-left: 8px;
   }
   .practice-error {
     position: absolute;

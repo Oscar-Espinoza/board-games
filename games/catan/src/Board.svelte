@@ -81,10 +81,11 @@
   provideSkin(() => pixel);
   const preferences = viewerPreferences('catan', {
     sound: true,
-    motion: null,
+    motion: true,
   });
+  // The system's reduced-motion request always wins over the table setting.
   const motionEnabled = $derived(
-    preferences.motion ?? !prefersReducedMotion.current,
+    preferences.motion && !prefersReducedMotion.current,
   );
   let settings = $state(false),
     rulesOpen = $state(false);
@@ -838,7 +839,8 @@
         >
         <button
           aria-pressed={motionEnabled}
-          onclick={() => (preferences.motion = !motionEnabled)}
+          disabled={prefersReducedMotion.current}
+          onclick={() => (preferences.motion = !preferences.motion)}
           >{m.catan_motion({}, { locale })}
           {motionEnabled ? '✓' : '×'}</button
         >

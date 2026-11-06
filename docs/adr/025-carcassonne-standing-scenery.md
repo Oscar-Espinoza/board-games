@@ -34,7 +34,7 @@ the event contract are unchanged.
   public feature snapshot (`risingFeatures`). Reloads and reconnects therefore show
   finished towns already standing and never replay the animation.
 - **Ambient motion** (river shimmer, swaying trees, chimney smoke, slot glow) is on
-  by default, persisted per browser as `carcassonne:motion`, toggled in Settings
+  by default, persisted per browser with the other viewer preferences, toggled in Settings
   and disabled by `prefers-reduced-motion`. When off, completed features appear
   instantly.
 - **Sprites** are Codex-generated painted WebPs under

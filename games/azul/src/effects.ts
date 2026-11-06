@@ -60,10 +60,7 @@ export function ceramicAudio() {
         marker = list.find((f) => f.sound === 'marker'),
         // Overflow and direct floor drafts, not the round-end sweep off the floor.
         floor = list.find(
-          (f) =>
-            f.color !== 'marker' &&
-            parseLocation(f.to).kind === 'floor' &&
-            !f.cleanup,
+          (f) => f.color !== 'marker' && parseLocation(f.to).kind === 'floor',
         ),
         deal = list.find((f) => f.from === bag || f.from === discard);
       if (draft) {

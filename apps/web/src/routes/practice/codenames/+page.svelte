@@ -186,46 +186,49 @@
   }
 </script>
 
-{#key seatCount}
-  <Practice
-    bind:this={shell}
-    game="codenames"
-    title={`Codenames · ${m.cn_practice()}`}
-    {start}
-    {scenarios}
-    label={(id) => scenarioLabels[id]()}
-    bind:scenario
-    bind:table
-    boardProps={{ note: jev ? jevStatus : '' }}
-  >
-    {#snippet controls()}
-      <label
-        >{m.cn_seats()}<select aria-label={m.cn_seats()} bind:value={seatCount}
-          >{#each seatCounts as size}<option value={size}>{size}</option
-            >{/each}</select
-        ></label
-      >
-      <label class="toggle"
-        ><input
-          type="checkbox"
-          bind:checked={jev}
-          disabled={!lab}
-          onchange={toggleJev}
-        />{m.cn_jev_mode()}{#if !lab}<small>{m.cn_jev_off()}</small>{/if}</label
-      >
-      <label
-        >{m.cn_jev_personality()}<select
-          aria-label={m.cn_jev_personality()}
-          bind:value={personality}
-          disabled={started}
-          >{#each personalities as [value, name]}<option {value}
-              >{name()}</option
-            >{/each}</select
-        >{#if started}<small>{m.cn_jev_locked()}</small>{/if}</label
-      >
-    {/snippet}
-  </Practice>
-{/key}
+<Practice
+  bind:this={shell}
+  game="codenames"
+  title={`Codenames · ${m.cn_practice()}`}
+  {start}
+  {scenarios}
+  label={(id) => scenarioLabels[id]()}
+  bind:scenario
+  bind:table
+  boardProps={{ note: jev ? jevStatus : '' }}
+>
+  {#snippet controls()}
+    <label
+      >{m.cn_seats()}<select
+        aria-label={m.cn_seats()}
+        bind:value={seatCount}
+        onchange={() => {
+          table = start(scenario);
+          shell?.refresh();
+        }}
+        >{#each seatCounts as size}<option value={size}>{size}</option
+          >{/each}</select
+      ></label
+    >
+    <label class="toggle"
+      ><input
+        type="checkbox"
+        bind:checked={jev}
+        disabled={!lab}
+        onchange={toggleJev}
+      />{m.cn_jev_mode()}{#if !lab}<small>{m.cn_jev_off()}</small>{/if}</label
+    >
+    <label
+      >{m.cn_jev_personality()}<select
+        aria-label={m.cn_jev_personality()}
+        bind:value={personality}
+        disabled={started}
+        >{#each personalities as [value, name]}<option {value}>{name()}</option
+          >{/each}</select
+      >{#if started}<small>{m.cn_jev_locked()}</small>{/if}</label
+    >
+  {/snippet}
+</Practice>
 
 <style>
   label {

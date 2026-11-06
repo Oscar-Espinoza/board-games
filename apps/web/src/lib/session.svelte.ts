@@ -20,6 +20,8 @@ export const session = $state({
 let socket: Socket | undefined;
 let current: Credentials | undefined;
 const key = (roomId: string) => `board-games:room:${roomId}`;
+/** The display name the viewer last used, offered again when creating or joining. */
+export const nameKey = 'board-games:name';
 function saved(roomId: string): Credentials | undefined {
   try {
     const value = JSON.parse(read(key(roomId)) ?? 'null');

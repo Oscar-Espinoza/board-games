@@ -11,7 +11,7 @@
   import { seatPosition } from './table/layout.js';
   import {
     createAudio,
-    errorText,
+    message,
     eventGate,
     modal,
     viewerPreferences,
@@ -158,7 +158,8 @@
       else if (action.type === 'vote' || action.type === 'rps') cue('vote');
       else if (action.type !== 'guess') cue('select');
     } catch (error) {
-      localError = errorText((error as Error).message, locale);
+      localError =
+        message((error as Error).message, {}, locale) ?? m.ls_error();
     } finally {
       busy = false;
     }
