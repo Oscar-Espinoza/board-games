@@ -934,6 +934,12 @@ body:has(.sushi-table) .sushi-dialog.sgp-pixel {
   .dialog-close {
     background: var(--sgp-paper);
   }
+  .guide-intro {
+    border-radius: 0;
+    background: #f1e2bf;
+    border: 2px solid var(--sgp-paper-edge);
+  }
+  .guide-intro p,
   .dish-guide p {
     font-size: 17px;
   }

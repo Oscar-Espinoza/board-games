@@ -72,12 +72,11 @@
   const prefs = viewerPreferences('codenames', {
     sound: true,
     volume: 0.5,
-    motion: null,
+    motion: true,
     layout: 'center' as 'left' | 'center' | 'right',
   });
-  const still = $derived(
-    prefs.motion === null ? prefersReducedMotion.current : !prefs.motion,
-  );
+  const still = $derived(prefersReducedMotion.current || !prefs.motion);
+  const dialogOpen = $derived(panel !== null);
   const isNarrow = () => window.innerWidth < 1024;
   let mounted = $state(false),
     enlarged = $state(false),
@@ -680,7 +679,7 @@
         )}
       </div>
       {@render board()}
-      <nav class="drawer">
+      <nav class="drawer" aria-label={m.cn_settings()}>
         <button
           aria-label={m.cn_clue_history()}
           onclick={(e) => open('history', e.currentTarget)}
@@ -749,7 +748,7 @@
   class="cn-dialog cn-table-tokens"
   class:px-tokens={pixel}
   class:cn-pixel={pixel}
-  {@attach modal(() => panel !== null)}
+  {@attach modal(() => dialogOpen)}
   class:confirmation={panel === 'confirm'}
   class:result={panel === 'result'}
   onclose={(e) => {

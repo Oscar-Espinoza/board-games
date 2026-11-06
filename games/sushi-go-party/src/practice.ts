@@ -272,7 +272,7 @@ function fixture(name: Scenario, count: number) {
   return { state: s, random };
 }
 
-export function assertConservation(s: State) {
+function assertConservation(s: State) {
   const ids = [
     ...s.deck,
     ...s.reserve,

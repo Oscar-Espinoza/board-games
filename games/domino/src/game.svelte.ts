@@ -295,10 +295,7 @@ export class DominoGame {
 
   compact = $state(media(COMPACT));
   /** The classic skin is the three.js patio. */
-  readonly skin = new ViewerSkin(
-    'domino',
-    () => import('./pixel/PixelTable.svelte'),
-  );
+  readonly skin = new ViewerSkin('domino');
   /** `camera` (3D): 0 = seated at the table, 1 = straight overhead. */
   readonly preferences = viewerPreferences('domino', {
     sound: true,

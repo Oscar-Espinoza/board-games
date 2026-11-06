@@ -52,7 +52,8 @@ export class ViewerSkin {
   readonly pixel = $derived(this.choice === 'pixel' && this.ready);
   constructor(
     readonly game: string,
-    load: () => Promise<unknown>,
+    /** Omit when the table loads each skin's code itself. */
+    load: () => Promise<unknown> = async () => {},
   ) {
     this.choice = gameSkin(game);
     $effect(() => {

@@ -64,12 +64,11 @@
   let root: HTMLElement;
   const prefs = viewerPreferences('little-secret', {
     sound: true,
-    motion: null,
+    motion: true,
   });
   let mounted = $state(false);
-  const still = $derived(
-    prefs.motion === null ? prefersReducedMotion.current : !prefs.motion,
-  );
+  const still = $derived(prefersReducedMotion.current || !prefs.motion);
+  const dialogOpen = $derived(panel !== null);
   const audio = createAudio(),
     animations = new Set<Animation>();
   let chip = $state<((cue: PixelCue) => void) | null>(null),
@@ -677,7 +676,7 @@
     </div>{/if}
 </section>
 <dialog
-  {@attach modal(() => panel !== null)}
+  {@attach modal(() => dialogOpen)}
   class="ls-dialog"
   class:px-tokens={pixel}
   class:ls-pixel={pixel}

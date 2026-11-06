@@ -108,7 +108,7 @@
     requestVariant = $state(''),
     requestPriority = $state('');
   let root: HTMLElement;
-  let panel = $state<'rules' | 'guide' | 'settings' | 'tray' | null>(null),
+  let panel = $state<'guide' | 'settings' | 'tray' | null>(null),
     search = $state(''),
     tray = $state('');
   let custom = $state(false),
@@ -116,9 +116,10 @@
   const prefs = viewerPreferences('sushi-go-party', {
     sound: true,
     volume: 0.35,
-    motion: null,
+    motion: true,
   });
-  const motion = $derived(prefs.motion ?? !prefersReducedMotion.current);
+  const motion = $derived(prefs.motion && !prefersReducedMotion.current);
+  const dialogOpen = $derived(panel !== null);
   let announcement = $state(''),
     revealCards = $state<{ seat: string; card: PublicCard }[]>([]),
     scoring = $state(false);
@@ -403,7 +404,7 @@
   <TableControls
     guideLabel={label('guide')}
     settingsLabel={label('settings')}
-    onguide={() => open('rules')}
+    onguide={() => open('guide')}
     onsettings={() => open('settings')}
   />
 
@@ -436,7 +437,7 @@
             })}
         onrule={(kind) => {
           search = label(kind);
-          void open('guide');
+          open('guide');
         }}
       />
       <p class="passing-note">
@@ -579,7 +580,7 @@
                 title={label('rule_' + k)}
                 onclick={() => {
                   search = label(k);
-                  void open('guide');
+                  open('guide');
                 }}
                 ><span
                   ><Dish
@@ -872,7 +873,7 @@
                 aria-label={cardName(card, locale)}
                 onclick={() => {
                   search = label(card.kind);
-                  void open('guide');
+                  open('guide');
                 }}><Card {card} {locale} small /></button
               >{/each}
           </div>
@@ -957,18 +958,17 @@
   class="sushi-dialog"
   class:px-tokens={pixel}
   class:sgp-pixel={pixel}
-  {@attach modal(() => panel !== null)}
-  onclose={() => (panel = null)}
+  {@attach modal(() => dialogOpen)}
+  onclose={(e) => {
+    if (!e.currentTarget.open) panel = null;
+  }}
 >
   <button
     class="dialog-close"
     aria-label={label('close')}
     onclick={() => (panel = null)}>×</button
   >
-  {#if panel === 'rules'}{@render rulesContent?.()}{:else if panel === 'guide'}<h2
-    >
-      {label('guide')}
-    </h2>
+  {#if panel === 'guide'}<h2>{label('guide')}</h2>
     <input
       class="guide-search"
       type="search"
@@ -976,6 +976,12 @@
       aria-label={label('search')}
       bind:value={search}
     />
+    {#each ['quick', 'advanced', 'conventions'] as section}{#if !search || `${label(section)} ${label('rules_' + section)}`
+          .toLocaleLowerCase()
+          .includes(search.toLocaleLowerCase())}<article class="guide-intro">
+          <h3>{label('rules_' + section)}</h3>
+          <p>{label(section)}</p>
+        </article>{/if}{/each}
     <div class="dish-guide">
       {#each kinds.filter((k) => !search || `${label(k)} ${label('rule_' + k)}`
             .toLocaleLowerCase()
@@ -1619,6 +1625,15 @@
   .guide-search {
     width: 100%;
     margin: 8px 0 15px;
+  }
+  .guide-intro {
+    background: #e9eed8;
+    border-radius: 14px;
+    padding: 4px 16px;
+    margin-bottom: 12px;
+  }
+  .guide-intro p {
+    font-size: 13px;
   }
   .dish-guide {
     display: grid;
