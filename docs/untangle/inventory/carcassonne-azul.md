@@ -5,6 +5,7 @@ Paths are relative to the repo root. Line numbers verified with grep/cat -n. "un
 ## Problems
 
 ### Azul: rules module (`games/azul/src/index.ts`)
+
 - `games/azul/src/index.ts:80-425` The rules module emits UI anchor strings (`factory/${f}/${slot}`, `${player}/pattern/${row}/0`, `${actor}/floor/${n}`, `center/${color}`, `'bag'`, `'discard'`, `${actor}/marker`) as `Event.from/to` (lines 102-108, 264-273, 333-341, 345, 357-363, 373-379). `presentation.ts:54-105,150-189`, `effects.ts:8-16,128-134` (`locate` falls back to `<player>/summary`), `Board.svelte` and `PlayerBoard.svelte` (`data-azul-location=` / `location()` at PlayerBoard 53-54) all parse or produce the same grammar with `split('/')`. The grammar is defined nowhere. A player id containing `/` would break it. [hidden] convention callers must just know; [needless] stable rules code knows presentation element ids
 - `games/azul/src/presentation.ts:107-232` The replay re-implements `resolveRound` (index.ts:253-316) from events: clearing pattern lines (219-220), clearing floors, discard counting (227-230), marker hand-back (226), wall points and floor deductions (137-141, 162-164). Any change to scoring or cleanup in index.ts must be mirrored here. [hidden] copy of logic
 - `games/azul/src/presentation.ts:45-49,53,71,91,119-125,135,154,191,213` The timing constants 310/240/150/230/380/390/80/430/1740 are scattered literals. The 150 is also a flag: `f.duration === 150 && f.to === 'discard'` (228) identifies "cleanup flights" by their duration. [hidden] magic number as identity
@@ -16,6 +17,7 @@ Paths are relative to the repo root. Line numbers verified with grep/cat -n. "un
 - `games/azul/README.md:7-9` The README mentions `src/Help.svelte` and `help.ts`, which do not exist (HelpScene.svelte only). [surplus] stale description
 
 ### Azul: Board and helpers
+
 - `games/azul/src/Board.svelte:29-61,521,1033,1077` The props `canConfigure` (line 40, 56) is accepted and never read in the template or script. [surplus] unused prop. `rematch = async () => {}` plus `canRematch` is two props for one concept, and the settings dialog renders a rematch button only `{#if canRematch && !settingsContent}` (1077), because the room page's `settingsContent` carries its own rematch button (room `+page.svelte` ~219-225). [hidden] the two renderers must agree; [needless] pass-through default
 - `games/azul/src/Board.svelte:202,255,369,449` The identity string `` `${round}/${playerId}` `` is built four times, plus `key = `${round}/${visual.revision}`` (457). [hidden] repeated convention
 - `games/azul/src/Board.svelte:65-73,207-215` The `modal` kind union is written out twice. [surplus] duplicate type
@@ -35,12 +37,14 @@ Paths are relative to the repo root. Line numbers verified with grep/cat -n. "un
 - `games/azul/src/pixel/sound.ts:5-8,35-59` Two sound back-ends (`audio.tone/noise` vs `playChiptune` ZzFX) selected per cue, with a private `timers` Set for delayed ZzFX cues. Carcassonne's `pixel/sound.ts` has the same job with a different cancellation story (see Cross-game). [hidden] duplicated plumbing
 
 ### Azul practice route
+
 - `games/azul/src/practice.ts:11-17` + `apps/web/src/routes/practice/azul/+page.svelte:19-21` The seat objects carry `reservedUntil: null`, copied from the server's `rooms.ts:16` seat shape. `Board` never reads it. [surplus] unused field
 - `apps/web/src/routes/practice/azul/+page.svelte:12-22` vs `.../carcassonne/+page.svelte` The Azul page keeps its own `seat` and never follows `game.actor` after a `send` (it only re-reads `game.view(seat)`); Carcassonne sets `seat = game.actor` after every `send` (carc page:70). Same helper, different seat-tracking behaviour. [hidden] undocumented difference
 - `apps/web/src/routes/practice/azul/+page.svelte:79-81` passes `canConfigure={true}` (ignored by Azul Board) and passes `rulesContent` (Carcassonne's page passes neither). [surplus] unused prop
 - `apps/web/src/routes/practice/azul/+page.svelte:5-9,31-41` Azul's `practice()` exposes `players`, Carcassonne's does not (the page picks `seats`/`tableSeats` itself). The `labels` map (31-41, has a stray blank line) has to track `scenarios` by hand (type-checked only through `Record`-style lookup). [hidden] must change together
 
 ### Carcassonne: rules module (`games/carcassonne/src/index.ts`)
+
 - `games/carcassonne/src/index.ts:91-93,771,844-853` Every rejection throws `Error('Invalid Carcassonne action')`. The room page shows it raw (`errorText` returns `session.error`), untranslated, while Azul uses `AZUL_*` -> `azul_error` and Codenames/Sushi/Little Secret use message keys (`/^(azul_|cn_|sgp_|ls_)/` in room `+page.svelte:76`). Carcassonne is outside the convention. [hidden] error convention
 - `games/carcassonne/src/index.ts:25-50,34-39,54-60,87` Rules state is stringly typed: `Option.kind`, `Pending.kind`, `Event.kind`, `State.stage`, `cropMode: string`, all plain `string`. The client branches on the values (`Board.svelte:560-578,686-697,1709-1727`, `effects.ts` cue names, `pixel/sound.ts:89-105`, `overview.ts:45-57`). Renaming a prompt kind silently breaks the UI and sound. [hidden] values the callers must just know
 - `games/carcassonne/src/index.ts:461-681` `advance` is a 220-line stage machine on `s.stage` strings (`'robbers' ... 'end'`), with `guard < 1000` plus `throw 'Carcassonne resolution overflow'` (462, 679-680) as a loop guard. `stage` and `phase` overlap (`phase` has 'decision'/'place', `stage` has 'place'/'finished'/'setup' too). [hidden] two overlapping state variables; special case guard
@@ -56,6 +60,7 @@ Paths are relative to the repo root. Line numbers verified with grep/cat -n. "un
 - `games/carcassonne/src/index.ts:34-39` The type `Pending` is exported and used only locally. [surplus] (low)
 
 ### Carcassonne: Board and helpers
+
 - `games/carcassonne/src/Board.svelte:1-3995` 3995 lines in one component: pointer/camera handling, drag and drop (664-860), setup panel, guide dialog (1967-2028), journal, overview panel, finished panel, status/option labelling, and ~1900 lines of CSS. It also holds rules-derived logic: `available` (706), `usable` (712), `normalChoice` (693), `figureTypes` (701), `optionLabel` (555-581, depends on `Option` kind strings), `keeps` (201-218). [needless] one module changes for many unrelated reasons
 - `games/carcassonne/src/Board.svelte:51-73` Props: `players`, `locale`, `connected`, `practice` etc. The room page also passes `pending`, `errorCode`, `canRematch`, `rematch`, `rulesContent`, `onLeave`, `copied`; this Board drops them silently. So it never shows the STALE_REVISION/MATCH_CHANGED notice (Azul 443-446 does) and has no `rulesContent` (own guide dialog instead). [hidden] contract is implicit per game
 - `games/carcassonne/src/Board.svelte:2095-2096` `:global(body:has(.carc-table) .site-header)` and `.room-toolbar` hide the app shell from inside the game. The practice page also hides `.site-header` (carc page:112-114). Azul's practice route does the same, and Catan/Domino pages do too. [hidden] reads global class names owned by another module; [hidden] duplicate
@@ -84,6 +89,7 @@ Paths are relative to the repo root. Line numbers verified with grep/cat -n. "un
 - `games/carcassonne/package.json:8-12` Exports `./TileArt.svelte`, consumed by `apps/web/src/lib/catalog/guides/CarcassonneScene.svelte:2`. Azul exports `./HelpScene.svelte` for `AzulScene.svelte`. A stable catalog guide imports a volatile game component and its `x/y/pixel/rotation` props. [needless] stable code importing volatile game code (reasonable but unremarked)
 
 ### Carcassonne practice route
+
 - `games/carcassonne/src/practice.ts:6-10,97-104` `seats` (Rose/Azure/Amber) and `tableSeats` (six names) both use ids `practice-0..`, and the page chooses between them with `scenario === 'table'` (page:22). The practice object does not expose its players, so the page encodes "which scenario uses which seat list". [hidden] scenario to seats link in the page
 - `games/carcassonne/src/practice.ts:165-167` The `state` getter is not used by the page or any other module. [surplus] unused member
 - `games/carcassonne/src/practice.ts:179` `state.deck = state.deck.slice(0, 17)` after setup for the `short` scenario: magic number, applied inside `send` after detecting a phase transition. [special] fixture logic lives in the generic send
@@ -94,6 +100,7 @@ Paths are relative to the repo root. Line numbers verified with grep/cat -n. "un
 - `apps/web/src/routes/practice/carcassonne/+page.svelte:46-50` The `locale` prop is `getLocale()` read at render while the Azul page keeps `locale` state with `{#key locale}`; the Carcassonne select calls `setLocale(...)` without `{reload:false}` (Azul does). Both pages repeat the same nav/select/CSS block as the other five practice pages. [hidden] duplicated plumbing
 
 ## Special cases
+
 - `games/azul/src/Board.svelte:291-296` `catch {` around `send`: the error text is discarded and replaced by `azul_error`; `errorCode` handled separately at 443-446 — keep, but `STALE_REVISION`/`MATCH_CHANGED` literals duplicate `packages/shared/src/index.ts:85` and `apps/server/src/rooms.ts:228-231`.
 - `games/azul/src/Board.svelte:443-446` `errorCode === 'STALE_REVISION' || 'MATCH_CHANGED'` string literals duplicated from `ReplyErrorCode` — type is available; Carcassonne ignores both codes.
 - `games/azul/src/Board.svelte:1077` `canRematch && !settingsContent` shows rematch only when no settings snippet, because the room page's snippet already has its own button — a coupling to one caller; the design needs either the Board or the room to own it, not both.
@@ -135,6 +142,7 @@ Paths are relative to the repo root. Line numbers verified with grep/cat -n. "un
 - `apps/web/src/routes/room/[id]/+page.svelte:74-75` (outside scope, relevant) `startsWith('AZUL_')` and `room.gameId === 'carcassonne'` branches (settings) — shell hard-codes two of these games.
 
 ## Restating comments
+
 - `games/azul/src/Board.svelte` 3 notable: `:480` "8-bit cues for scoring steps as they appear on the boards." (above `cue`), `:494` "The wall tile each accepted scoring event placed, with its points." (above `gains`), `:99` partly ("Viewer-only table skin..." is fine, but the rest restates the effect).
 - `games/azul/src/effects.ts` 3: `:28` "The shared Web Audio instance, for building the 8-bit pack." (`raw`), `:47` "8-bit cues for a whole presentation; false leaves it to `play`.", `:90` "`pixel` reports the viewer's skin when a flight starts."
 - `games/azul/src/pixel/sound.ts` 8 doc comments restate the cue names: `:233` "Tiles lifted from a factory or the centre." (pick), `:238` "Tiles click into a pattern line." (place), `:250`, `:261`, `:265`, `:271`, `:282`, `:302`, `:309`.
@@ -147,6 +155,7 @@ Paths are relative to the repo root. Line numbers verified with grep/cat -n. "un
 - Others (`index.ts`, `features.ts`, `overview.ts`, `practice.ts`, `camera.ts`, `tiles.ts`) have few comments and most explain rules or sources; leave.
 
 ## Cross-game patterns noticed
+
 - Each game re-implements the same 8-bit skin wiring: `gameSkin`/`setGameSkin` + lazy `import('./pixel.css')` + lazy sound pack + a `pixelReady` flag. Azul Board 99-113 and Carcassonne Board 113-130 are near-copies. The classic-vs-pixel sound facade exists as `ceramicAudio` (Azul `effects.ts:18-61`), `audio` object (Carcassonne `Board.svelte:131-153`), and likely other `pixel/sound.ts` packs in other games. Candidate for one shared helper in `@board-games/shared/ui/pixel`.
 - Both `pixel/sound.ts` files wrap `createAudio()` with their own `mute`/`stop`/`close` and a private `timers`/`setTimeout` scheme. Azul cancels delayed ZzFX cues; Carcassonne does not (`pixel/sound.ts:62`). `tableAudio` (Carcassonne `effects.ts`) and `ceramicAudio` (Azul `effects.ts`) are siblings.
 - Presentation gating: Azul `RevisionGate`; Carcassonne local `EventGate` (effects.ts:110); Codenames/Little Secret `eventGate()`. `docs/workflow.md` lists only `RevisionGate` and `eventGate()`.
@@ -160,6 +169,7 @@ Paths are relative to the repo root. Line numbers verified with grep/cat -n. "un
 - Dead-ID guard `#az-pixel` specificity hack in Azul vs `.carc-table.cc-pixel` double-class in Carcassonne for the same cascade problem — two different fixes; check other `pixel.css` files for a third.
 
 ## Suggested fixes (one fix may solve several problems; cite which)
+
 1. Define a location-id module in azul (e.g. `azul/src/locations.ts` with `factory(f, slot)`, `pattern(player,row,slot)`, `wall(...)`, `floor(...)`, `parse(id)`) and use it from index.ts events, presentation.ts, effects.ts and PlayerBoard/Board templates. Solves: rules emitting UI ids, repeated `split('/')` parsing, the `'/floor/'`/`/(pattern|floor)/` regexes, `markers` special guards. Alternatively have rules emit structured `{kind, ...}` locations and let presentation build strings.
 2. In azul presentation.ts, name the timing constants (`TRAVEL`, `WALL_STEP`, `WALL_OFFSET`, `CLEANUP`...) and give `Flight` a `kind: 'cleanup'` field to replace the `duration === 150` test. Solves: presentation.ts:45-49,71,91,119-135,154,191,213,228-229.
 3. Replace repeated azul literals with exports from index.ts: `FLOOR_SIZE = penalties.length`, `TILES_PER_COLOR`, `WALL_SIZE`; use in Board (160,175), practice.ts (106-107), index.ts (91,118,191,334,339). Solves the copied-value problems. Use `colorLabels` exported once (a small `labels.ts` or in palette.ts) for Board/Tile/PlayerBoard; hoist `identity(round, playerId)` and the `modal` union to one local type/function in Board.

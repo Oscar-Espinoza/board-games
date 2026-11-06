@@ -10,6 +10,7 @@ No file in the repo was edited.
 Why the page needs it: the practice route has no socket. It plays the authoritative rules locally in the browser. It calls `apply` (page L36, L69), `view` (L56) and `create` (L90). The seed comes from `seeded`, and `scenario` and `demonstrationAction` come from `./practice`.
 
 Is it reasonable? Partly.
+
 - It is acceptable that the practice page runs the rules in the browser. The rules are pure TS with no Node or Bun APIs (they import only `game-core`'s `shuffle`). The route is lazy, so the cost is limited to that route.
 - It is the only `/server` import from `apps/web` (grep confirms). The `./server` subpath export is therefore a leaky name used by exactly one page. Domino hides the same need behind `./practice`, which exposes a `practice()` facade and never exports `apply`/`create`.
 - The page re-assembles a facade by hand (see Problems #S1, #S2). The sushi `practice.ts` already imports `create/apply/view`. It could re-export them or expose a `createPractice()` object like domino's, and the web package would then need no `./server` import.
@@ -18,6 +19,7 @@ Is it reasonable? Partly.
 ## Problems
 
 ### Sushi Go Party - rules (index.ts / scoring.ts / cards.ts / menus.ts / presentation.ts)
+
 - `SGP/presentation.ts:23-97` plus `SGP/index.ts:827`: `projectPresentation` hand-clones every event variant (75 lines). `apply` already `structuredClone`s state and `view` clones other fields the same way (index.ts:809, 824). Adding an event type means editing three places: the `Event` union, the `emit` call and this switch. [needless] shallow module, duplicated shape
 - `SGP/presentation.ts:96-108` and `SGP/index.ts:743-748`: `Presentation.round` and `.turn` are written on every apply and cloned, but nothing reads them. Grep shows only `sequence` and `events` are consumed (Board.svelte:302-304, EventCursor). [surplus] dead fields
 - `SGP/presentation.ts:1-8` (events `deal`, `committed`, `attach`, `miso-discard`, `utensil-exchange`, `takeout`): they are emitted (index.ts:214, 260, 276, 642, 675, 722, 770), projected and sent, but `Board.svelte:309-373` only reads `reveal`, `copy`, `pass`, `score`, `round-end` and `finished`. Six of twelve event kinds have no consumer. [surplus] dead events
@@ -33,6 +35,7 @@ Is it reasonable? Partly.
 - `SGP/scoring.ts:21-25` (`colorCounts`) and `scoring.ts:26` (`onigiriScore`) are exported but used only inside scoring.ts. Grep finds no outside caller. [surplus] unused exports
 
 ### Sushi Go Party - labels / cards UI data
+
 - `SGP/Card.svelte:50-88`: a 14-branch nested ternary hard-codes scoring blurbs (`'2 -> 5'`, `'3 -> 10'`, `'1 . 3 . 6 . 10 . 15'`, `'-3 / 7'`, `'1 . 4 . 9 . 16'`, `'4 -> 12'`, ...). These duplicate `scoring.ts:74-94, 139-146`. They are English-only, unlocalised, and drift if a value changes. [hidden] copy of values
 - `SGP/Card.svelte:17-29`: the `family` classification re-derives menu category (roll/dessert/special/appetizer) from `cards.ts` arrays. `menus.ts:203` (`menuKinds`) holds the same grouping logic. [hidden] copy of logic
 - `SGP/table/data.ts:25-82`: the `menu` array has English `title` and `rules` strings. `table/layout.ts:119-126` always overwrites them with `t(kind)` and `t('tile_' + kind)`. Only `color` and `accent` are read (layout.ts:123-125, Card.svelte:37). The English copy is dead for 6 of 8 kinds and is also a fallback source for copy. [surplus] dead data
@@ -44,6 +47,7 @@ Is it reasonable? Partly.
 - `SGP/table/FoodArt.svelte` (386 lines) vs `SGP/Dish.svelte` (337 lines): two classic-art components, with `Board`, `Card` and `MenuTile` importing `FoodArt` (aliased `Dish` in Board.svelte:21 and Card.svelte:2). Only `Dish.svelte` is exported to the web (`apps/web/.../SushiScene.svelte:3`). The confusing aliasing hides that the web guide shows the classic art even in 8-bit. [needless] confusing naming/split
 
 ### Sushi Go Party - Board.svelte (2275 lines)
+
 - `SGP/Board.svelte:40-74` props: `practice`, `chooseSeat`, `practiceAction`, `practiceActionLabel`, `practiceActionDisabled` (5 of 16 props) exist only for `/practice/sushi-go-party`. `canRematch`/`rematch` are real. In the room shell `practice={room.practice}` is passed, but `chooseSeat` is not, so the `practice` flag is half-used. [needless] parameters for one caller
 - `SGP/Board.svelte:1105-1113` (`practice-seats` in settings dialog) duplicates the seat `<select>` that the practice page already renders in its own `settingsContent` (`+page.svelte:156-163`). The same control is built twice, and `.practice-seats` has no CSS (grep: only Board.svelte:1796-1801). [surplus] duplicate UI
 - `SGP/Board.svelte:232-243`: hand-rolled `<dialog>` open/close with focus return (`opener`, `showModal`, `close`). `docs/workflow.md` says to use `{@attach modal(() => open)}`. Domino (Hud.svelte:173) and Carcassonne/UNO use it. [hidden] copy of shared helper
@@ -62,8 +66,9 @@ Is it reasonable? Partly.
 - `SGP/Board.svelte:68`: `rematch?: () => Promise<void>` vs domino `rematch?: () => void`; the shell passes `start`. Inconsistent Board contract across games. [needless] type drift
 
 ### Sushi Go Party - table/pixel components
+
 - `SGP/table/PartyBoard.svelte:12, 22, 23, 31`: `boardLabel`, `indicator`, `onrule`, `scoreLabel` are optional with English fallbacks (`'Party board and score track'`, `Round {round} Pick {pick}`, `'${name}: ${score} points'` in ScoreTrack.svelte:9). Board always passes all four (Board.svelte:455-496), so the defaults and the `{:else}` branch (L31) are dead and unlocalised. [surplus] unused options
-- `SGP/table/HiddenHand.svelte:4-6`: `bundle` prop is never passed (only OpponentSeat uses it, without `bundle`). Fallback label `\`${count} hidden cards\`` is English-only; OpponentSeat always passes `label`. [surplus] unused prop / fallback
+- `SGP/table/HiddenHand.svelte:4-6`: `bundle` prop is never passed (only OpponentSeat uses it, without `bundle`). Fallback label `\`${count} hidden cards\``is English-only; OpponentSeat always passes`label`. [surplus] unused prop / fallback
 - `SGP/table/ScoreTrack.svelte:15-31, 40, 44-45` and `PartyBoard.svelte` CSS: `point()` and `beltPoint()` hard-code the `840x490` board geometry and the 60-station loop. `Board.svelte:17-20 (--phone-board-scale: (vw-16)/840)` and `layout.ts:130` ("1440x900 design pixels") re-state the same numbers. [hidden] copy of values
 - `SGP/table/layout.ts:139-165`: `desktopSeats(count)` is a branch per player count (`=== 1`, `=== 2`, `<= 4`, `=== 5`, rest) with hand-picked coordinates. [special] per-count layouts - needed by design for fixed art, but the table of positions would read better as data.
 - `SGP/pixel/context.ts` + `ScorePawn/ScoreTrack/FoodArt` call `usePixel()`; the same 8-bit state is also passed as a prop to PixelDecor/Dish via `{#if pixel}` in Board. Two mechanisms (Svelte context and prop/`{#if}`) for one flag. [needless] two ways
@@ -71,6 +76,7 @@ Is it reasonable? Partly.
 - `SGP/pixel/pawn.ts:1-32`: a pixel grid is parsed to SVG path strings at import time (`path(chars)`), exported as `pawnPaths`. This is used only in ScorePawn. Fine, but `pixel/` mixes asset data (pawn grid, sprite cells) and runtime helpers with no common shape. [needless] low-cost
 
 ### Sushi Go Party - practice.ts and the route
+
 - `SGP/practice.ts:13-21`: a local `seeded()` (mulberry32) duplicates `@board-games/game-core` `seeded` (`packages/game-core/src/random.ts:2`, a different LCG). `+page.svelte:90-91` imports this copy for `setup()`. Domino's practice uses the game-core one. [hidden] copy of helper
 - `SGP/practice.ts:22, 116`: `startPractice` and `arrangeHand` are exported but only used inside practice.ts (grep: no importer). [surplus] unused exports
 - `SGP/practice.ts:5-12, 48-114`: `demonstrationAction` is a second bot-like decision procedure. It re-implements the prompt `kind` -> `Choice` mapping (`menu|supplier|chopsticks` -> card, `spoon` -> request, `takeout`, `copy`, `attach`). That mapping duplicates `Board.svelte:675-800`'s UI-to-`Choice` logic and has to change with the prompt types. [hidden] copy of logic
@@ -84,6 +90,7 @@ Is it reasonable? Partly.
 - `apps/web/src/lib/action-retry.ts:116-146`: the web shell encodes Sushi's action shapes and state fields (`READY`, `PICK`, `setupVersion`, `pickPromptId`, `ready`, `turn`, `round`). The game's action rules leak into shared web plumbing. [needless] stable shell knows a game's internals
 
 ### Domino - rules (index.ts / layout.ts / spots.ts)
+
 - `DOM/index.ts:82-84, 138-199`: errors are `'DOMINO_PLAYERS'`, `'DOMINO_SEAT'`, `'DOMINO_ACTION'`, `'DOMINO_NAME'`, `'DOMINO_PHASE'`, `'DOMINO_TURN'`, `'DOMINO_ILLEGAL'`. They are not message keys and are not in the room page's prefix regex (`^(azul_|cn_|sgp_|ls_)`), so the room shows the raw `DOMINO_ILLEGAL` string. The practice page replaces every error with the generic `m.domino_error()` (page L48-54). [hidden] convention callers must know
 - `DOM/index.ts:6, 15, 106, 110, 138-199, 228`: `TARGET`, `DOUBLE_SIX`, `ends`, `legalFor`, `validate`, `attach` are exported. `DOUBLE_SIX`, `legalFor`, `validate`: no importer outside index.ts. `ends` is not used outside either (the grep hits are other games' own `ends`). [surplus] unused exports
 - `DOM/index.ts:129-137` (`canPlay`) vs `DOM/index.ts:110-128` (`legalFor`): "does this hand match the open ends" written twice, in different shapes (`some` with array vs loop). [hidden] copy of logic
@@ -100,6 +107,7 @@ Is it reasonable? Partly.
 - `DOM/index.ts:329-331`: no `presence` hook, unlike Sushi (`index.ts:779`). Domino has no disconnect handling in rules; `connected` is only a UI gate (`game.svelte.ts:189`). [needless] inconsistent contract across games (not a bug found)
 
 ### Domino - controller and Hud/Board
+
 - `DOM/Board.svelte:25-49`: Board is a thin shell that re-wraps all props into a getter and passes `game` down. Good. But props are re-declared in three places: `Board.svelte:25-38`, `game.svelte.ts:24-33` (`GameProps`) and the prop list in `Hud.svelte:11-25`. [hidden] copy of shape
 - `DOM/game.svelte.ts:141-173`: `this.t` is a hand-copied dictionary of 24 `m.domino_*` calls, and `this.L` is the locale options. Some strings go through `t.*`, others through `m.domino_*({}, L)` (`game.svelte.ts:350, 354`; `Hud.svelte:112-129, 152-158`; `Table3D.svelte:177, 192`; `PixelTable.svelte:113, 130-137`). Two idioms for one thing. [needless] two ways
 - `DOM/look.ts:3-12` + `game.svelte.ts:297-301`: `lookOf()` re-implements `gameSkin('domino')` (saved key, else `html[data-theme=pixel]`) from `packages/shared/src/ui/pixel/skin.ts:8` with a private key `domino:look` and values `'3d'/'pixel'`. Seven other games use `gameSkin`/`setGameSkin`. `apps/web/.../practice/domino/+page.svelte:5, 70` imports `lookOf` to pick the loading style. [hidden] cross-game copy
@@ -122,6 +130,7 @@ Is it reasonable? Partly.
 - `DOM/pixel/sprites.ts:11` (`FELT = { x: 14, y: 8.5 }`, comment "the same leather as the 3D table") vs `DOM/three/table.ts:11-12` (`feltX: 14, feltZ: 8.5`): the felt size is copied between the two looks, and both must match `layout.ts:21 HALF_WIDTH = 10` snake logic. [hidden] copy of values
 
 ### Domino - practice route
+
 - `apps/web/src/routes/practice/domino/+page.svelte:3-5, 8, 37-41, 70-74`: imports `Loading` and `lookOf` from the game package to render a loading cover. `Board.svelte:72-76` already renders the same `Loading` while its table chunk loads. The page loads the Board lazily, then Board lazy-loads the table: two lazy hops with two loading covers. It needs two extra package exports (`./Loading.svelte`, `./look`) that only this page uses. [needless] page depends on internals
 - `+page.svelte:12-15, 45-47`: `onMount` + `gameClients.domino()` re-implements the shell's lazy Board loading. A static `import Board from '.../Board.svelte'` would be simpler since the route is already game-specific; but the `gameClients.domino()` call also triggers `preload()` (games.ts:12), which may be the reason. Needs a comment. [special] justified by preload, undocumented
 - `+page.svelte:48-54`: `catch { error = m.domino_error(); }` swallows the rule error (it discards `DOMINO_*` code). [special] swallowed exception
@@ -130,6 +139,7 @@ Is it reasonable? Partly.
 - `DOM/practice.ts:1-3`: imports order puts `seeded` before the file comment; the comment says "Never imported by the server" but `package.json` exports `./practice` and `./Loading.svelte`, `./look`, `./layout`, `./preload` solely for web files. Only `./Board.svelte`, `./preload`, `./practice`, `./Loading.svelte`, `./look` are imported anywhere (grep). `./layout` is not. [surplus] dead export
 
 ## Special cases
+
 - `SGP/index.ts:302-309` (`special_order` with `copy === undefined` / `!copy`) - two nearly identical branches for a played Special Order (queue copy prompt vs discard with nothing to copy). Needed by the Special Order rule, but the double test (`=== undefined` then `!copy`) is hard to read - still needed.
 - `SGP/index.ts:422-425` (`copy` effect discards itself if no other card) and `SGP/index.ts:421` (`attach` skipped if no wasabi) - needed by rule, yes.
 - `SGP/index.ts:566, 556-560` (`menu` prompt rejects `menu` cards; supplier prompt validates request) - rule-driven, yes.
@@ -159,14 +169,16 @@ Is it reasonable? Partly.
 - `DOM/Board.svelte:62-64` - `.catch(() => (failed = true))` swallows the import error (no message, no retry).
 - `DOM/pixel/PixelTable.svelte:84-89` and `DOM/three/Table3D.svelte:143-150` - nested `setTimeout`s (300->500 and 450->600 ms) to let loading finish - timers as workaround.
 - `DOM/pixel/PixelTable.svelte:114` - banner `setTimeout 1500` - presentation timing.
-- `DOM/preload.ts:134-145` - `phone ? ... : ...` branches for which art to preload (phones skip patio props and cast); tied to Table3D `lite` selection (`Table3D.svelte:137-140`, which uses `(pointer: coarse)` + screen size) that is a *different* test than `COMPACT`. Two definitions of "phone".
+- `DOM/preload.ts:134-145` - `phone ? ... : ...` branches for which art to preload (phones skip patio props and cast); tied to Table3D `lite` selection (`Table3D.svelte:137-140`, which uses `(pointer: coarse)` + screen size) that is a _different_ test than `COMPACT`. Two definitions of "phone".
 - `DOM/three/Table3D.svelte:137-140` - `lite` = `compact || (coarse pointer && min(screen) < 820)` - hard-coded device heuristic.
 - `DOM/three/Table3D.svelte:44, 47` and `pixel/scene.ts:485-492, 712-713` and `three/textures.ts:39-42, 172-178` - `Math.random()` for cosmetic noise in presentation code (not game rules); AGENTS.md says randomness is explicit in rules, so fine here, but untestable/not seedable.
 - `DOM/layout.ts:72-80` - `d[1] === 0` / `vertical >= 1` corner logic and `link.near === link.far && !bent` double handling - geometry special cases for the chain turning at the rails.
 - `DOM/game.svelte.ts:129-131` (`#won`) and `PixelTable.svelte:28-36` (`cheer`): tie/win/lose derived separately; `result.winner === null` handled in three places.
 
 ## Restating comments
-Counts are of `//` and `/** */` lines. Almost all of Domino's comments explain *why* (rules, browser behaviour, art decisions). Restating ones are few.
+
+Counts are of `//` and `/** */` lines. Almost all of Domino's comments explain _why_ (rules, browser behaviour, art decisions). Restating ones are few.
+
 - `SGP/practice.ts` 6 comments; e.g. `practice.ts:47` "A transparent local seat control, not a bot exposed to multiplayer rooms." (restates the file's role). Others are rationale for fixtures and fine.
 - `SGP/pixel/sound.ts` 6; e.g. `pixel/sound.ts:242` "A chopstick "pip" when a dish is chosen from the hand." (names the cue); `:245` "Two quick notes as the dish is kept face down."; `:249` "Everyone flips: a rising sparkle arpeggio."; `:252` "The conveyor belt clatters round: ticking noise over a low hum."; `:264` "A set is complete (tempura pair, sashimi trio, wasabi nigiri...)." These describe the notes rather than why.
 - `SGP/Board.svelte` 4-5; e.g. `Board.svelte:136` "Viewer-only look; the 8-bit stylesheet loads the first time it is chosen." (describes the code beneath), `:158` "A revealed dish that completes a set on your own plate earns a jingle." (describes the function name `combo`), `:271` "Preference or system motion changes cancel in-flight presentation." (describes the `$effect`).
@@ -181,6 +193,7 @@ Counts are of `//` and `/** */` lines. Almost all of Domino's comments explain *
 - `DOM/pixel/sprites.ts` 35 comment lines and `DOM/pixel/scene.ts` 63 and `DOM/three/scene.ts` 50: not sampled line by line; mostly rationale/units, a few section banners (`// ---- Art ----` at pixel/scene.ts:130) which are structure not content.
 
 ## Cross-game patterns noticed
+
 - Audio packs: `SGP/effects.ts:tableAudio`, `SGP/pixel/sound.ts:pixelSounds`, `DOM/pixel/sound.ts:chiptune`, Azul `pixel/sound.ts:pixelSounds`, Carcassonne `effects.ts:tableAudio`. All build `note()`/`tune()` helpers over `createAudio()`. A `chiptune(audio)` helper in `@board-games/shared/ui/pixel` (it already has `playChiptune`) would remove most of it.
 - Presentation gate: `EventCursor` (Sushi) vs `RevisionGate`/`eventGate` (Azul, Carcassonne, Catan, Codenames, Little Secret, Domino). Sushi is the odd one out.
 - Skin toggle: `gameSkin`/`setGameSkin` (Azul, Carcassonne, Catan, Codenames, Little Secret, Sushi, UNO) vs Domino's private `lookOf`/`domino:look`.
@@ -192,6 +205,7 @@ Counts are of `//` and `/** */` lines. Almost all of Domino's comments explain *
 - Settings panel: Sushi (`Board.svelte:1087-1115`) and Domino (`Hud.svelte:187-221`) both build sound/motion/skin/camera settings by hand.
 
 ## Suggested fixes (one fix may solve several problems; cite which)
+
 1. **Sushi practice facade.** Move `+page.svelte`'s `send`, `others()`, `reset()`, `setup()` and the `JSON.parse(JSON.stringify())` into `practice.ts` as `createPractice()` (like Domino's `practice()`), using game-core's `seeded`. Drop the web page's `./server` import and the `./server` subpath use from web. Fixes: server-import question, practice.ts seeded copy, loose exports, page-contains-logic, clone mismatch.
 2. **Replace `EventCursor` with `eventGate`/`RevisionGate`; trim presentation.** Delete `Presentation.round/turn`, the six unused event kinds and `projectPresentation`'s hand cloning (rely on the existing deep copy). Keeps rules free of UI-class (`presentation.ts` becomes just the event union). Fixes: presentation problems 1-4, cross-game gate copy.
 3. **One shared `modal`.** Switch Sushi's dialog to `{@attach modal(...)}`. Fixes: hand-rolled dialog.

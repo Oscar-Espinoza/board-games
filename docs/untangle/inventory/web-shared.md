@@ -1,6 +1,7 @@
 ## Problems
 
 ### packages/shared and packages/game-core
+
 - `packages/shared/src/index.ts:11,20,29,37,45,53,61,69` catalog field `preview` ('cards','hexes',...) is never read anywhere (grep apps/games/packages). [surplus] dead field
 - `packages/shared/src/index.ts:12` catalog `practice: true` (UNO only) is never read; the home page hard-codes `selected === 'uno'` (`apps/web/src/routes/+page.svelte:298`) and `practice` on RoomView is a different thing. [surplus] dead field + [hidden] duplicate of the special case
 - `packages/shared/src/index.ts:21` catalog `setupModes: ['variable','beginner']` never read; `+page.svelte:279-289` hard-codes `selected === 'catan'` and `['variable','beginner']`. [surplus] dead field + [hidden] copy
@@ -22,6 +23,7 @@
 - `packages/shared/messages/{en,es}.json`: 1813 keys each, same key set, zero keys in only one locale. OK. But at least 54 keys are never referenced (see Message keys below) and `sgp_*`/`carc_*` keys are only reachable through string-built lookups that hide them from tooling. [surplus] unused keys, [hidden] stringly-typed keys
 
 ### apps/web (outside practice/room/session/action-retry)
+
 - `apps/web/src/lib/games.ts:17-29`, `apps/web/src/lib/catalog/guides/load.ts:2-11`, `apps/web/src/lib/catalog/Rulebook.svelte:21-30`, `apps/web/src/routes/+page.svelte:25-56` (`summaries`, `loops`), `apps/web/src/lib/home/PixelStore.svelte:31-51` (`categories`, `shelves`), `apps/web/src/lib/catalog/BoxArt.svelte:42-408` and `SummaryStep.svelte:7-149` (if-chains by game id), `packages/shared/src/index.ts:4-71`, and the server registry `apps/server/src/index.ts`: ten places keyed by game id. Only `guide load.ts` has `satisfies Record<GameId, ...>`; `gameClients`, `sceneLoaders`, `summaries`, `loops` have no completeness check against the catalog (`categories`/`shelves` are `Record<GameId,...>` so they do). Adding a game = edit 10 files. [hidden] feature split across folders
 - `apps/web/src/routes/+page.svelte:12-34` summaries use `m.ls_summary` / `m.sgp_summary` for two games but `m.library_<game>_summary` for the others, and loops likewise (`ls_loop_N`, `sgp_loop_N` vs `library_*_loop_N`). Two key schemes for the same thing. [hidden] convention
 - `apps/web/src/routes/+page.svelte:114-123` hand-rolled `<dialog>` open/close + focus-return (`opener`, `open()`/`close()` at 97-113) duplicates `modal()` from `@board-games/shared/ui` (`modal.ts:5-13`), which the workflow doc says to use. The page adds `body.style.overflow` and `scrollTop = 0`, which `modal()` does not. [hidden] copy of logic
@@ -55,6 +57,7 @@
 - `apps/web/package.json:43-51` the web app depends on all 8 game packages and also `game-core`; `game-core` is only imported (as types) by shared. Check: `git grep "@board-games/game-core" apps/web/src` returns nothing outside lead's files. [surplus?] unused dependency in package.json (verify with `bun pm ls`, not run).
 
 ### Message keys (script run over `git ls-files apps games packages`, excluding `paraglide/` and `messages/`)
+
 - Counts: en.json 1813 keys, es.json 1813 keys, 0 only-in-en, 0 only-in-es.
 - Prefix distribution: learn_ 525, sgp_ 279, carc_ 236, ls_ 193, cn_ 131, catan_ 116, azul_ 92, library_ 80, domino_ 43, pixel_ 42, uno_ 34, rest <=3 each (global keys: catalog, join, name, players, ...).
 - Naive "never referenced as identifier" count: 663. But `sgp_*` and `carc_*` (and `ls_*`, `cn_guide_*`) are reached by string-built lookups (`labels.ts` `t(key)`, `label(key)`, `m[`ls_${...}`]`, `t(kind + '_title')`, `t(mod + '_info')`), so a literal-suffix and template-pattern exclusion pass leaves 54 genuinely unreferenced keys (upper bound: a few may be built dynamically in ways the script missed). Breakdown: learn_ 22, catan_ 8, carc_ 6, library_ 5, cn_ 5, azul_ 4, sgp_ 1, uno_ 1, plus `subtitle`, `connecting`.
@@ -62,6 +65,7 @@
 - Conventions: prefixes are per game and mostly short (`carc_`, `cn_`, `ls_`, `sgp_`) except `library_<game>_...` and `learn_<game>_...` for catalog copy; UNO uses `uno_*` + `library_uno_*`; Little Secret and sgp use `ls_summary`/`sgp_summary`/`*_loop_N` instead of `library_*` (see +page.svelte:25-56). `pixel_*` (42) belongs to the home page only. `skin`, `theme_*`, `action_*` are shared. Server throws plain English strings or keys? (not checked here, other agents cover rules/server).
 
 ## Special cases
+
 - `apps/web/src/routes/+page.svelte:135-140` `selected === 'little-secret' ? ... : selected === 'codenames' ? ... : { setup, practice }` — per-game create options; follows from each game's `create()` options, not from the design (no declarative per-game setup schema) — needed today, a smell.
 - `apps/web/src/routes/+page.svelte:255,270,279,298` four `{#if selected === '<game>'}` blocks in the start dialog (ls language+powers, codenames language, catan setup, uno online-practice button) — same as above; uno is the only game with a server-side practice, others link to `/practice/<id>`.
 - `apps/web/src/routes/+page.svelte:303` `<a href={`/practice/${selected}`}>` for all non-uno games, while `catalog.practice` (UNO only, unused) hints at the intended data-driven version.
@@ -81,7 +85,9 @@
 - No `@ts-ignore`, `as any`, `eslint-disable` or `svelte-ignore` in my scope (grep). Type escapes: `apps/web/src/lib/catalog/guides/sushi-go-party.ts:29` and `games/sushi-go-party/src/labels.ts:11`, `games/carcassonne/src/labels.ts:9` `as unknown as Record<string, ...>`; `packages/shared/src/index.ts:101` `GameDefinition<State = any>`; `packages/shared/src/ui/audio.ts:71` `webkitAudioContext` cast (browser quirk).
 
 ## Restating comments
+
 Very few in this scope (code is mostly comment-free).
+
 - `packages/shared/src/ui/audio.ts` 9 comment lines; `:63` "True once a gesture has resumed the context." (restates getter), `:124` "Play prebuilt mono samples (e.g. from ZzFX) at `volume` (0–1)." (partly restates signature). Rest explain behaviour.
 - `packages/shared/src/ui/storage.ts:1` fine (explains fallback).
 - `packages/game-core/src/index.ts` 6 comments: `:1-3` "Current room owner, supplied by the authoritative room binding." (mildly restates `hostId`), `:12` "Reject invalid intentions without mutating state. Return the accepted state." (contract; keep).
@@ -94,18 +100,19 @@ Very few in this scope (code is mostly comment-free).
 ## Cross-game patterns noticed
 
 ### Shared plumbing: used vs re-implemented
+
 Every game uses `createAudio`, `read/readJson/write`, `modal` and `gameSkin/setGameSkin` from `@board-games/shared/ui(/pixel)`. What each Board re-implements around them is the policy layer: skin lazy-load, preference persistence, settings dialog, skin chooser. Per game (7 Board.svelte games; domino differs, see below):
 
-| game | shared/ui imports (Board) | pref storage | sound/motion semantics | skin lazy-load block | pixel context | settings dialog |
-|---|---|---|---|---|---|---|
-| uno | modal, read, write, gameSkin, setGameSkin, Skin | keys `uno:sound`, `uno:motion` ('on'/'off', `Board.svelte:49,51,198`) | motion tri-state (null follows system) | `Board.svelte:58-72` css + sound pack | none (prop `pixel`) | own `<dialog>` `:622-660` + skin fieldset `:642` |
-| catan | RevisionGate, read, write, gameSkin, setGameSkin | `catan:sound`, `catan:motion` stored as `'true'/'false'` (`:86-87,302`) | `!== 'false'`; `reduced` separate | `:78-84` css only | `setContext('catan:pixel', ...)` `:85` | own `<dialog>` `:791`, skin fieldset `:828` |
-| carcassonne | modal, read, write, gameSkin, setGameSkin | `carcassonne:sound`, `carcassonne:motion` 'on'/'off' (`:91,171,655,661`) | motion also ANDed with system reduced | `:115-130` css + sound + art; plus audio facade `:131-153`, `chooseSkin` `:154-157` | prop | 3 dialogs (`:1766,1966,2032`), skin fieldset `:2072` |
-| azul | RevisionGate, readJson, write, gameSkin, setGameSkin | key `azul-preferences` (JSON, no colon; `:301,363`) | `{sound, volume, motion}` | `:100-113` css + sound pack | `skinKey` Symbol in `palette.ts:21` | `<dialog>` `:914`, skin fieldset `:1051` |
-| codenames | eventGate, readJson, write, gameSkin, setGameSkin | `codenames:preferences` JSON (`:377,387`) | `{sound, volume, reduced, layout}` (`reduced` = inverse of azul/sgp `motion`) | `:153-159` css only | prop | `<dialog>` `:820`, skin fieldset `:949` |
-| sushi-go-party | readJson, write, gameSkin, setGameSkin | `sushi-go-party:preferences` JSON (`:245,270`) | `{sound, volume, motion}` | `:137-143` css only; `pixelSounds()` created with its own `createAudio()` (second AudioContext) `:~190` | `providePixel` (`pixel/context.ts`) | `<dialog>` `:1006`, skin fieldset `:1081` |
-| little-secret | eventGate, readJson, write, gameSkin, setGameSkin | `little-secret:preferences` JSON (`:263,268`) | `{sound, reduced}` | `:85-98` css + sound pack | `providePixel` (`pixel/context.ts`, identical to sgp's file) | `<dialog>` `:720`, skin fieldset `:741` |
-| domino | modal, read (Hud, look.ts, game.svelte.ts) | `domino:sound`, `domino:motion`, `domino:camera`, `domino:look` (`game.svelte.ts:90,300,312-313`) | motion tri-state like uno | no `skin`; own `Look = '3d'|'pixel'` in `look.ts` with its own `lookOf()` duplicating `gameSkin` | n/a | in `Hud.svelte` |
+| game           | shared/ui imports (Board)                            | pref storage                                                                                      | sound/motion semantics                                                        | skin lazy-load block                                                                                    | pixel context                                                  | settings dialog                                      |
+| -------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------- |
+| uno            | modal, read, write, gameSkin, setGameSkin, Skin      | keys `uno:sound`, `uno:motion` ('on'/'off', `Board.svelte:49,51,198`)                             | motion tri-state (null follows system)                                        | `Board.svelte:58-72` css + sound pack                                                                   | none (prop `pixel`)                                            | own `<dialog>` `:622-660` + skin fieldset `:642`     |
+| catan          | RevisionGate, read, write, gameSkin, setGameSkin     | `catan:sound`, `catan:motion` stored as `'true'/'false'` (`:86-87,302`)                           | `!== 'false'`; `reduced` separate                                             | `:78-84` css only                                                                                       | `setContext('catan:pixel', ...)` `:85`                         | own `<dialog>` `:791`, skin fieldset `:828`          |
+| carcassonne    | modal, read, write, gameSkin, setGameSkin            | `carcassonne:sound`, `carcassonne:motion` 'on'/'off' (`:91,171,655,661`)                          | motion also ANDed with system reduced                                         | `:115-130` css + sound + art; plus audio facade `:131-153`, `chooseSkin` `:154-157`                     | prop                                                           | 3 dialogs (`:1766,1966,2032`), skin fieldset `:2072` |
+| azul           | RevisionGate, readJson, write, gameSkin, setGameSkin | key `azul-preferences` (JSON, no colon; `:301,363`)                                               | `{sound, volume, motion}`                                                     | `:100-113` css + sound pack                                                                             | `skinKey` Symbol in `palette.ts:21`                            | `<dialog>` `:914`, skin fieldset `:1051`             |
+| codenames      | eventGate, readJson, write, gameSkin, setGameSkin    | `codenames:preferences` JSON (`:377,387`)                                                         | `{sound, volume, reduced, layout}` (`reduced` = inverse of azul/sgp `motion`) | `:153-159` css only                                                                                     | prop                                                           | `<dialog>` `:820`, skin fieldset `:949`              |
+| sushi-go-party | readJson, write, gameSkin, setGameSkin               | `sushi-go-party:preferences` JSON (`:245,270`)                                                    | `{sound, volume, motion}`                                                     | `:137-143` css only; `pixelSounds()` created with its own `createAudio()` (second AudioContext) `:~190` | `providePixel` (`pixel/context.ts`)                            | `<dialog>` `:1006`, skin fieldset `:1081`            |
+| little-secret  | eventGate, readJson, write, gameSkin, setGameSkin    | `little-secret:preferences` JSON (`:263,268`)                                                     | `{sound, reduced}`                                                            | `:85-98` css + sound pack                                                                               | `providePixel` (`pixel/context.ts`, identical to sgp's file)   | `<dialog>` `:720`, skin fieldset `:741`              |
+| domino         | modal, read (Hud, look.ts, game.svelte.ts)           | `domino:sound`, `domino:motion`, `domino:camera`, `domino:look` (`game.svelte.ts:90,300,312-313`) | motion tri-state like uno                                                     | no `skin`; own `Look = '3d'                                                                             | 'pixel'`in`look.ts`with its own`lookOf()`duplicating`gameSkin` | n/a                                                  | in `Hud.svelte` |
 
 - Skin lazy-load `$effect` (`if (skin === 'pixel' && !pixelReady) import('./pixel.css') [+ sound]`) copied in all 7 Boards, along with `const pixel = $derived(skin === 'pixel' && pixelReady)`. Only the set of things imported varies (css only: catan, codenames, sgp; css+sound: uno, azul, little-secret; css+sound+art: carcassonne).
 - Skin chooser `<fieldset class="skin-choice">` with radio group named `<game>-skin` and its `.skin-choice` CSS block copied in 7 Boards (grep `skin-choice`: uno 1437, catan 2726, carcassonne 3072, azul 1703, codenames, sgp 1746, ls 1140). Settings `<dialog>` with backdrop-click close copied in 6 (uno `:627-630`, etc.).
@@ -118,15 +125,18 @@ Every game uses `createAudio`, `read/readJson/write`, `modal` and `gameSkin/setG
 - Per-game "pixel/" skins in `docs/*-pixel.md`: seven separate docs for the same kit.
 
 ### Game-package exports other packages import
+
 - `./server`, `./Board.svelte`, `./practice` are consumed by `apps/server` / `apps/web` registries; reasonable (documented in architecture).
 - `./HelpScene.svelte` (azul), `./TileArt.svelte` (carcassonne), `./Dish.svelte` (sushi), `./GuideScene.svelte`+`./guide` (codenames, little-secret), `./layout`, `./preload`, `./Loading.svelte`, `./look` (domino): each exists only so `apps/web` (`lib/catalog/guides/*Scene.svelte`, `routes/practice/domino/+page.svelte:3-4`, `lib/games.ts:12`) can reach into a game's internals. Reasonable for lazy loading but the guide/scene contract (`Lesson` shape) is owned by web, implemented by games structurally. `./layout` of domino: no importer found in apps/games/packages (grep `@board-games/domino/layout` empty) - dead export (verify, `package.json` entry only).
 - `apps/web` depends on every game package, `catalog` in shared depends on none (good, documented). `packages/shared` depends on `game-core` (types only).
 
 ### Other notes
+
 - `packages/jev-lab` exists (not in scope) and depends on codenames internals via its package; flagged by other agents.
 - Rules/UI separation spot-check: nothing in `packages/game-core` or `packages/shared/src/index.ts` imports a game or DOM; `packages/shared/src/ui/*` is browser-only code in the same package that the server imports types from (`@board-games/shared`) but via a separate entry (`./ui`), so ok.
 
 ## Suggested fixes (one fix may solve several problems; cite which)
+
 1. Delete dead catalog fields `preview`, `practice`, `setupModes` (or make them real: drive the start-dialog extras and the practice link from catalog data) — solves the three catalog surplus items and the `selected === 'catan'/'uno'` special cases at `+page.svelte:279,298,303`.
 2. Make the per-game registries one table keyed by game id, or at least typed `satisfies Record<GameId, ...>`: `gameClients`, `guideLoaders`, `sceneLoaders`, `summaries`/`loops`, `categories`/`shelves`. Solves the "ten places per game" hidden link and the unchecked completeness. Optionally derive `minPlayers/maxPlayers/id` in the catalog from the game definitions (or assert equality in one place).
 3. Add `packages/shared/src/ui/preferences.ts` (`gamePreferences(game)` returning sound/volume/motion + persistence under one key, one encoding) and migrate the seven Boards; add `clamp01` there too. Solves key-scheme drift (`azul-preferences`, 'on'/'off' vs 'true'/'false'), the `motion` vs `reduced` inversion, the 4 volume clamp copies, `readJson` re-validation.

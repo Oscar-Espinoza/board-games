@@ -28,8 +28,8 @@ names and the revision-gated event feed), renders the shared chrome in `Hud.svel
 chips) and lazy-loads the table for the chosen look. Each look brings its own sound
 pack (`Sounds`) and subscribes to accepted plays and passes with `game.on()`.
 
-The look is `lookOf()` (`look.ts`): the player's saved `domino:look`, otherwise 8-bit
-when the home page uses the 8-bit theme. **Table** in Settings switches it live. It is
+The look is the shared per-game skin (`ViewerSkin('domino')`; `classic` is the 3D
+table): the player's saved choice, otherwise 8-bit when the home page uses the 8-bit theme. **Table** in Settings switches it live. It is
 per player, so one room can mix looks.
 
 ### 3D
@@ -65,7 +65,7 @@ Tapping a ghost plays soft; holding it fills a gauge in the bar. Touch devices w
 screens also render a lite table: pixel ratio at most 1.5, 1024 shadows, standard
 materials, and no patio plane or props (the beer labels are never downloaded).
 
-**Loading.** `gameClients.domino` also calls `preload()` (`src/preload.ts`), which starts
+**Loading.** The game's client entry (`src/client.ts`) also calls `preload()` (`src/preload.ts`), which starts
 the three.js chunk and preloads the art and plaque font in parallel with the board's own
 code. `Loading.svelte` covers the table until all textures (tracked by one
 `THREE.LoadingManager`), the font and `renderer.compileAsync` are done, so the first
@@ -76,7 +76,7 @@ another and the rails fill. Art is kept small (about 280 KB in total).
 Every pressable object (rack tiles, end ghosts, Pass, Tidy up) gets a transparent
 HTML `<button>` over its projected screen rectangle, so mouse, touch and keyboard all
 use real buttons (44px minimum where tiles don't overlap). The camera slider (and mouse
-wheel) is remembered in `domino:camera`; portrait screens start higher and crop the
+wheel) is remembered with the other viewer preferences; portrait screens start higher and crop the
 outer rails.
 
 Selecting a tile lifts it (no outline). Ghost tiles show exactly where it will land on

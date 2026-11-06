@@ -117,13 +117,13 @@ Private hand handles rotate on passing and ownership exchanges. Public dish IDs
 are unrelated to physical IDs. Reconnection reproduces the saved hand, commitment
 and offer. Public prompt metadata contains only ID, actor and kind. Only the
 prompt's actor sees offer/matching cards and legal targets. Canonical state is
-never spread into a view. Accepted presentation events explicitly project their
-public fields, and commitment events contain only the seat.
+never spread into a view. Accepted presentation events carry only public fields
+(the view clones them), and commitment events contain only the seat.
 
 Shared room revisions, match epochs, authentication and action-ID deduplication
 remain in force. Only guarded PICK and READY retries are automatic; other choices
-must be reviewed after a stale response. The shared retry implementation belongs
-to the coordinator. In-game round numbers are distinct from `RoomView.round`,
+must be reviewed after a stale response. The shared retry loop belongs to the
+coordinator; the game's `client.ts` decides which intentions still qualify. In-game round numbers are distinct from `RoomView.round`,
 which identifies the whole match.
 
 ## Practice and validation

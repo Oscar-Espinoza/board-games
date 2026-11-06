@@ -3,6 +3,7 @@
 Paths are relative to the repo root. `U` = `games/uno/src`, `C` = `games/catan/src`.
 
 ### Catan: rules vs Board (hidden links, duplication)
+
 - `C/Board.svelte:416-424` `reserve()` recomputes the 15/5/4 piece limits from `pub.roads`/`pub.buildings`, while the rules already project `players[].inventory` (`C/index.ts:778`, computed by `inventory()` at `C/index.ts:233-239`). Board never reads `.inventory`. The limits live in two places. [hidden] copy of logic; [surplus] unused projected field
 - `C/index.ts:751-789` `playerView` projects fields Board never reads: `public.primary`, `public.secondary`, `players[].knights`, `players[].played`, `players[].inventory`. Verified by grep in `Board.svelte`, `effects.ts`, `Dice.svelte`, `table/*`. [surplus] dead projection
 - `C/Board.svelte:425-437` `validOffer()` re-implements the OFFER checks in `C/index.ts:429-435` (`quantities`: integer, 0..24, length 5) and `C/index.ts:503-511` (give/take distinct, `enough`). The `24` literal also appears at `Board.svelte:434,437,1730` and as the extended bank size at `index.ts:153`. [hidden] copy of values/logic
@@ -22,6 +23,7 @@ Paths are relative to the repo root. `U` = `games/uno/src`, `C` = `games/catan/s
 - `C/Board.svelte:45-73` props: the host passes `roomId`, `maxPlayers`, `pending`, `errorCode`, `practice`, `canConfigure`, `canRematch`, `rematch` (room page `:186-206`); Catan declares none of them. It never disables on `pending`, unlike UNO (`U/Board.svelte:30`). `locale` is typed required yet defaulted to `'en'` (`:50,64`). `players` is an inline `{id,name}[]` (`:62`) while UNO uses `Player` from game-core (`U/Board.svelte:12,37`). [hidden] host/board contract not enforced
 
 ### Catan: Board internals
+
 - `C/Board.svelte` is 3220 lines (script 565, template 738-1836, style 1837-3220) plus `pixel.css` 884. `{#if pixel}`/`pixel ?` branch 13 times (52 mentions) inside one template, so classic and 8-bit rendering of settlements, roads, ghost, tokens and reserve are duplicated side by side. [hidden] two skins in one file
 - Settlement path `'M -8 8 V -2 L 0 -10 L 8 -2 V 8 Z'` appears at `Board.svelte:669,1361,1370,1577` and `effects.ts:187`; city path `'M -10 9 V -8 H -2 V -1 H 8 V 9 Z'` at `Board.svelte:668,1360,1369,1576`. Ghost (`:642-700`), built piece (`:1355-1385`) and hover/target previews each carry a copy. [hidden] copy of values
 - `C/Board.svelte:556-559` `center(h)` exists but hex-center math `(2*h.q+h.r)*tileX` / `3*h.r*tileY` is inlined at `:691,1142,1148,1156,1164`; edge midpoint is computed inline at `:1309-1324`. [hidden] copy of logic
@@ -42,6 +44,7 @@ Paths are relative to the repo root. `U` = `games/uno/src`, `C` = `games/catan/s
 - `C/Board.svelte:173-176` effect also calls `tradeOpen = false` when `!canTrade() && tradeMode === 'compose'`, tying trade-panel visibility to rules `legal` state through an effect rather than a derived. [hidden] state sync via effect
 
 ### Catan: effects / audio / dice
+
 - `C/effects.ts` reaches into Board's DOM by selector: `[data-seat]`, `.dice`, `.table`, `.shore`, `.board-dice`, `.die`, `[data-hex]`, `[data-piece="road-N|building-N"]`, `.built`, `.piece-finish`, `.piece-detail`, `[data-robber]`, `.px-glow`, `.hand > .resource-card`, `.resource-art`, `.card-title`, `[data-pips]`, `[data-value]` (`effects.ts:39-45,180-183,203-204,253,274-276,287,305,332,374-380,162,158`). `root.querySelector('.table')!` and `.shore')!` and `.board-dice')!` (`:274-276`) throw if absent (e.g. before first paint). None of this is declared in Board. [hidden] module reading DOM written by another
 - `C/effects.ts:131 (pixel/sound.ts)` vs `effects.ts:399,454`: production delivery timing `rollDuration + 300 + delivery++ * 700` (+1400 for the seat glow) is repeated in `pixel/sound.ts:131` (`rollDuration/1000 + 0.3 + delivery++*0.7 + 1.4`). If one changes, sound drifts. [hidden] copy of values
 - `C/effects.ts:109-115` + `:284-286` + `:552-554` the roll strength default `roll?.type === 'roll' ? (roll.strength ?? 0) : 0` is repeated 4 times (also `sound.ts:127`, `effects.ts:590-591`). [hidden] copy
@@ -56,6 +59,7 @@ Paths are relative to the repo root. `U` = `games/uno/src`, `C` = `games/catan/s
 - `C/dice-throw.ts:106-119` the `settle` search returns `-1` when no frame matches, then `Math.max(1, settle)` hides it (`:120`). [hidden] silent fallback
 
 ### Catan: practice
+
 - `C/practice.ts:14-24` `scenarios` list is paired by hand with `labels` and `hints` in the route (`apps/web/src/routes/practice/catan/+page.svelte:42-61`) and messages `catan_sandbox_*`/`catan_hint_*` in both locale files. Adding a scenario means 4 edits. [hidden] parallel tables
 - `C/practice.ts:26` `scenarioState` is exported; its only caller is `practice()` in the same file (the carcassonne hit is a separate local function). [surplus] unused export
 - `C/practice.ts:74-86` `practice()` returns `get state()` exposing canonical `State`; the route reads `game.state.phase.player!` and `game.state.phase.type` (`+page.svelte:32,33,64,65,77`) so the page depends on the rules' `State.phase` shape. `practiceSeat` (`practice.ts:89-97`) exists to hide part of it but the page still reads phase directly. [needless] caller depends on internals
@@ -68,6 +72,7 @@ Paths are relative to the repo root. `U` = `games/uno/src`, `C` = `games/catan/s
 - `apps/web/src/routes/practice/catan/+page.svelte:152-178` `:global(body:has(.practice) .site-header)` hides the header from a page-scoped style; relies on the layout's `.site-header` class. [hidden] CSS reach into another module
 
 ### UNO: rules
+
 - `U/index.ts:5` exports `colors`, `deck` (`:30`) — no consumer outside the file. Board redefines its own `colors: Color[] = ['red','yellow','green','blue']` (`U/Board.svelte:85`) and the palette (`:79-84`) instead of importing; the order is relied on by `colors.indexOf(...)` sprite rows (`Board.svelte:120,152,168`) and by the pixel sheet. [hidden] copy of values; [surplus] exports
 - `U/index.ts:30-52` `deck()` uses magic offsets (`id < 100`, `>= 104`, `% 25`, `offset <= 18/20/22`) while `Board.svelte:116-119` `glyph()` re-encodes symbol→sheet column (`['skip','reverse','+2','+4','wild'].indexOf + 10`) and `symbol()`/`label()` (`:169-178`) re-encode symbols. Symbols are bare strings in three places. [hidden] copy of values
 - `U/index.ts:254-261` `view()` builds all candidate actions (2 per card, DRAW, 4 colors, CATCH) and filters by calling `validate` inside `try { ... } catch { return false }`. The legality logic is only reachable through exceptions. [needless] exceptions as control flow
@@ -79,6 +84,7 @@ Paths are relative to the repo root. `U` = `games/uno/src`, `C` = `games/catan/s
 - `U/bot.ts:3` imports `Action, Card, Color` from `index.ts`; `index.ts:3` imports `botAction` from `bot.ts` (type-only cycle). `view.private as {hand, legalActions}` cast at `bot.ts:8-11`. [needless] cast/cycle
 
 ### UNO: Board and client modules
+
 - `U/Board.svelte:22-46` props `view, playerId, players, send, locale, round, connected, pending, canRematch, rematch, settingsContent` — all used. The host also passes `roomId, maxPlayers, onInvite, onLeave, copied, errorCode, practice, canConfigure, rulesContent` (room page `:186-206`) which UNO ignores. Contract by omission. [hidden]
 - `U/Board.svelte:38` `send: (action: unknown) => void` while Catan uses `(action: any)`. [hidden] inconsistent
 - `U/Board.svelte:48-72` preference state: `soundEnabled` (Board) and `enabled` inside `cardAudio()` (`U/motion.ts:216,222-227`) are two sources of truth, synced by hand in `preference()` (`Board.svelte:197-207`) and `onMount` (`:267`). `cue()` (`:121-123`) checks `soundEnabled` again before the chiptune. [hidden] copy of state
@@ -101,6 +107,7 @@ Paths are relative to the repo root. `U` = `games/uno/src`, `C` = `games/catan/s
 - `U/package.json` exports `./server` and `./Board.svelte` (used by `apps/server/src/index.ts:8` and `apps/web/src/lib/games.ts:7`) — reasonable, no `./presentation` leak. Catan additionally exports `./practice` (used only by the practice route) — reasonable.
 
 ### Repo hygiene in scope
+
 - `games/catan/art/__pycache__/pixel-art.cpython-312.pyc` is tracked by git (`git ls-files games/catan/art`). Build artifact committed. [surplus] dead file
 - `games/catan/README.md` describes "Historical ChaCha replay files", "responsive SVG island", and the 3.2 MB-ish asset story that is partly superseded by `docs/games/catan.md`. [surplus] stale doc
 
@@ -155,6 +162,7 @@ Paths are relative to the repo root. `U` = `games/uno/src`, `C` = `games/catan/s
 ## Restating comments
 
 Most comments in this scope explain intent (cosmetic constraints, privacy, skin differences) and are fine. Notable restaters:
+
 - `games/catan/src/pixel/geometry.ts` 4 of 12 comments; e.g. `:62` "Several shapes' pixels unioned into one path (overlaps stay filled)." (above `union()`, dead), `:98` "Snap a board coordinate to the art-pixel grid.", `:101` "Inline style that shows cell (col, row) of a sprite sheet…", `:65` "A filled pixel disc of radius `r` art pixels…".
 - `games/catan/src/pixel/sprites.ts` 2; e.g. `:98` "Four-tone wooden ramp of a seat colour." (above `ramp()`).
 - `games/catan/src/pixel/sound.ts` 5; e.g. `:35` "Dice rattle in the cup, then two clacks as they land." (describes the next lines), `:47` "A coin pick-up per delivery, rising with each resource.", `:76` "Sneaky descending minor steps and a thud.", `:89` "A card flip: quick noise swish and two blips.", `:54` "Falling whistle, crunchy landing, then a short 'built' chime."

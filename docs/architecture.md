@@ -6,8 +6,8 @@ The catalog runs on Bun workspaces, TypeScript, SvelteKit, Bun and Socket.IO. Bu
 | ---------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `apps/web`             | SvelteKit SPA, catalog, room UI, shared session client and Paraglide localization                           |
 | `apps/server`          | In-memory rooms, token verification, connection ownership, action acceptance and same-origin static serving |
-| `packages/game-core`   | Small game contract and common player/room/view types                                                       |
-| `packages/shared`      | Metadata-only catalog and shared message types                                                              |
+| `packages/game-core`   | Small game contract, common player/view types and the socket protocol (`RoomView`, `Reply`, …)              |
+| `packages/shared`      | Game identities and seat limits (`./games`), metadata-only catalog, messages and browser helpers (`./ui`)   |
 | `games/uno`            | UNO rules, private/public projection and lazily imported Svelte table                                       |
 | `games/catan`          | Catan board/rules, private/public projection and lazily imported Svelte table                               |
 | `games/carcassonne`    | Big Box 3.1 tiles, connected features, resumable decisions and lazy SVG table                               |
@@ -32,13 +32,13 @@ Disconnect reserves a seat for `RECONNECT_GRACE_MS` (default 120000). Expiration
 
 ## Browser delivery and languages
 
-The static adapter emits an SPA into `apps/web/build`. Bun serves it with `sirv`, including room-route fallback, and handles Socket.IO on the same origin. Development uses Vite with a proxy to Bun. The catalog imports metadata only. `apps/web/src/lib/games.ts` contains dynamic client imports invoked after game selection; opening the catalog does not import every game's UI or server rules.
+The static adapter emits an SPA into `apps/web/build`. Bun serves it with `sirv`, including room-route fallback, and handles Socket.IO on the same origin. Development uses Vite with a proxy to Bun. The catalog imports metadata only. `apps/web/src/lib/games.ts` maps each game id to the game's tiny `./client` entry, whose `load()` imports the table after game selection; opening the catalog does not import every game's UI or server rules.
 
 Paraglide generates localized functions from `packages/shared/messages/en.json` and `es.json`. Locale configuration lives in `packages/shared/project.inlang/settings.json`; adding a locale means adding that locale's messages and registration. CSS, SVG and Svelte handle presentation; there is no game engine.
 
 ## Adding a game
 
-Create a workspace game package with the contract implementation and its Svelte UI. Register server rules in the server registry, catalog metadata in `packages/shared`, and one dynamic UI import in the client registry. Keep game assets and rules with that game. Extract additional shared helpers only when current games demonstrate the need.
+Create a workspace game package with the contract implementation, its Svelte UI typed with `BoardProps`, a `./client` entry (`GameClient`: lazy `load()`, optional `retryable`) and, for a local practice route, a `./practice` entry returning a `PracticeTable`. Add the game's identity and seat limits to `packages/shared/src/games.ts` (the definition spreads `seats(id)`), its description to the catalog, its rules to the server registry and its client entry to `apps/web/src/lib/games.ts`; the per-game catalog tables are `Record<GameId, …>`, so the type checker lists what is missing. Keep game assets and rules with that game. Extract additional shared helpers only when current games demonstrate the need.
 
 The [UNO house rules](rules.md) and [Catan rules summary](games/catan.md) describe the retained game behavior.
 
@@ -162,7 +162,7 @@ are resumable actor-owned prompts, resolved before terminal scoring, with
 solutions withheld from actors until their reactions finish.
 
 The existing room transport handles identity, host transfer, deduplication and
-replacement. Its retry predicate additionally permits unchanged, uncommitted
+replacement. Its `client.ts` retry predicate permits unchanged, uncommitted
 Little Secret readiness, continuation, ballots and RPS, preserving the original
 action ID and the existing three-attempt limit. Other actions never retry
 automatically. See [ADR 014](adr/014-little-secret.md) and

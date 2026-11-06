@@ -6,6 +6,7 @@ Abbreviations: CN = games/codenames/src, LS = games/little-secret/src, PJ = pack
 ## Problems
 
 ### Codenames rules / types / practice
+
 - `CN/index.ts:70` `validRoster` is exported but only used at `CN/index.ts:208`; the web Board re-implements the same predicate. [surplus] unused export
 - `CN/Board.svelte:81-93` `rosterReady` is a hand copy of `validRoster` and has drifted: engine requires exactly one spymaster per team (index.ts:76), Board only `some` spymaster; Board adds the all-connected check that the engine does inside `ready` (index.ts:209). Two copies of the "can we start" rule. [hidden] copy of logic
 - `CN/Board.svelte:675-701` The "spymaster slot taken by someone else" disable rule duplicates the engine check at `CN/index.ts:189-196`. [hidden] copy of logic
@@ -23,6 +24,7 @@ Abbreviations: CN = games/codenames/src, LS = games/little-secret/src, PJ = pack
 - `CN/practice.ts:121-145` returns `state` getter, `seats`, `actor`, `view`, `send`; `state` getter is used by CNP heavily (reading `game.state.*` at CNP:42-44, 63, 90-153), i.e. page depends on engine `State` internals (assignments/board/clueHistory) rather than on the public view. [needless] callers depend on internals
 
 ### Codenames Board.svelte
+
 - `CN/Board.svelte:51,56` props `locale` and `canConfigure` are typed but never destructured or read; `CNP:195` and the room page pass `locale`/`canConfigure`. [surplus] unused props
 - `apps/web/src/routes/room/[id]/+page.svelte` passes `onLeave` (never declared on CN Board type) and also renders its own Back/Invite/Language controls into `settingsContent` for `cornerControls` games (room page lines ~212-225), while CN Board renders its own invite button + `roomId` + player count (`CN/Board.svelte:975-989`). Two invite buttons in one settings dialog for rooms. [hidden] split feature across Board and route / [surplus] duplicate control
 - `CN/Board.svelte:29-33,975-989` `roomId`, `maxPlayers`, `onInvite`, `copied` exist only to draw one status line; `practice` flag (`:33`) picks between two branches of that line. Props mirror what one caller (room page) knows. [needless] parameters for one caller
@@ -48,12 +50,14 @@ Abbreviations: CN = games/codenames/src, LS = games/little-secret/src, PJ = pack
 - `CN/tokens.css:342`, `CN/pixel.css:64` read `--cn-wood-image` set inline by Board (:631). Variable defined in a different file than its consumers. [hidden] CSS var contract
 
 ### Codenames guide / effects
+
 - `CN/guide.ts:1-31` and `LS/guide.ts:1-40` are the same generator (`ids.map(id => ({chapters, lessons:[{... frames:[_0,_1,_2], scene:id, values:['1','2','3']}]}))`), each chapter has exactly one lesson whose `id`/`title` repeat the chapter's. `values` is the constant `['1','2','3']` in both. [surplus] option for a thing that never varies / [hidden] cross-game copy
 - `CN/GuideScene.svelte:132-140` the same condition `lesson.scene === 'finish' ? i % 4 === 0 && (i !== 8 || step === 2) : step === 2 && i === 7` appears twice (fill and path). [hidden] copy of logic
 - `CN/GuideScene.svelte:7-163` hard-coded colours (#a93645, #245c97, #152532...) that mirror `--cn-key-*` tokens in tokens.css. [hidden] copy of values
 - `CN/effects.ts:7-23` cue table + `chiptune` boolean flag on `play(volume, cue, chiptune=false)`; the flag exists only because Board has a pixel skin. `soundEffects` re-exports `unlock/cancel/dispose` as aliases of `audio.*` (`:12,25-26`). [needless] pass-through wrapper
 
 ### Little Secret rules / types
+
 - `LS/engine.ts:13,22` `distribution` and `normalize` are exported but only used inside engine.ts (grep: no other importer). [surplus] unused exports
 - `LS/engine.ts:105,484` `create`, `presence`, `view` are exported and then re-bundled in `rules()` (:473-482); only `rules` (via `LS/index.ts:5` and `LS/practice.ts:3`) is consumed. [surplus] unused exports
 - `LS/engine.ts:254-312` `deal()` re-assigns ~20 fields to the same defaults that `create()` sets (:68-103: `phase`, `speaker`, `eliminated`, `revealed`, `ballots`, `rps`, `candidates`, `prompt`, `reactions`, `result`, `continued`, `clues`, `clueOrder`, `origin`, `ballotId`, `rpsId`, `history`). `finish()` (:203-206) and `cycle()` (:215-220) reset subsets again. Adding a `State` field needs edits in 3-4 places. [hidden] copy of values
@@ -68,6 +72,7 @@ Abbreviations: CN = games/codenames/src, LS = games/little-secret/src, PJ = pack
 - `LS/index.ts:1-6` comment "Server entry only" and a 3-line module whose only job is binding `words.json`; `LS/types.ts` re-exported with `export type *`. Fine, but `Packs/Pair` (types.ts:6-11) are types for server-only data placed in the browser-imported types file. [needless] stable code (types) knows about server-only data
 
 ### Little Secret Board and table components
+
 - `LS/Board.svelte:28,44` `locale` prop destructured and typed, never read. [surplus] unused prop
 - `LS/Board.svelte:33,451-461,522` `canConfigure` actually means "viewer is host"; also gates `openVote` (:522) which is a host-only action, not configuration. Name hides a rule shared with `LS/engine.ts:365`. [hidden] convention callers must know
 - `LS/Board.svelte:352-355,379-382` and `LS/table/Outcome.svelte:12-19`: "is this player a winner / awarded" (`winners.length ? winners.includes : points>0`) written three times. [hidden] copy of logic
@@ -91,6 +96,7 @@ Abbreviations: CN = games/codenames/src, LS = games/little-secret/src, PJ = pack
 - `LS/Board.svelte:775` global `body:has(.ls-table) .site-header` rule. [hidden] module reading DOM set by another module
 
 ### LS practice
+
 - `LS/practice.ts:96-116` `vote()` and `:146-167` sage/rps block repeat the same volunteer -> clue loop -> openVote sequence. [hidden] copy
 - `LS/practice.ts:127-132` and `:138-143` same roles map (`i===4 journalist, i===3 infiltrator`) written twice. [hidden] copy
 - `LS/practice.ts:182-199` `actor` getter re-derives "who must act next" with a nested ternary mirroring engine phases (prompt actor, speaker, ready, vote, tie, continue). Any new phase/prompt in the engine needs a matching edit here. [hidden] copy of logic
@@ -100,6 +106,7 @@ Abbreviations: CN = games/codenames/src, LS = games/little-secret/src, PJ = pack
 - `LSP:22-33` `reset()`/`send()` each re-derive `seat`, `seats`, `view` by hand (same shape as `CNP:47-60,174-178`). [hidden] cross-game page copy
 
 ### Practice pages
+
 - `LSP:15-21,43-53` and `CNP:15-28,186-197`: each practice page keeps `game`, `seat`, `view`, `locale`, `round` state and `{#key locale}` remount; locale switch writes `setLocale(next, {reload:false})` (`LSP:34-37`, `CNP:170-173`). Practice pages of other games repeat this (azul/domino/sushi/catan/carcassonne). [hidden] cross-game copy
 - `CNP:61-88` `publicView()` builds the Jev wire body by projecting `State` -> `{lang, clue, board, revealed, history, guessedThisTurn}`; this shape is typed in `PJ/codenames/prompts.ts:6-14`, validated in `PJ/codenames/live.ts:85-126`, and built here by hand. Three copies of the wire contract; the web side cannot import the type (server package) so drift is only caught at runtime (`400 Bad request`). [hidden] copy of shape
 - `CNP:86` `guessedThisTurn: []` is always empty on the live path; `PJ/codenames/live.ts:110,123` validates/copies it and `plan()` never uses it. [surplus] unused field on this path (used only by lab, `PJ/codenames/guessers.ts:272` via `view()`)
@@ -112,6 +119,7 @@ Abbreviations: CN = games/codenames/src, LS = games/little-secret/src, PJ = pack
 - `CNP:19-20,46-52` `seat` in state plus `refresh()` in every handler (`send`, `reset`, checkbox, jevTurn) — manual sync between `game` (non-reactive object) and `view` ($state). [hidden] call-order convention
 
 ### jev-lab and server coupling
+
 - `apps/server/src/index.ts:12,43-109` the general server entry imports `@board-games/jev-lab/codenames` and owns the Jev HTTP route, rate-limit (`budget()` with module state `recent`/`planned`), request parsing and body limit (64_000). `index.ts` knows `personality` names (:96), `score` shape (:84-85), `unlimited` (:83). Game-specific lab code inside the generic server bootstrap; every future HTTP endpoint would need to be added here too. [needless] stable code (server entry) imports more volatile code
 - `apps/server/package.json:18` depends on `@board-games/jev-lab` even when `JEV_LAB` is unset; Jev code is loaded on every server start. [needless] eager coupling
 - `PJ/codenames/scenarios.ts:3` imports `../../../../games/codenames/src/words.ts` by relative path across packages, bypassing `games/codenames/package.json` `exports` (which does not export words). If the pack moves, the lab breaks silently (only `bun run lab:codenames`). [needless] callers depend on internals / [hidden]
@@ -132,6 +140,7 @@ Abbreviations: CN = games/codenames/src, LS = games/little-secret/src, PJ = pack
 - `packages/jev-lab/package.json:5-7` exports only `./codenames` -> `live.ts`; `run.ts` is run via root script `lab:codenames`. `packages/jev-lab/.gitignore` `runs/`. OK.
 
 ## Special cases
+
 - `CN/index.ts:23` shuffle rejects non-finite or out-of-range random — validates the injected RNG; `LS/engine.ts:27-31` `draw()` does the same. Guard for a bug in callers, not the design — likely removable (one copy via `game-core` `seeded`/`shuffle`; see cross-game).
 - `CN/index.ts:236` regex `[\p{Cc}\p{Cf}]` reject; `LS/engine.ts:451` same regex only for `guess`, not for `clue` text (`LS/engine.ts:351-358` only checks length) — inconsistent special case; per-game, probably intended only for answers? guess.
 - `CN/index.ts:372-374` `private.key` only for spymaster when `phase !== 'setup'`; `CN/Board.svelte:123-126` adds `phase==='finished'` fallback building the key from public board — still needed (design: key is private until finish).
@@ -169,6 +178,7 @@ Abbreviations: CN = games/codenames/src, LS = games/little-secret/src, PJ = pack
 - `CN/Icon.svelte:53` default `else` branch for unknown names.
 
 ## Restating comments
+
 - `CN/Board.svelte` 4 comments; e.g. `:152` "Viewer-only look; the 8-bit stylesheet loads the first time it is chosen." (restates code just below), `:747` "<!-- Compact: slim status bar, the board, and a drawer for history and players. -->". Most others explain assets/product (`:160-161`, `:36`) — keep.
 - `CN/practice.ts` 4 comments; e.g. `:92` "Local deterministic example: one red, three blue, then two red agents." (restates the calls at :99-108), `:24` "Preset positions need a known board; ..." is valid (keep).
 - `CN/effects.ts` 3 comments; e.g. `:6` "Public feedback only. No context is created before an explicit user gesture." (restates `createAudio`), `:9` "Brief original cues depend only on accepted public event types." , `:10` "`chiptune` swaps in the 8-bit skin's ZzFX cues." (restates the branch).
@@ -187,6 +197,7 @@ Abbreviations: CN = games/codenames/src, LS = games/little-secret/src, PJ = pack
 - `PJ/codenames/run.ts` 2 comments; `:1-2` usage text (keep), `:64` "Per-scenario verdict: what a good operative should have done with this clue."
 
 ## Cross-game patterns noticed
+
 - `effects.ts` (createAudio + cue table + `unlock/cancel/dispose` aliases) exists in azul, carcassonne, catan, codenames, little-secret, sushi-go-party; each games' `pixel/sound.ts` (azul, carcassonne, catan, domino, little-secret, sushi-go-party, uno) is a "chiptune pack" over `createAudio` with similar helper shapes (`note`/`tune`/`stamp`). Likely one shared builder.
 - Skin boot in every Board: `gameSkin(id)`, `pixelReady`, `import('./pixel.css')`, `px-tokens`/`<game>-pixel` classes. CN `Board:152-159`, LS `Board:84-99`. `body:has(.<game>-table) .site-header {display:none}` is repeated per game (also carcassonne; app.css/+layout reference `site-header`).
 - Preferences persistence: `write('<game>:preferences', {...})` in an effect + `readJson` in `onMount` with per-field validation (CN `Board:375-392`, LS `Board:261-270`, azul, sushi). Key naming inconsistent (`azul-preferences` vs `codenames:preferences`).
@@ -201,6 +212,7 @@ Abbreviations: CN = games/codenames/src, LS = games/little-secret/src, PJ = pack
 - Static asset paths `/games/<id>/...` and `/fonts/<id>/...` are string literals in components pointing to `apps/web/static` (CN Board:163,632; LS Board:772,784; LS Sprite:83).
 
 ## Suggested fixes (one fix may solve several problems)
+
 1. Delete dead material: `CN/table/{books,coaster,foliage,mug,notepad}.webp` and fix `CN/table/README.md`/`provenance.json`; `Icon.svelte` `settings` branch and fallback; `LS/effects.ts` `clue`/`handoff` cues; `locale`/`canConfigure` props in CN Board and `locale` in LS Board; `data-testid` attributes; `packVersion` state fields (CN, LS); `validRoster` export; `distribution`/`normalize`/`create`/`presence`/`view` exports in LS engine; unused Sprite frames after checking the strips; `Prompt.state?`, `Plan.ms`, `guessedThisTurn` on the live path, redundant `unlimited` parameter (page already sends `count: 0`). Solves: surplus items throughout.
 2. Make the engine own the "start allowed / slot available" predicates and expose them to the Board through the view (e.g. `Public.canStart`, per-slot availability) or a tiny shared pure module the Board imports; removes `rosterReady` and the spymaster-slot copy (CN Board:81-93, 695-702) and the drift against `validRoster`.
 3. Collapse CN `view`/`publicEvent` to explicit work only (board masking, history filter, remaining, key); keep `structuredClone`-style allowlist like LS or `Omit<State,...>`; derive `Public` from `State` in types.ts. Solves copy-of-fields problems in CN types/index.
