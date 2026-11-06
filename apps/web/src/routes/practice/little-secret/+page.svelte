@@ -6,6 +6,7 @@
 </script>
 
 <Practice
+  boardReports
   game="little-secret"
   title={() => `Little Secret · ${m.ls_practice()}`}
   start={(scenario) => practice(scenario, getLocale() === 'es' ? 'es' : 'en')}

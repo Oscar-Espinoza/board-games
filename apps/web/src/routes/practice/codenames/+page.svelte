@@ -187,6 +187,7 @@
 </script>
 
 <Practice
+  boardReports
   bind:this={shell}
   game="codenames"
   title={() => `Codenames · ${m.cn_practice()}`}

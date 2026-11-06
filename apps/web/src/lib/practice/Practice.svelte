@@ -26,6 +26,7 @@
     table = $bindable(),
     controls,
     boardProps = {},
+    boardReports = false,
   }: {
     game: GameId;
     /** Read again when the language changes. */
@@ -38,6 +39,8 @@
     table?: PracticeTable;
     controls?: Snippet;
     boardProps?: Record<string, unknown>;
+    /** The Board shows a rejected move itself, so the shell leaves its banner out. */
+    boardReports?: boolean;
   } = $props();
 
   let Board = $state<Component<any> | null>(null),
@@ -97,7 +100,7 @@
       refresh();
       return Promise.resolve();
     } catch (e) {
-      error = errorText((e as Error).message, locale);
+      error = boardReports ? '' : errorText((e as Error).message, locale);
       const rejected = Promise.reject(e);
       rejected.catch(() => {});
       return rejected;
@@ -114,7 +117,7 @@
   {#if error}<p class="practice-error" role="alert">
       {error}<button
         type="button"
-        aria-label={m.catan_dismiss_error()}
+        aria-label={m.practice_dismiss_error()}
         onclick={() => (error = '')}>×</button
       >
     </p>{/if}

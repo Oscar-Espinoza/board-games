@@ -21,6 +21,7 @@
 </script>
 
 <Practice
+  boardReports
   game="azul"
   title={() => `Azul · ${m.azul_practice()}`}
   start={practice}
