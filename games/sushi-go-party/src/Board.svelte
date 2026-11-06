@@ -184,14 +184,15 @@
     if (prefs.sound && pixel) chip.play(name, prefs.volume);
   }
   function keep() {
-    if (!selectedCard || !allowed || priv.committed) return;
+    if (!selectedCard || !allowed || priv.committed || !priv.pickPromptId)
+      return;
     gesture();
     cue('lock');
     void send({
       type: 'PICK',
       round: pub.round,
       turn: pub.turn,
-      promptId: priv.pickPromptId!,
+      promptId: priv.pickPromptId,
       card: selection,
       utensils: armed,
       ...(selectedCard.kind === 'special_order' && copyTarget
