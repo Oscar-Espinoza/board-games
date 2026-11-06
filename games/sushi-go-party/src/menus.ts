@@ -98,8 +98,9 @@ export function validMenu(value: unknown, count: number): value is Menu {
   )
     return false;
   const types = menuKinds(m);
+  // Every kind on the menu differs from the others, nigiri included.
   return (
-    new Set(types).size === 2 + APPETIZER_SLOTS + SPECIAL_SLOTS &&
+    new Set(types).size === types.length &&
     !types.some((k) => unavailable(k, count))
   );
 }
