@@ -119,6 +119,9 @@ export function practice(scenario: Scenario = 'start2'): PracticeTable<View> {
     get actor() {
       return state.players[state.turn];
     },
+    get finished() {
+      return state.phase === 'finished';
+    },
     get players() {
       return seats.filter((p) => state.players.includes(p.id));
     },

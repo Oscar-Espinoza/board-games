@@ -59,10 +59,6 @@
   {scenarios}
   label={(name) => labels[name]()}
   boardProps={{
-    // A table made here restarts presentation sequences, so it needs its own round.
-    round: sushi?.generation ?? 0,
-    canRematch: true,
-    rematch: () => replace(practice(scenario, guests)),
     practiceStep: {
       label: m.sgp_practice_step(),
       disabled: stepping,

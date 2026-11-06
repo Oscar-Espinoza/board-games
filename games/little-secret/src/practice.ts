@@ -180,6 +180,9 @@ export function practice(
     get actor() {
       return nextActor(state) ?? hostId;
     },
+    get finished() {
+      return state.phase === 'finished';
+    },
     view: (seat) => practiceRules.view(state, seat),
     // The viewer plays every seat, so every seat may do what the host does.
     send: (seat, action) => send(seat, action, seat),

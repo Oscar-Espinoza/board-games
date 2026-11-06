@@ -183,6 +183,9 @@ export function practice(scenario: Scenario = 'short'): PracticeTable<View> {
             state.players[0])
         : (state.pending?.actor ?? state.players[state.active]);
     },
+    get finished() {
+      return state.phase === 'finished';
+    },
     view: (id) => playerView(state, id),
     send(id, action) {
       if (

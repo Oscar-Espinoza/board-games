@@ -145,6 +145,9 @@ export function practice(
           : 'operative',
       );
     },
+    get finished() {
+      return state.phase === 'finished';
+    },
     view: (seat: string) => view(state, seat),
     send(seat: string, action: unknown) {
       state = apply(state, seat, action, random);

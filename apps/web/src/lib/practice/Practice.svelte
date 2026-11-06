@@ -63,16 +63,25 @@
       .then((module) => (Board = module.default))
       .catch((e: Error) => (error = e.message));
   });
-  /** Follow the seat that must act next after the page changed the table itself. */
+  let shown = table;
+  /** Show the seat that must act next; call it after changing the table yourself. */
   export function refresh() {
+    // A new table restarts revisions, so presentation starts over with a new round.
+    if (table !== shown) {
+      shown = table;
+      round++;
+    }
     seat = table!.actor;
     version++;
   }
   function reset() {
     table = start(scenario);
     error = '';
-    round++;
     refresh();
+  }
+  function chooseSeat(next: string) {
+    seat = next;
+    version++;
   }
   function send(action: unknown) {
     try {
@@ -101,6 +110,9 @@
         {locale}
         practice={true}
         canConfigure={true}
+        canRematch={table!.finished}
+        rematch={reset}
+        {chooseSeat}
         {...boardProps}
       >
         {#snippet rulesContent()}<Rulebook {game} />{/snippet}
@@ -115,10 +127,7 @@
               >{/if}<select
               aria-label={m.practice_seat()}
               value={seat}
-              onchange={(e) => {
-                seat = e.currentTarget.value;
-                version++;
-              }}
+              onchange={(e) => chooseSeat(e.currentTarget.value)}
               >{#each table!.players as player}<option value={player.id}
                   >{player.name}</option
                 >{/each}</select

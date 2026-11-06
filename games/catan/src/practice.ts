@@ -93,6 +93,9 @@ export function practice(
     get actor() {
       return actor;
     },
+    get finished() {
+      return state.phase.type === 'finished';
+    },
     view: (seat) => playerView(state, seat),
     send(seat, action) {
       state = applyAction(state, seat, action, random);

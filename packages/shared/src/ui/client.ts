@@ -24,6 +24,8 @@ export type BoardProps<View = GameView, Action = unknown> = {
   rematch?: () => unknown;
   rulesContent?: Snippet;
   settingsContent?: Snippet;
+  /** A practice host lets the viewer switch seats from the table itself. */
+  chooseSeat?: (seat: string) => void;
   /** Room actions for a Board that draws its own room chrome. */
   onLeave?: () => void;
   onInvite?: () => unknown;
@@ -73,6 +75,7 @@ export interface PracticeTable<View = GameView> {
   readonly players: Player[];
   /** The seat that must act next; the route shows it after every move. */
   readonly actor: string;
+  readonly finished: boolean;
   view(seat: string): View;
   /** Throws the rules' rejection (a message key) and leaves the table unchanged. */
   send(seat: string, action: unknown): void;

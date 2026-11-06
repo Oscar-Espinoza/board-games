@@ -301,15 +301,12 @@ const names = [
   'Valentina de la Costa',
   'Nicolás del Río',
 ];
-let tables = 0;
 
 /**
  * A Sushi Go Party! table on the real rules. Every seat picks at once, so `actor` stays
  * on the seat the viewer last played from rather than following the rules.
  */
 export class SushiPractice implements PracticeTable<ReturnType<typeof view>> {
-  /** A new table restarts presentation sequences, so a Board keys its round on this. */
-  readonly generation = ++tables;
   readonly players: Player[];
   #state: State;
   #random: () => number;
@@ -328,6 +325,9 @@ export class SushiPractice implements PracticeTable<ReturnType<typeof view>> {
   }
   get actor() {
     return this.#seat;
+  }
+  get finished() {
+    return this.#state.phase === 'finished';
   }
   view(seat: string) {
     return view(this.#state, seat);
