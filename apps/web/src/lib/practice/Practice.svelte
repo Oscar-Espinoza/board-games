@@ -133,7 +133,7 @@
         {round}
         {locale}
         practice={true}
-        canConfigure={true}
+        canConfigure={table!.host === undefined || table!.host === seat}
         canRematch={finished}
         rematch={reset}
         {chooseSeat}

@@ -98,10 +98,8 @@ export function practice(
     wordLanguage: language,
     powers: count >= powersFrom,
   });
-  const send = (actor: string, action: unknown, host = hostId) => {
-    state = practiceRules.apply(state, actor, action, random, {
-      hostId: host,
-    });
+  const send = (actor: string, action: unknown) => {
+    state = practiceRules.apply(state, actor, action, random, { hostId });
   };
   for (const id of ids) send(id, { type: 'ready', version: 0 });
   const roles = () => {
@@ -177,6 +175,7 @@ export function practice(
   }
   return {
     players,
+    host: hostId,
     get actor() {
       return nextActor(state) ?? hostId;
     },
@@ -184,7 +183,6 @@ export function practice(
       return state.phase === 'finished';
     },
     view: (seat) => practiceRules.view(state, seat),
-    // The viewer plays every seat, so every seat may do what the host does.
-    send: (seat, action) => send(seat, action, seat),
+    send: (seat, action) => send(seat, action),
   };
 }

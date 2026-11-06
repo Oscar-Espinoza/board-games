@@ -93,6 +93,8 @@ export interface PracticeTable<View = GameView> {
    * flights play only for an unchanged viewer). Absent: the route follows `actor`.
    */
   readonly followsActor?: boolean;
+  /** The seat that may do host-only things; absent: every seat may. */
+  readonly host?: string;
   readonly finished: boolean;
   view(seat: string): View;
   /** Throws the rules' rejection (a message key) and leaves the table unchanged. */
