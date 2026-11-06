@@ -32,7 +32,7 @@
 
 <Practice
   game="catan"
-  title={m.catan_try()}
+  title={() => m.catan_try()}
   start={practice}
   {scenarios}
   label={(id) => labels[id]()}

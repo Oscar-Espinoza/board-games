@@ -7,7 +7,7 @@
 
 <Practice
   game="little-secret"
-  title={`Little Secret · ${m.ls_practice()}`}
+  title={() => `Little Secret · ${m.ls_practice()}`}
   start={(scenario) => practice(scenario, getLocale() === 'es' ? 'es' : 'en')}
   {scenarios}
   label={(id) => m[`ls_scenario_${id}`]()}

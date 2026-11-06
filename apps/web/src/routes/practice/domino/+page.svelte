@@ -6,6 +6,6 @@
 
 <Practice
   game="domino"
-  title="Dominó · {m.domino_practice()}"
+  title={() => `Dominó · ${m.domino_practice()}`}
   start={practice}
 />

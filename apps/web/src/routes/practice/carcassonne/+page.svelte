@@ -23,7 +23,7 @@
 
 <Practice
   game="carcassonne"
-  title="Carcassonne · {m.carc_try()}"
+  title={() => `Carcassonne · ${m.carc_try()}`}
   start={practice}
   {scenarios}
   label={(scenario) => labels[scenario]()}

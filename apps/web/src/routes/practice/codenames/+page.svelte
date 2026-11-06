@@ -189,7 +189,7 @@
 <Practice
   bind:this={shell}
   game="codenames"
-  title={`Codenames · ${m.cn_practice()}`}
+  title={() => `Codenames · ${m.cn_practice()}`}
   {start}
   {scenarios}
   label={(id) => scenarioLabels[id]()}

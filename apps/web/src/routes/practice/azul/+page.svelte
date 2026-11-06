@@ -22,7 +22,7 @@
 
 <Practice
   game="azul"
-  title="Azul · {m.azul_practice()}"
+  title={() => `Azul · ${m.azul_practice()}`}
   start={practice}
   {scenarios}
   label={(scenario) => labels[scenario]()}

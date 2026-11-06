@@ -34,7 +34,6 @@ export function handleGuess(req: IncomingMessage, res: ServerResponse) {
     const view = parseView(input?.view);
     if (!view) return fail(400, 'Bad request');
     if (!budget()) return fail(429, 'Jev lab budget spent');
-    // Older clients also send `unlimited`; the clue's count (0) already says it.
     const { score, personality } = input;
     const valid =
       Number.isInteger(score?.ours) && Number.isInteger(score?.theirs);

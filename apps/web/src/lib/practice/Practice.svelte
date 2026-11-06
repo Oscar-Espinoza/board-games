@@ -28,7 +28,8 @@
     boardProps = {},
   }: {
     game: GameId;
-    title: string;
+    /** Read again when the language changes. */
+    title: () => string;
     start: (scenario: Scenario) => PracticeTable;
     scenarios?: readonly Scenario[];
     label?: (scenario: Scenario) => string;
@@ -88,13 +89,18 @@
     seat = next;
     version++;
   }
-  function send(action: unknown) {
+  /** Like a room's send: a rejection shows here, and a Board that awaits it can react. */
+  function send(action: unknown): Promise<void> {
     try {
       table!.send(seat, action);
       error = '';
       refresh();
+      return Promise.resolve();
     } catch (e) {
       error = errorText((e as Error).message, locale);
+      const rejected = Promise.reject(e);
+      rejected.catch(() => {});
+      return rejected;
     }
   }
   function changeLocale(next: Locale) {
@@ -103,7 +109,7 @@
   }
 </script>
 
-<svelte:head><title>{title}</title></svelte:head>
+<svelte:head><title>{(void locale, title())}</title></svelte:head>
 <main class="practice-route">
   {#if error}<p class="practice-error" role="alert">
       {error}<button

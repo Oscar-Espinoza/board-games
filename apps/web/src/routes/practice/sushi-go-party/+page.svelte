@@ -54,7 +54,7 @@
   bind:table
   bind:scenario
   game="sushi-go-party"
-  title="Sushi Go Party! · {m.sgp_practice()}"
+  title={() => `Sushi Go Party! · ${m.sgp_practice()}`}
   start={(name) => practice(name, guests)}
   {scenarios}
   label={(name) => labels[name]()}
