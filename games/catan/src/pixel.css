@@ -24,8 +24,6 @@
 
   /* Chrome: flat wood, ink border, hard bevel and a one-pixel drop. */
   & button,
-  & .table-navigation a,
-  & .table-language,
   & .table-connection {
     font-family: var(--px-font);
     font-size-adjust: ex-height 0.56;
@@ -41,8 +39,7 @@
     filter: none;
     transition: none;
   }
-  & button:hover:not(:disabled):not([aria-disabled='true']),
-  & .table-navigation a:hover {
+  & button:hover:not(:disabled):not([aria-disabled='true']) {
     filter: none;
     background-color: #74492b;
   }
@@ -74,17 +71,6 @@
   & .table-utilities button > span[aria-hidden],
   & .table-navigation span {
     color: var(--px-gold);
-  }
-  & .table-language select {
-    font-family: var(--px-font);
-    font-size: inherit;
-    color: var(--px-cream);
-    background: transparent;
-    border: 0;
-  }
-  & .table-language option {
-    color: var(--px-ink);
-    background: var(--px-cream);
   }
   & .table-connection i {
     border-radius: 0;
@@ -605,7 +591,7 @@
     background: var(--px-ink);
   }
   & input:not([type='checkbox'], [type='radio']),
-  & select:not(.table-language select) {
+  & select {
     border-radius: 0;
     border: var(--px) solid var(--px-ink);
     font-family: var(--px-font);
@@ -760,7 +746,6 @@
     & .seat-stats {
       font-size: 13px;
     }
-    & .table-navigation a,
     & .table-navigation button,
     & .table-utilities button,
     & .table-connection {
@@ -799,7 +784,6 @@
     & .card-title {
       font-size: 14px;
     }
-    & .table-navigation a,
     & .table-navigation button,
     & .table-utilities button,
     & .table-connection {

@@ -1,32 +1,15 @@
 /** Versioned Jev request builders. A version changes wording or state layout, never the game rules. */
 import type { Question } from '../jev.ts';
-import type { PastClue } from './scenarios.ts';
-
-/** Public information only: exactly what a human operative could see. */
-export interface View {
-  lang: 'en' | 'es';
-  clue: { word: string; count: number };
-  /** Unrevealed words in display order. */
-  board: string[];
-  revealed: { word: string; identity: 'ours' | 'theirs' | 'civilian' }[];
-  history: PastClue[];
-  guessedThisTurn: string[];
-}
-
-/** State path of the clue being judged: `clue` now, or `history[k]` for an earlier clue of ours. */
-export type ClueRef = string;
+import type { ClueRef, View } from './types.ts';
 
 export interface Prompt {
-  /** One Noul: does `ref` point to `board[i]`? */
   card(ref: ClueRef, i: number): Question;
-  /** One Score: how directly `ref` hints at `board[i]`, on ordered levels (low to high). */
+  /** On ordered levels, low to high. */
   level(ref: ClueRef, i: number): Question;
-  /** One Choice over unrevealed words, plus `stop` when stopping is legal. */
+  /** A Choice over unrevealed words, plus `stop` when stopping is legal. */
   pick(view: View, ref: ClueRef, canStop: boolean): Question;
-  /** One Choice over candidate groups of `clue.count` words, each option like `apple + cherry`. */
+  /** A Choice over candidate groups of `clue.count` words, each option like `apple + cherry`. */
   group(view: View, groups: string[]): Question;
-  /** Shapes the state; defaults to the whole public view. */
-  state?(view: View): unknown;
 }
 
 const options = (view: View, canStop: boolean, stop: string) => {

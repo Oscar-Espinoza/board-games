@@ -1,9 +1,20 @@
 import type { uno } from './index.js';
 export type UnoView = ReturnType<typeof uno.view>;
 
+export const consecutive = (before: UnoView, after: UnoView) =>
+  after.public.revision === before.public.revision + 1;
+
+/** Cards a seat holds now beyond what it held before (0 for a seat unseen before). */
+export function gained(before: UnoView, seat: { id: string; count: number }) {
+  return (
+    seat.count -
+    (before.public.players.find((p) => p.id === seat.id)?.count ?? seat.count)
+  );
+}
+
 /** Only recipient-visible differences are used. Opponent draw faces are never available. */
 export function movements(before: UnoView, after: UnoView, playerId: string) {
-  if (after.public.revision !== before.public.revision + 1) return [];
+  if (!consecutive(before, after)) return [];
   const moves: {
     kind: 'play' | 'draw';
     player: string;
@@ -18,10 +29,7 @@ export function movements(before: UnoView, after: UnoView, playerId: string) {
       count: 1,
     });
   for (const seat of after.public.players) {
-    const count =
-      seat.count -
-      (before.public.players.find((p) => p.id === seat.id)?.count ??
-        seat.count);
+    const count = gained(before, seat);
     if (count <= 0) continue;
     if (seat.id === playerId) {
       const held = new Set(before.private.hand.map((card) => card.id));
@@ -39,23 +47,11 @@ export function movements(before: UnoView, after: UnoView, playerId: string) {
 }
 
 /**
- * Opponent seat centre in % of the table, relative to the viewer (south, index 0).
- * Opponents arc across the top rim; larger tables wrap a little down the sides.
- */
-export function seatPosition(index: number, count: number): [number, number] {
-  if (count < 3) return [50, 11];
-  const spread = count >= 5 ? Math.PI * 0.14 : 0;
-  const angle =
-    Math.PI - spread + ((index - 1) / (count - 2)) * (Math.PI + spread * 2);
-  return [50 + 41 * Math.cos(angle), 52 + 41 * Math.sin(angle)];
-}
-
-/**
  * Players who called UNO in this revision. Only a declared last card leaves a
  * player at one card without being catchable; wild plays resolve after the colour.
  */
 export function unoCalls(before: UnoView, after: UnoView) {
-  if (after.public.revision !== before.public.revision + 1) return [];
+  if (!consecutive(before, after)) return [];
   if (after.public.phase === 'color') return [];
   return after.public.players
     .filter((seat) => {
@@ -71,14 +67,10 @@ export function unoCalls(before: UnoView, after: UnoView) {
     .map((seat) => seat.id);
 }
 
-/** Penalty-sized draws (2+) worth a "+N" bubble, from public counts only. */
 export function bigDraws(before: UnoView, after: UnoView) {
-  if (after.public.revision !== before.public.revision + 1) return [];
+  if (!consecutive(before, after)) return [];
   return after.public.players.flatMap((seat) => {
-    const gained =
-      seat.count -
-      (before.public.players.find((p) => p.id === seat.id)?.count ??
-        seat.count);
-    return gained >= 2 ? [{ id: seat.id, count: gained }] : [];
+    const count = gained(before, seat);
+    return count >= 2 ? [{ id: seat.id, count }] : [];
   });
 }

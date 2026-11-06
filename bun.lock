@@ -151,6 +151,9 @@
     },
     "packages/jev-lab": {
       "name": "@board-games/jev-lab",
+      "dependencies": {
+        "@board-games/codenames": "workspace:*",
+      },
     },
     "packages/shared": {
       "name": "@board-games/shared",

@@ -1,16 +1,18 @@
-import { seeded } from '@board-games/game-core';
-import {
-  applyAction,
-  createGame,
-  playerView,
-  type Action,
-  type State,
-} from './index.js';
+import { seeded, type Player } from '@board-games/game-core';
+import type { PracticeTable } from '@board-games/shared/ui';
+import { applyAction, createGame, playerView, type State } from './index.js';
 
-export const seats = ['Coral', 'Azure', 'Pearl', 'Amber'].map((name, i) => ({
-  id: `practice-${i}`,
-  name,
-}));
+const players: Player[] = ['Coral', 'Azure', 'Pearl', 'Amber'].map(
+  (name, i) => ({
+    id: `practice-${i}`,
+    name,
+    connected: true,
+    reservedUntil: null,
+  }),
+);
+/** Fixed seeds: every reset deals the same board and rolls the same dice. */
+const FIXTURE_SEED = 42,
+  DICE_SEED = 10;
 export const scenarios = [
   'setup',
   'building',
@@ -23,10 +25,10 @@ export const scenarios = [
 ] as const;
 export type Scenario = (typeof scenarios)[number];
 /** Local fixtures only. Never imported by room creation or the catalog. */
-export function scenarioState(scenario: Scenario): State {
+function scenarioState(scenario: Scenario): State {
   const s = createGame(
-    seats.map((p) => p.id),
-    seeded(42),
+    players.map((p) => p.id),
+    seeded(FIXTURE_SEED),
     scenario === 'setup' ? 'variable' : 'beginner',
   );
   if (scenario === 'setup') return s;
@@ -71,27 +73,33 @@ export function scenarioState(scenario: Scenario): State {
   }
   return s;
 }
-export function practice(scenario: Scenario) {
-  let state = scenarioState(scenario);
-  const random = seeded(10);
-  return {
-    get state() {
-      return state;
-    },
-    view: (seat: string) => playerView(state, seat),
-    send(seat: string, action: Action) {
-      state = applyAction(state, seat, action, random);
-    },
-  };
-}
-
-/** The next required seat in the local sandbox, including each pending discard. */
-export function practiceSeat(state: State, current: string): string {
+/** The seat that must act next; during discards, each pending seat in turn. */
+function nextActor(state: State, current: string) {
   if (state.phase.type === 'discard') {
     const pending = state.phase.pending ?? {};
     return pending[current] ? current : (Object.keys(pending)[0] ?? current);
   }
-  return state.phase.type === 'finished'
-    ? current
-    : (state.phase.player ?? current);
+  return state.phase.player ?? current;
+}
+
+export function practice(
+  scenario: Scenario,
+): PracticeTable<ReturnType<typeof playerView>> {
+  let state = scenarioState(scenario);
+  let actor = state.phase.player!;
+  const random = seeded(DICE_SEED);
+  return {
+    players,
+    get actor() {
+      return actor;
+    },
+    get finished() {
+      return state.phase.type === 'finished';
+    },
+    view: (seat) => playerView(state, seat),
+    send(seat, action) {
+      state = applyAction(state, seat, action, random);
+      actor = nextActor(state, seat);
+    },
+  };
 }

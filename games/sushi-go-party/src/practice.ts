@@ -1,34 +1,21 @@
 /** Local-only fixtures. This module is never imported by multiplayer initialization. */
+import { seeded, type Player } from '@board-games/game-core';
+import { games } from '@board-games/shared/games';
+import type { PracticeTable } from '@board-games/shared/ui';
 import {
   create,
   apply,
   view,
-  assertConservation,
   type State,
   type Action,
   type Choice,
 } from './index.js';
-import { presets, type Menu } from './menus.js';
+import { presets, validMenu, type Menu } from './menus.js';
 import { type Kind, type Card } from './cards.js';
-export function seeded(seed: number) {
-  return () => {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-export function startPractice(
-  count = 4,
-  menu: Menu = presets.first,
-  seed = 72,
-) {
+const { maxPlayers } = games['sushi-go-party'];
+function startPractice(count = 4, menu: Menu = presets.first, seed = 72) {
   const random = seeded(seed);
-  let state = create(
-    Array.from({ length: count }, (_, i) => `seat-${i + 1}`),
-    random,
-  );
+  let state = create(Array.from({ length: count }, (_, i) => `seat-${i + 1}`));
   state = apply(
     state,
     state.players[0],
@@ -44,8 +31,8 @@ export function startPractice(
     );
   return { state, random };
 }
-/** A transparent local seat control, not a bot exposed to multiplayer rooms. */
-export function demonstrationAction(
+/** What a demonstration seat plays: random legal choices, never offered in rooms. */
+function demonstrationAction(
   state: State,
   player: string,
   random: () => number,
@@ -113,11 +100,7 @@ export function demonstrationAction(
   return null;
 }
 /** Swap actual physical cards; never manufacture a card to arrange a demonstration. */
-export function arrangeHand(
-  s: State,
-  seat: number,
-  kinds: (Kind | [Kind, string])[],
-) {
+function arrangeHand(s: State, seat: number, kinds: (Kind | [Kind, string])[]) {
   for (let i = 0; i < kinds.length; i++) {
     const desired = kinds[i];
     const kind = typeof desired === 'string' ? desired : desired[0];
@@ -158,7 +141,7 @@ export const scenarios = [
   'takeout',
 ] as const;
 export type Scenario = (typeof scenarios)[number];
-export function scenario(name: Scenario, count = 4) {
+function fixture(name: Scenario, count: number) {
   const menus: Record<Scenario, Menu> = {
     table: presets.original,
     draft: presets.original,
@@ -170,18 +153,15 @@ export function scenario(name: Scenario, count = 4) {
     copy: { ...presets.two, specials: ['special_order', 'chopsticks'] },
     takeout: presets.master,
   };
-  const fixture = startPractice(
-    Math.max(
-      name === 'spoon' || name === 'takeout' || name === 'uramaki' ? 3 : 2,
-      Math.min(
-        name === 'menu' || name === 'copy' || name === 'uramaki' ? 6 : 8,
-        count,
-      ),
-    ),
+  const sizes = Array.from({ length: maxPlayers + 1 }, (_, n) => n).filter(
+    (n) => validMenu(menus[name], n),
+  );
+  const started = startPractice(
+    Math.max(sizes[0], Math.min(sizes[sizes.length - 1], count)),
     menus[name],
   );
-  const { random } = fixture;
-  let s = fixture.state;
+  const { random } = started;
+  let s = started.state;
   if (name === 'table') {
     // Reach the illustrated midgame through accepted rules actions, conserving
     // every physical card. This fixture is never imported by room initialization.
@@ -290,4 +270,119 @@ export function scenario(name: Scenario, count = 4) {
     if (next[name]) arrangeHand(s, 0, next[name]!);
   }
   return { state: s, random };
+}
+
+function assertConservation(s: State) {
+  const ids = [
+    ...s.deck,
+    ...s.reserve,
+    ...s.hands.flat(),
+    ...s.commitments.flatMap((c) => (c ? [c.card] : [])),
+    ...s.tableaus.flat(),
+    ...s.desserts.flat(),
+    ...s.discard,
+    ...(s.prompt?.offer ?? []),
+  ].map((c) => c.physical);
+  if (
+    ids.length !== s.manifest.length ||
+    new Set(ids).size !== ids.length ||
+    s.manifest.some((c) => !ids.includes(c.physical))
+  )
+    throw new Error('Sushi physical card conservation failed');
+}
+
+const names = [
+  'Marina',
+  'Kai',
+  'Sakura',
+  'Tomás',
+  'Emi',
+  'Ren',
+  'Valentina de la Costa',
+  'Nicolás del Río',
+];
+
+/**
+ * A Sushi Go Party! table on the real rules. Every seat picks at once, so `actor` stays
+ * on the seat the viewer last played from rather than following the rules.
+ */
+export class SushiPractice implements PracticeTable<ReturnType<typeof view>> {
+  readonly players: Player[];
+  #state: State;
+  #random: () => number;
+  #seat: string;
+
+  constructor(state: State, random: () => number, seat = state.players[0]) {
+    this.#state = state;
+    this.#random = random;
+    this.#seat = seat;
+    this.players = state.players.map((id, i) => ({
+      id,
+      name: names[i],
+      connected: true,
+      reservedUntil: null,
+    }));
+  }
+  get actor() {
+    return this.#seat;
+  }
+  get finished() {
+    return this.#state.phase === 'finished';
+  }
+  view(seat: string) {
+    return view(this.#state, seat);
+  }
+  send(seat: string, action: unknown) {
+    // The wire hands the rules a fresh copy, as a room would.
+    this.#state = apply(
+      this.#state,
+      seat,
+      JSON.parse(JSON.stringify(action)),
+      this.#random,
+    );
+    this.#seat = seat;
+  }
+  /**
+   * Plays the other seats until the viewer has something to decide. `delivered` runs
+   * after each accepted move so the Board sees every revision, as in a room: skipping
+   * revisions rightly suppresses presentation after a gap.
+   */
+  async step(seat: string, delivered: () => Promise<void>) {
+    this.#seat = seat;
+    const { turn, round, phase } = this.#state;
+    for (let moves = 0; moves < 100; moves++) {
+      let moved = false;
+      for (const player of this.#state.players) {
+        if (player === seat) continue;
+        const action = demonstrationAction(this.#state, player, this.#random);
+        if (!action) continue;
+        this.#state = apply(this.#state, player, action, this.#random);
+        await delivered();
+        moved = true;
+        break;
+      }
+      const next = this.#state;
+      if (
+        !moved ||
+        next.prompt?.actor === next.players.indexOf(seat) ||
+        next.turn !== turn ||
+        next.round !== round ||
+        (next.phase !== phase && next.phase !== 'resolving')
+      )
+        return;
+    }
+  }
+  /** The same seats, back at the menu. */
+  setup() {
+    return new SushiPractice(
+      create(this.#state.players),
+      seeded(9),
+      this.#seat,
+    );
+  }
+}
+
+export function practice(name: Scenario, count = 5) {
+  const { state, random } = fixture(name, count);
+  return new SushiPractice(state, random);
 }

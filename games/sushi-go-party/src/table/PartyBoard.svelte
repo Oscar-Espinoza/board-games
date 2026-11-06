@@ -1,34 +1,28 @@
 <script lang="ts">
   import ScoreTrack from './ScoreTrack.svelte';
   import MenuTile from './MenuTile.svelte';
-  import type { MenuTileData, PartyPlayer } from './data.js';
+  import type { MenuTileData, ScoreSeat } from './data.js';
   let {
     players,
     menu,
-    round,
-    pick,
-    totalPicks,
     indicator,
-    boardLabel = 'Party board and score track',
+    boardLabel,
     onrule,
     scoreLabel,
   }: {
-    players: Pick<PartyPlayer, 'id' | 'name' | 'score' | 'color'>[];
+    players: ScoreSeat[];
     menu: MenuTileData[];
-    round: number;
-    pick: number;
-    totalPicks: number;
-    indicator?: string;
-    boardLabel?: string;
-    onrule?: (kind: MenuTileData['kind']) => void;
-    scoreLabel?: (name: string, score: number) => string;
+    indicator: string;
+    boardLabel: string;
+    onrule: (kind: MenuTileData['kind']) => void;
+    scoreLabel: (name: string, score: number) => string;
   } = $props();
 </script>
 
 <section class="party-board" aria-label={boardLabel}>
   <ScoreTrack {players} {scoreLabel} />
   <div class="round-pick">
-    {#if indicator}{indicator}{:else}Round {round}<span>·</span>Pick {pick} / {totalPicks}{/if}
+    {indicator}
   </div>
   <div class="menu-grid">
     {#each [menu.slice(0, 4), menu.slice(4, 8)] as row}
@@ -37,11 +31,11 @@
             class="tile-position"
             style:--tilt={`${(i - 1.5) * 1.6}deg`}
           >
-            {#if onrule}<button
-                class="rule-target"
-                aria-label={`${tile.title}: ${tile.rules.join(' ')}`}
-                onclick={() => onrule?.(tile.kind)}><MenuTile {tile} /></button
-              >{:else}<MenuTile {tile} />{/if}
+            <button
+              class="rule-target"
+              aria-label={`${tile.title}: ${tile.rules.join(' ')}`}
+              onclick={() => onrule(tile.kind)}><MenuTile {tile} /></button
+            >
           </div>{/each}
       </div>
     {/each}
@@ -72,10 +66,6 @@
     line-height: 29px;
     font-weight: 750;
     letter-spacing: 0.3px;
-  }
-  .round-pick span {
-    padding: 0 10px;
-    opacity: 0.6;
   }
   .menu-grid {
     position: absolute;

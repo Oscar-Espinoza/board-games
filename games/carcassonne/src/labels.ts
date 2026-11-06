@@ -1,11 +1,5 @@
-import { m } from '@board-games/shared/messages';
+import { message } from '@board-games/shared/ui';
 import type { Locale } from '@board-games/shared/runtime';
-export function label(key: string, locale: Locale = 'en'): string {
-  const fn = (
-    m as unknown as Record<
-      string,
-      (args: Record<string, never>, options: { locale: Locale }) => string
-    >
-  )['carc_' + key];
-  return fn ? fn({}, { locale }) : key;
-}
+/** The `carc_` message for a key built at runtime; an unknown key shows as itself. */
+export const label = (key: string, locale: Locale = 'en') =>
+  message(`carc_${key}`, {}, locale) ?? key;

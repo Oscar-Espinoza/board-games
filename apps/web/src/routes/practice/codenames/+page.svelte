@@ -1,156 +1,165 @@
 <script lang="ts">
-  import Rulebook from '$lib/catalog/Rulebook.svelte';
-  import Board from '@board-games/codenames/Board.svelte';
+  import { untrack } from 'svelte';
+  import { m } from '@board-games/shared/messages';
+  import { getLocale } from '@board-games/shared/runtime';
   import {
     practice,
     scenarios,
+    seatCounts,
+    type CodenamesPractice,
     type Scenario,
   } from '@board-games/codenames/practice';
-  import { m } from '@board-games/shared/messages';
-  import {
-    getLocale,
-    setLocale,
-    type Locale,
-  } from '@board-games/shared/runtime';
+  import Practice from '$lib/practice/Practice.svelte';
+
+  // The wire contract of `/api/codenames/guess` (packages/jev-lab/src/codenames).
+  type Personality = 'conservative' | 'normal' | 'risky';
+  type Plan = { guesses: string[]; usd: number; situation: string | null };
+
   let scenario = $state<Scenario>('match'),
-    round = $state(0),
-    game = practice(),
-    seat = $state(game.actor),
-    view = $state(game.view(game.actor)),
-    locale = $state(getLocale()),
     seatCount = $state(4),
-    // You give every clue for both teams; Jev plays each team's operative.
     jev = $state(true),
     // False once the server answers that its Jev lab (JEV_LAB=1) is off.
     lab = $state(true),
     jevStatus = $state(''),
-    personality = $state<'conservative' | 'normal' | 'risky'>('normal'),
-    busy = false;
-  const seatSizes = [4, 5, 8, 12];
-  const displaySeats = $derived.by(() => {
-    locale;
-    return view.public.players.map((id, i) => ({
-      ...game.seats.find((p) => p.id === id)!,
-      name: `${i < 2 || (i >= 4 && i % 2 === 0) ? m.cn_red() : m.cn_blue()} · ${i + 1}`,
-    }));
+    // Fixed from the first clue until a reset.
+    personality = $state<Personality>('normal'),
+    started = $state(false),
+    busy = false,
+    shell = $state<{ refresh(): void }>();
+  let table = $state.raw<CodenamesPractice>();
+  const personalities = [
+    ['conservative', m.cn_jev_conservative],
+    ['normal', m.cn_jev_normal],
+    ['risky', m.cn_jev_risky],
+  ] as const;
+  const scenarioLabels = {
+    setup: m.cn_practice_setup,
+    match: m.cn_practice_match,
+    midgame: m.cn_practice_midgame,
+    final: m.cn_practice_final,
+    assassin: m.cn_practice_assassin,
+  };
+
+  function start(next: Scenario) {
+    const created = practice(next, {
+      language: getLocale() === 'es' ? 'es' : 'en',
+      size: seatCount,
+    });
+    created.botOperatives = jev;
+    created.onMove = () => {
+      syncStarted();
+      void jevTurn();
+    };
+    return created;
+  }
+  const publicOf = (t: CodenamesPractice) => t.view(t.players[0]!.id).public;
+  function syncStarted() {
+    const p = publicOf(table!);
+    started = p.clueHistory.length > 0 && p.phase !== 'finished';
+  }
+  // A new table (first load, scenario, reset, seat count) clears the status and may start Jev.
+  $effect(() => {
+    if (!table) return;
+    untrack(() => {
+      jevStatus = '';
+      syncStarted();
+      void jevTurn();
+    });
   });
-  // Personality is part of the match setup: fixed from the first clue until a reset.
-  const started = $derived(
-    view.public.clueHistory.length > 0 && view.public.phase !== 'finished',
-  );
-  const spymaster = () =>
-    game.state.players.find(
-      (p) =>
-        game.state.assignments[p]?.team === game.state.activeTeam &&
-        game.state.assignments[p]?.role === 'spymaster',
-    );
-  function refresh() {
-    seat =
-      jev && game.state.phase !== 'setup'
-        ? (spymaster() ?? game.actor)
-        : game.actor;
-    view = game.view(seat);
-  }
-  function reset() {
-    game = practice(scenario, locale === 'es' ? 'es' : 'en', seatCount);
-    jevStatus = '';
-    refresh();
-    round++;
-    void jevTurn();
-  }
-  /** Public information only, from the guessing team's point of view. */
-  function publicView() {
-    const s = game.state;
+
+  /** The public view from the guessing team's point of view, as the Jev route expects it. */
+  function jevBody(current: CodenamesPractice) {
+    const p = publicOf(current);
+    const team = p.activeTeam;
     const side = (identity: string) =>
-      identity === s.activeTeam
+      identity === team
         ? 'ours'
         : identity === 'civilian'
           ? 'civilian'
           : 'theirs';
-    return {
-      lang: s.options.boardLanguage,
-      clue: {
-        word: s.clue!.word,
-        count: s.clue!.count === 'unlimited' ? 0 : s.clue!.count,
+    const count = (n: number | 'unlimited') => (n === 'unlimited' ? 0 : n);
+    return JSON.stringify({
+      view: {
+        lang: p.options.boardLanguage,
+        clue: { word: p.clue!.word, count: count(p.clue!.count) },
+        board: p.board.filter((c) => !c.revealed).map((c) => c.word),
+        revealed: p.board
+          .filter((c) => c.revealed && c.identity !== 'assassin')
+          .map((c) => ({ word: c.word, identity: side(c.identity!) })),
+        history: p.clueHistory.slice(0, -1).map((h) => ({
+          team: h.team === team ? 'ours' : 'theirs',
+          word: h.word,
+          count: count(h.count),
+          guessed: h.guesses.map((g) => g.word),
+        })),
       },
-      board: s.board.filter((c) => !c.revealed).map((c) => c.word),
-      revealed: s.board
-        .filter((c) => c.revealed && c.identity !== 'assassin')
-        .map((c) => ({ word: c.word, identity: side(c.identity) })),
-      history: s.clueHistory.slice(0, -1).map((h) => ({
-        team: h.team === s.activeTeam ? 'ours' : 'theirs',
-        word: h.word,
-        count: h.count === 'unlimited' ? 0 : h.count,
-        guessed: h.guesses.map((g) => g.word),
-      })),
-      guessedThisTurn: [],
-    };
+      personality,
+      // Public score; lets Jev gamble when waiting would likely lose.
+      score: {
+        ours: p.remaining[team],
+        theirs: p.remaining[team === 'red' ? 'blue' : 'red'],
+      },
+    });
+  }
+  /** The plan, or null when this server has no Jev lab. */
+  async function requestPlan(body: string): Promise<Plan | null> {
+    const request = () =>
+      fetch('/api/codenames/guess', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+      });
+    // One retry covers a dev server that is restarting.
+    let res = await request().catch(() => null);
+    if (!res || res.status >= 500) {
+      await new Promise((r) => setTimeout(r, 1500));
+      res = await request();
+    }
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      let reason = `HTTP ${res.status}`;
+      try {
+        reason = JSON.parse(await res.text()).error ?? reason;
+      } catch {}
+      throw new Error(reason);
+    }
+    return res.json();
   }
   async function jevTurn() {
-    const s = game.state;
-    if (!jev || busy || s.phase !== 'guessing' || !s.clue) return;
+    const current = table;
+    if (!current || !jev || busy) return;
+    const before = publicOf(current);
+    if (before.phase !== 'guessing' || !before.clue) return;
     busy = true;
-    const current = game;
-    const team = s.activeTeam;
+    const team = before.activeTeam;
+    const guessing = () => {
+      const p = publicOf(current);
+      return (
+        table === current && p.phase === 'guessing' && p.activeTeam === team
+      );
+    };
     jevStatus = m.cn_jev_thinking();
     try {
-      const body = JSON.stringify({
-        view: publicView(),
-        unlimited: s.clue.count === 'unlimited',
-        personality,
-        // Public score; lets Jev gamble when waiting would likely lose.
-        score: {
-          ours: game.view(game.actor).public.remaining[team],
-          theirs: game.view(game.actor).public.remaining[
-            team === 'red' ? 'blue' : 'red'
-          ],
-        },
-      });
-      const request = () =>
-        fetch('/api/codenames/guess', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body,
-        });
-      // One retry covers a dev server that is restarting.
-      let res = await request().catch(() => null);
-      if (!res || res.status >= 500) {
-        await new Promise((r) => setTimeout(r, 1500));
-        res = await request();
-      }
-      if (res.status === 404) {
+      const plan = await requestPlan(jevBody(current));
+      if (!plan) {
         // No lab on this server: you play the operatives yourself.
         lab = jev = false;
+        current.botOperatives = false;
         return;
       }
-      if (!res.ok) {
-        const detail = await res.text();
-        let reason = `HTTP ${res.status}`;
-        try {
-          reason = JSON.parse(detail).error ?? reason;
-        } catch {}
-        throw new Error(reason);
-      }
-      const plan = (await res.json()) as {
-        guesses: string[];
-        usd: number;
-        situation: string | null;
-      };
       const guessed: string[] = [];
       for (const word of plan.guesses) {
         await new Promise((r) => setTimeout(r, 900));
-        const g = game.state;
-        if (game !== current || g.phase !== 'guessing' || g.activeTeam !== team)
-          break;
-        const card = g.board.findIndex((c) => c.word === word && !c.revealed);
+        if (!guessing()) break;
+        const card = publicOf(current).board.findIndex(
+          (c) => c.word === word && !c.revealed,
+        );
         if (card < 0) continue;
-        game.send(game.actor, { type: 'guess', card });
+        current.send(current.operative, { type: 'guess', card });
         guessed.push(word);
-        refresh();
+        shell?.refresh();
       }
-      const g = game.state;
-      if (game === current && g.phase === 'guessing' && g.activeTeam === team)
-        game.send(game.actor, { type: 'endTurn' });
+      if (guessing()) current.send(current.operative, { type: 'endTurn' });
       jevStatus =
         (plan.situation === 'last-chance'
           ? `${m.cn_jev_last_chance()} · `
@@ -164,124 +173,77 @@
       jevStatus = `${m.cn_jev_error()} (${error instanceof Error ? error.message : error})`;
     } finally {
       busy = false;
-      if (game === current) refresh();
+      if (table === current) {
+        syncStarted();
+        shell?.refresh();
+      }
     }
   }
-  function changeLocale(next: Locale) {
-    setLocale(next, { reload: false });
-    locale = next;
-  }
-  function send(action: unknown) {
-    game.send(seat, action);
-    refresh();
+  function toggleJev() {
+    table!.botOperatives = jev;
+    shell?.refresh();
     void jevTurn();
   }
 </script>
 
-<svelte:head
-  ><title>Codenames · {m.cn_practice({}, { locale })}</title></svelte:head
+<Practice
+  boardReports
+  bind:this={shell}
+  game="codenames"
+  title={() => `Codenames · ${m.cn_practice()}`}
+  {start}
+  {scenarios}
+  label={(id) => scenarioLabels[id]()}
+  bind:scenario
+  bind:table
+  boardProps={{ note: jev ? jevStatus : '' }}
 >
-
-{#key locale}
-  <Board
-    {view}
-    playerId={seat}
-    players={displaySeats}
-    {send}
-    {round}
-    practice
-    canRematch
-    rematch={async () => reset()}
-    {locale}
-    note={jev ? jevStatus : ''}
-  >
-    {#snippet rulesContent()}<Rulebook game="codenames" />{/snippet}
-    {#snippet settingsContent()}<nav>
-        <a href="/">{m.back()}</a><label
-          >{m.cn_practice()}<select
-            aria-label={m.cn_practice()}
-            bind:value={scenario}
-            onchange={reset}
-            >{#each scenarios as id}<option value={id}
-                >{{
-                  setup: m.cn_practice_setup,
-                  match: m.cn_practice_match,
-                  midgame: m.cn_practice_midgame,
-                  final: m.cn_practice_final,
-                  assassin: m.cn_practice_assassin,
-                }[id]()}</option
-              >{/each}</select
-          ></label
-        ><label
-          >{m.cn_actor()}<select
-            aria-label={m.cn_actor()}
-            bind:value={seat}
-            onchange={() => (view = game.view(seat))}
-            >{#each displaySeats as p}<option value={p.id}>{p.name}</option
-              >{/each}</select
-          ></label
-        ><label
-          >{m.cn_seats()}<select
-            aria-label={m.cn_seats()}
-            bind:value={seatCount}
-            onchange={reset}
-            >{#each seatSizes as size}<option value={size}>{size}</option
-              >{/each}</select
-          ></label
-        ><label class="toggle"
-          ><input
-            type="checkbox"
-            bind:checked={jev}
-            disabled={!lab}
-            onchange={() => {
-              refresh();
-              void jevTurn();
-            }}
-          />{m.cn_jev_mode()}{#if !lab}<small>{m.cn_jev_off()}</small
-            >{/if}</label
-        ><label
-          >{m.cn_jev_personality()}<select
-            aria-label={m.cn_jev_personality()}
-            bind:value={personality}
-            disabled={started}
-            >{#each [['conservative', m.cn_jev_conservative()], ['normal', m.cn_jev_normal()], ['risky', m.cn_jev_risky()]] as [value, label]}<option
-                {value}>{label}</option
-              >{/each}</select
-          >{#if started}<small>{m.cn_jev_locked()}</small>{/if}</label
-        ><button onclick={reset}>{m.cn_reset()}</button><label
-          >{m.language()}<select
-            aria-label={m.language()}
-            value={locale}
-            onchange={(e) => changeLocale(e.currentTarget.value as Locale)}
-            ><option value="en">EN</option><option value="es">ES</option
-            ></select
-          ></label
-        >
-      </nav>{/snippet}
-  </Board>
-{/key}
+  {#snippet controls()}
+    <label
+      >{m.cn_seats()}<select
+        aria-label={m.cn_seats()}
+        bind:value={seatCount}
+        onchange={() => {
+          table = start(scenario);
+          shell?.refresh();
+        }}
+        >{#each seatCounts as size}<option value={size}>{size}</option
+          >{/each}</select
+      ></label
+    >
+    <label class="toggle"
+      ><input
+        type="checkbox"
+        bind:checked={jev}
+        disabled={!lab}
+        onchange={toggleJev}
+      />{m.cn_jev_mode()}{#if !lab}<small>{m.cn_jev_off()}</small>{/if}</label
+    >
+    <label
+      >{m.cn_jev_personality()}<select
+        aria-label={m.cn_jev_personality()}
+        bind:value={personality}
+        disabled={started}
+        >{#each personalities as [value, name]}<option {value}>{name()}</option
+          >{/each}</select
+      >{#if started}<small>{m.cn_jev_locked()}</small>{/if}</label
+    >
+  {/snippet}
+</Practice>
 
 <style>
-  nav {
-    display: grid;
-    gap: 12px;
-  }
   label {
     display: grid;
     gap: 5px;
-  }
-  select,
-  button {
-    font: inherit;
-    min-height: 44px;
-    padding: 6px;
-  }
-  a {
-    color: #245c97;
   }
   .toggle {
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+  select {
+    font: inherit;
+    min-height: 44px;
+    padding: 6px;
   }
 </style>

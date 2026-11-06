@@ -9,9 +9,11 @@
   } from './index.js';
   import { getContext } from 'svelte';
   import { railPosition } from './geometry.js';
-  import { skinKey } from './palette.js';
+  import { skinKey } from './skin.js';
   import Tile from './Tile.svelte';
   import { m } from '@board-games/shared/messages';
+  import { colorLabels } from './labels.js';
+  import { floorSlot, markerSpot, patternSlot, wallCell } from './locations.js';
   let {
     board,
     id,
@@ -26,8 +28,6 @@
     fitted = false,
     density = 'full',
     interactive = true,
-    anchors = true,
-    displayedScore = board.score,
     gains = [],
   }: {
     /** Freshly tiled wall cells and their points (the 8-bit skin pops them). */
@@ -36,8 +36,6 @@
     hiddenLocations?: string[];
     density?: 'full' | 'compact';
     interactive?: boolean;
-    anchors?: boolean;
-    displayedScore?: number;
     board: Board;
     id: string;
     name: string;
@@ -50,17 +48,7 @@
   } = $props();
   const skin = getContext<(() => boolean) | undefined>(skinKey);
   const pixel = $derived(!!skin?.());
-  const location = (suffix: string) =>
-    anchors ? `${id}/${suffix}` : undefined;
   const descriptionId = $props.id();
-  const colorLabels = {
-    blue: m.azul_blue,
-    yellow: m.azul_yellow,
-    red: m.azul_red,
-    black: m.azul_black,
-    white: m.azul_white,
-    marker: m.azul_marker,
-  };
   const issueLabel = (issue: string | null) =>
     issue === 'full'
       ? m.azul_full()
@@ -89,7 +77,7 @@
     />{/if}
   {#if density === 'compact'}<span
       class="compact-marker"
-      data-azul-location={location('marker')}
+      data-azul-location={markerSpot(id)}
     ></span>{/if}
   <header>
     <span class="name"
@@ -97,11 +85,11 @@
         class="starter"
         class:marker-away={!marker}
         aria-hidden={!marker}
-        data-azul-location={density === 'full' ? location('marker') : undefined}
+        data-azul-location={density === 'full' ? markerSpot(id) : undefined}
         title={m.azul_next()}>①</span
       ></span
-    ><strong style:--az-score={pixel ? displayedScore : undefined}
-      ><span class="az-value">{displayedScore}</span><small>
+    ><strong style:--az-score={pixel ? board.score : undefined}
+      ><span class="az-value">{board.score}</span><small>
         {m.azul_score({ score: '' })}</small
       ></strong
     >
@@ -138,11 +126,11 @@
           {#each Array(row + 1) as _, slot}<span
               class="slot"
               style:visibility={hiddenLocations.includes(
-                `${id}/pattern/${row}/${slot}`,
+                patternSlot(id, row, slot),
               )
                 ? 'hidden'
                 : undefined}
-              data-azul-location={location(`pattern/${row}/${slot}`)}
+              data-azul-location={patternSlot(id, row, slot)}
               >{#if pattern.color && slot < pattern.count}<Tile
                   color={pattern.color}
                 />{:else}<span class="empty-slot"></span>{/if}</span
@@ -163,7 +151,7 @@
               color: colorLabels[wallColors[r][c]](),
               status: occupied ? m.azul_occupied() : m.azul_empty(),
             })}
-            data-azul-location={location(`wall/${r}/${c}`)}
+            data-azul-location={wallCell(id, r, c)}
             ><Tile
               color={wallColors[r][c]}
               ghost={!occupied}
@@ -199,7 +187,7 @@
       >{#each penalties as penalty, slot}<span class="floor-space"
           ><small>−{penalty}</small><span
             class="slot"
-            data-azul-location={location(`floor/${slot}`)}
+            data-azul-location={floorSlot(id, slot)}
             >{#if board.floor[slot]}<Tile
                 color={board.floor[slot]}
               />{:else}<span class="empty-slot"></span>{/if}</span
@@ -207,7 +195,7 @@
         >{/each}</span
     >
   </svelte:element>
-  <div class="score-rail" aria-label={m.azul_score({ score: displayedScore })}>
+  <div class="score-rail" aria-label={m.azul_score({ score: board.score })}>
     {#if !pixel}<img
         decoding="async"
         class="score-substrate"
@@ -221,7 +209,7 @@
     </div>
     <span
       class="score-marker"
-      style="left:calc(10.4% + {railPosition(displayedScore) * 0.792}%)"
+      style="left:calc(10.4% + {railPosition(board.score) * 0.792}%)"
       aria-hidden="true"
       >{#if !pixel}<img
           decoding="async"
@@ -229,11 +217,11 @@
           alt=""
           aria-hidden="true"
           draggable="false"
-        />{/if}<b>{displayedScore}</b></span
+        />{/if}<b>{board.score}</b></span
     >
-    {#if displayedScore > 100}<span
+    {#if board.score > 100}<span
         class="score-overflow"
-        aria-label={m.azul_score_overflow({ score: displayedScore })}>100+</span
+        aria-label={m.azul_score_overflow({ score: board.score })}>100+</span
       >{/if}
   </div>
 </section>

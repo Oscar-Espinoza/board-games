@@ -1,10 +1,9 @@
 import { shuffle } from '@board-games/game-core';
 import type { GameDefinition } from '@board-games/game-core';
+import { games, seats } from '@board-games/shared/games';
 import { botAction } from './bot.js';
+import { colors, deck, type Card, type Color } from './cards.js';
 
-export const colors = ['red', 'yellow', 'green', 'blue'] as const;
-export type Color = (typeof colors)[number];
-export type Card = { id: number; color: Color | null; symbol: string };
 export type Action =
   | { type: 'PLAY_CARD'; cardId: number; uno?: boolean }
   | { type: 'DRAW' }
@@ -27,36 +26,15 @@ export interface State {
   revision: number;
 }
 
-export function deck(): Card[] {
-  return Array.from({ length: 108 }, (_, id) => {
-    const offset = id % 25;
-    return {
-      id,
-      color: id < 100 ? colors[Math.floor(id / 25)]! : null,
-      symbol:
-        id >= 104
-          ? '+4'
-          : id >= 100
-            ? 'wild'
-            : offset === 0
-              ? '0'
-              : offset <= 18
-                ? String(Math.ceil(offset / 2))
-                : offset <= 20
-                  ? 'skip'
-                  : offset <= 22
-                    ? 'reverse'
-                    : '+2',
-    };
-  });
-}
 function create(players: string[], random: () => number): State {
   if (
-    players.length < 2 ||
-    players.length > 8 ||
+    players.length < games.uno.minPlayers ||
+    players.length > games.uno.maxPlayers ||
     new Set(players).size !== players.length
   ) {
-    throw new Error('Choose 2–8 distinct players.');
+    throw new Error(
+      `Choose ${games.uno.minPlayers}–${games.uno.maxPlayers} distinct players.`,
+    );
   }
   const stock = deck();
   shuffle(stock, random);
@@ -92,49 +70,71 @@ function matches(state: State, card: Card) {
     card.symbol === state.discards.at(-1)!.symbol
   );
 }
-function validate(state: State, player: string, input: unknown): Action {
+function seatOf(state: State, player: string) {
   const index = state.players.indexOf(player);
   if (index === -1) throw new Error('Unknown player.');
+  return index;
+}
+/** Why `action` is not allowed for `player` right now; null when it is. */
+function rejection(state: State, index: number, action: Action) {
+  if (state.phase === 'finished') return 'This round has finished.';
+  if (action.type === 'CATCH_UNO')
+    return typeof action.player !== 'string' ||
+      action.player === state.players[index] ||
+      state.catchable !== action.player
+      ? 'That UNO catch opportunity has closed.'
+      : null;
+  if (state.turn !== index) return 'Wait for your turn.';
+  if (state.phase === 'color' && action.type !== 'CHOOSE_COLOR')
+    return 'Choose a color to finish your Wild.';
+  if (action.type === 'CHOOSE_COLOR') {
+    if (state.phase !== 'color') return 'Play a Wild before choosing a color.';
+    if (!colors.includes(action.color)) return 'Invalid color.';
+  }
+  if (action.type === 'PLAY_CARD') {
+    const hand = state.hands[index]!;
+    const card = hand.find((card) => card.id === action.cardId);
+    if (!card) return 'That card is not in your hand.';
+    if (action.uno !== undefined && typeof action.uno !== 'boolean')
+      return 'Invalid UNO declaration.';
+    if (action.uno && hand.length !== 2)
+      return 'Declare UNO when holding two cards.';
+    if (!matches(state, card))
+      return 'Match the active color, symbol or permitted penalty stack.';
+  }
+  return null;
+}
+function validate(state: State, player: string, input: unknown): Action {
+  const index = seatOf(state, player);
   if (state.phase === 'finished') throw new Error('This round has finished.');
   if (!input || typeof input !== 'object') throw new Error('Invalid action.');
   const action = input as Action;
   if (!['PLAY_CARD', 'DRAW', 'CHOOSE_COLOR', 'CATCH_UNO'].includes(action.type))
     throw new Error('Invalid action.');
-  if (action.type === 'CATCH_UNO') {
-    if (
-      typeof action.player !== 'string' ||
-      action.player === player ||
-      state.catchable !== action.player
-    ) {
-      throw new Error('That UNO catch opportunity has closed.');
-    }
-    return action;
-  }
-  if (state.turn !== index) throw new Error('Wait for your turn.');
-  if (state.phase === 'color' && action.type !== 'CHOOSE_COLOR')
-    throw new Error('Choose a color to finish your Wild.');
-  if (action.type === 'CHOOSE_COLOR') {
-    if (state.phase !== 'color')
-      throw new Error('Play a Wild before choosing a color.');
-    if (!colors.includes(action.color)) throw new Error('Invalid color.');
-  }
-  if (action.type === 'PLAY_CARD') {
-    const card = state.hands[index]!.find((card) => card.id === action.cardId);
-    if (!card) throw new Error('That card is not in your hand.');
-    if (action.uno !== undefined && typeof action.uno !== 'boolean')
-      throw new Error('Invalid UNO declaration.');
-    if (action.uno && state.hands[index]!.length !== 2)
-      throw new Error('Declare UNO when holding two cards.');
-    if (!matches(state, card))
-      throw new Error(
-        'Match the active color, symbol or permitted penalty stack.',
-      );
-  }
+  const reason = rejection(state, index, action);
+  if (reason) throw new Error(reason);
   return action;
 }
-function advance(state: State, steps = 1) {
+/** Every action `player` may take now: the candidates the rules accept. */
+function legalActions(state: State, player: string): Action[] {
+  const index = seatOf(state, player);
+  const hand = [...state.hands[index]!].sort((a, b) => a.id - b.id);
+  const candidates: Action[] = [
+    ...hand.flatMap((card) => [
+      { type: 'PLAY_CARD' as const, cardId: card.id, uno: false },
+      { type: 'PLAY_CARD' as const, cardId: card.id, uno: true },
+    ]),
+    { type: 'DRAW' },
+    ...colors.map((color) => ({ type: 'CHOOSE_COLOR' as const, color })),
+    ...(state.catchable
+      ? [{ type: 'CATCH_UNO' as const, player: state.catchable }]
+      : []),
+  ];
+  return candidates.filter((action) => !rejection(state, index, action));
+}
+function advance(state: State) {
   state.turn =
-    (state.turn + state.direction * steps + state.players.length * steps) %
+    (state.turn + state.direction + state.players.length) %
     state.players.length;
   state.phase = 'turn';
 }
@@ -149,12 +149,9 @@ function finishPlay(state: State, uno: boolean) {
   }
   if (hand.length === 1 && !uno) state.catchable = state.players[state.turn]!;
   const symbol = state.discards.at(-1)!.symbol;
-  advance(
-    state,
-    symbol === 'skip' || (symbol === 'reverse' && state.players.length === 2)
-      ? 2
-      : 1,
-  );
+  advance(state);
+  if (symbol === 'skip' || (symbol === 'reverse' && state.players.length === 2))
+    advance(state);
 }
 function drawCards(
   state: State,
@@ -237,28 +234,9 @@ function apply(
   return state;
 }
 function view(state: State, player: string) {
-  const index = state.players.indexOf(player);
-  if (index < 0) throw new Error('Unknown player.');
-  const hand = [...state.hands[index]!].sort((a, b) => a.id - b.id);
-  const candidates: Action[] = [
-    ...hand.flatMap((card) => [
-      { type: 'PLAY_CARD' as const, cardId: card.id, uno: false },
-      { type: 'PLAY_CARD' as const, cardId: card.id, uno: true },
-    ]),
-    { type: 'DRAW' },
-    ...colors.map((color) => ({ type: 'CHOOSE_COLOR' as const, color })),
-    ...(state.catchable
-      ? [{ type: 'CATCH_UNO' as const, player: state.catchable }]
-      : []),
-  ];
-  const legalActions = candidates.filter((action) => {
-    try {
-      validate(state, player, action);
-      return true;
-    } catch {
-      return false;
-    }
-  });
+  const hand = [...state.hands[seatOf(state, player)]!].sort(
+    (a, b) => a.id - b.id,
+  );
   // Explicit projection: stock order, opponents' cards and canonical hands never leave the server.
   return {
     public: {
@@ -277,14 +255,15 @@ function view(state: State, player: string) {
       stockCount: state.stock.length,
       revision: state.revision,
     },
-    private: { hand: hand.map((card) => ({ ...card })), legalActions },
+    private: {
+      hand: hand.map((card) => ({ ...card })),
+      legalActions: legalActions(state, player),
+    },
   };
 }
 export const uno = {
-  id: 'uno',
+  ...seats('uno'),
   botAction,
-  minPlayers: 2,
-  maxPlayers: 8,
   create,
   apply,
   view,

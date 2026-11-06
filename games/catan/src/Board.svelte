@@ -1,11 +1,13 @@
 <script lang="ts">
-  import { onMount, setContext, tick, untrack, type Snippet } from 'svelte';
-  import { RevisionGate, read, write } from '@board-games/shared/ui';
+  import { onMount, tick, untrack } from 'svelte';
   import {
-    gameSkin,
-    setGameSkin,
-    type Skin,
-  } from '@board-games/shared/ui/pixel';
+    RevisionGate,
+    ViewerSkin,
+    modal,
+    viewerPreferences,
+    type BoardProps,
+  } from '@board-games/shared/ui';
+  import type { Skin } from '@board-games/shared/ui/pixel';
   import {
     P,
     cell,
@@ -24,7 +26,8 @@
   } from './pixel/sprites.js';
   import { prefersReducedMotion } from 'svelte/motion';
   import { playEffects, softAudio } from './effects.js';
-  import type { playerView } from './index.js';
+  import type { Action, playerView } from './index.js';
+  import { OFFER_LIMIT, isExtended, validOffer } from './limits.js';
   import Dice from './Dice.svelte';
   import ResourceArt from './ResourceArt.svelte';
   import ocean from '../assets/tabletop-ocean.webp?url';
@@ -38,56 +41,49 @@
   import desert from '../assets/painted-desert.webp?url';
   import BuildingCosts from './table/BuildingCosts.svelte';
   import PieceReserve from './table/PieceReserve.svelte';
+  import {
+    buildingPath,
+    gold,
+    hexCenter,
+    ink,
+    tileX,
+    tileY,
+  } from './table/shapes.js';
   import { resourceArtwork, shade } from './table/artwork.js';
-  import { setLocale } from '@board-games/shared/runtime';
+  import { provideSkin } from './table/skin.js';
   import { m } from '@board-games/shared/messages';
-  import type { Locale } from '@board-games/shared/runtime';
+  type PlayerView = ReturnType<typeof playerView>;
   let {
     view,
     playerId,
     players,
     send,
-    locale = 'en',
+    locale,
     round = 0,
     connected = true,
+    canRematch = false,
+    rematch,
     settingsContent,
-    chooseSeat,
-    onLeave,
-    onInvite,
-    copied = false,
     rulesContent,
-  }: {
-    view: ReturnType<typeof playerView>;
-    playerId: string;
-    players: { id: string; name: string }[];
-    send: (action: any) => void;
-    locale: Locale;
-    round?: number;
-    connected?: boolean;
-    settingsContent?: Snippet;
-    chooseSeat?: (id: string) => void;
-    onLeave?: () => void;
-    onInvite?: () => void;
-    copied?: boolean;
-    rulesContent?: Snippet;
-  } = $props();
+    chooseSeat,
+    practice = false,
+  }: BoardProps<PlayerView, Action> = $props();
 
   let root: HTMLElement;
   let map: SVGSVGElement;
-  /** Viewer-only look; the 8-bit stylesheet loads the first time it is chosen. */
-  let skin = $state<Skin>(gameSkin('catan')),
-    pixelReady = $state(false);
-  $effect(() => {
-    if (skin === 'pixel' && !pixelReady)
-      void import('./pixel.css').then(() => (pixelReady = true));
+  const skin = new ViewerSkin('catan', () => import('./pixel.css'));
+  const pixel = $derived(skin.pixel);
+  provideSkin(() => pixel);
+  const preferences = viewerPreferences('catan', {
+    sound: true,
+    motion: true,
   });
-  const pixel = $derived(skin === 'pixel' && pixelReady);
-  setContext('catan:pixel', () => pixel);
-  let sound = $state(read('catan:sound') !== 'false'),
-    motion = $state(read('catan:motion') !== 'false');
-  const reduced = $derived(prefersReducedMotion.current);
-  let settings = $state(false);
-  let rulesDialog: HTMLDialogElement;
+  // The system's reduced-motion request always wins over the table setting.
+  const motionEnabled = $derived(
+    preferences.motion && !prefersReducedMotion.current,
+  );
+  let settings = $state(false),
+    rulesOpen = $state(false);
   let tradeOpen = $state(false),
     developmentOpen = $state('');
   let rolling = $state(false);
@@ -97,6 +93,9 @@
     charging = $state(false);
   let chargeStart = 0,
     chargeFrame = 0;
+  /** A full throw takes this long to charge; a shorter press than the dead zone is a plain click. */
+  const CHARGE_MS = 3000,
+    CLICK_ZONE = 0.08;
   function cancelCharge() {
     cancelAnimationFrame(chargeFrame);
     charging = false;
@@ -107,17 +106,20 @@
     charging = true;
     chargeStart = performance.now();
     const update = () => {
-      charge = Math.min(1, (performance.now() - chargeStart) / 3000);
+      charge = Math.min(1, (performance.now() - chargeStart) / CHARGE_MS);
       if (charging && charge < 1) chargeFrame = requestAnimationFrame(update);
     };
     update();
   }
   function releaseCharge() {
     if (!charging) return;
-    const strength = Math.min(1, (performance.now() - chargeStart) / 3000);
+    const strength = Math.min(1, (performance.now() - chargeStart) / CHARGE_MS);
     cancelCharge();
     if (allowed('ROLL_DICE'))
-      send({ type: 'ROLL_DICE', strength: strength < 0.08 ? 0 : strength });
+      send({
+        type: 'ROLL_DICE',
+        strength: strength < CLICK_ZONE ? 0 : strength,
+      });
   }
   let tradeMode = $state<'compose' | 'bank' | 'offers'>('compose');
   const incomingOffers = () =>
@@ -176,7 +178,7 @@
   });
   function openTrade(id = '') {
     if (id ? !canTradeWith(id) : !canTrade()) {
-      if (sound) {
+      if (preferences.sound) {
         audio.unlock();
         audio.reject(pixel);
       }
@@ -293,13 +295,10 @@
     if (!pointers.size) panning = false;
     pinchDistance = 0;
   }
-  function preference(key: 'sound' | 'motion') {
-    if (key === 'sound') {
-      sound = !sound;
-      if (sound) audio.unlock();
-      else audio.cancel();
-    } else motion = !motion;
-    write('catan:' + key, String(key === 'sound' ? sound : motion));
+  function toggleSound() {
+    preferences.sound = !preferences.sound;
+    if (preferences.sound) audio.unlock();
+    else audio.cancel();
   }
   onMount(() => {
     const observer = new ResizeObserver(() => {
@@ -317,8 +316,8 @@
     const revision = view.public.revision,
       identity = round + ':' + playerId,
       online = connected;
-    const enabled = motion && !reduced,
-      audible = sound;
+    const enabled = motionEnabled,
+      audible = preferences.sound;
     const events = view.public.events;
     const chip = untrack(() => pixel);
     stopEffects();
@@ -333,9 +332,7 @@
         diceVisible = true;
         if (!enabled) diceTimer = setTimeout(() => (diceVisible = false), 1400);
       }
-      if (enabled && roll?.type === 'roll') {
-        rolling = true;
-      }
+      if (enabled && roll) rolling = true;
       if (audible && events.length) audio.play(events, chip, playerId);
       if (enabled)
         void tick().then(() => {
@@ -343,9 +340,9 @@
             stopEffects = playEffects(
               root,
               events,
+              chip,
               () => (diceVisible = false),
               () => (rolling = false),
-              chip,
             );
         });
     }
@@ -357,84 +354,84 @@
     };
   });
 
+  /** Terrain art by resource id (see `resources` in index.ts), then the desert. */
   const terrain = [wood, wool, wheat, brick, ore, desert];
-  const colors = [
-    '#df261b',
-    '#008ce1',
-    '#f5c735',
-    '#f88719',
-    '#54b877',
-    '#ac79dd',
+  /** Everything a seat's colour index (`player.color`) selects. */
+  const civilizations = [
+    { color: '#df261b', crest: '✹', name: m.catan_civ_0 },
+    { color: '#008ce1', crest: '≋', name: m.catan_civ_1 },
+    { color: '#f5c735', crest: '◆', name: m.catan_civ_2 },
+    { color: '#f88719', crest: '⌂', name: m.catan_civ_3 },
+    { color: '#54b877', crest: '❧', name: m.catan_civ_4 },
+    { color: '#ac79dd', crest: '✦', name: m.catan_civ_5 },
   ];
-  const civilizations = () => [
-    m.catan_civ_0({}, { locale }),
-    m.catan_civ_1({}, { locale }),
-    m.catan_civ_2({}, { locale }),
-    m.catan_civ_3({}, { locale }),
-    m.catan_civ_4({}, { locale }),
-    m.catan_civ_5({}, { locale }),
-  ];
-  const crests = ['✹', '≋', '◆', '⌂', '❧', '✦'];
+  const colors = civilizations.map((c) => c.color);
+  const civilization = (index: number) =>
+    civilizations[index].name({}, { locale });
+  /** Table position of each seat counting clockwise from the viewer, by player count. */
+  const layouts: Record<number, string[]> = {
+    3: ['south', 'west', 'east'],
+    4: ['south', 'west', 'north', 'east'],
+    5: ['south', 'west', 'north-west', 'north-east', 'east'],
+    6: ['south', 'west', 'north-west', 'north', 'north-east', 'east'],
+  };
   const position = (id: string) => {
     const n = pub.players.length,
       own = pub.players.findIndex((p) => p.id === playerId);
     const relative = (pub.players.findIndex((p) => p.id === id) - own + n) % n;
-    return (
-      n === 3
-        ? ['south', 'west', 'east']
-        : n === 4
-          ? ['south', 'west', 'north', 'east']
-          : n === 5
-            ? ['south', 'west', 'north-west', 'north-east', 'east']
-            : ['south', 'west', 'north-west', 'north', 'north-east', 'east']
-    )[relative];
+    return layouts[n][relative];
   };
-  let pending = $state<any>(null),
+  type Placement = Extract<
+    Action,
+    { type: 'BUILD_ROAD' | 'BUILD_SETTLEMENT' | 'BUILD_CITY' | 'MOVE_ROBBER' }
+  >;
+  const isPlacement = (a: Action): a is Placement =>
+    a.type === 'BUILD_ROAD' ||
+    a.type === 'BUILD_SETTLEMENT' ||
+    a.type === 'BUILD_CITY' ||
+    a.type === 'MOVE_ROBBER';
+  /** The vertex, edge or hex id a placement points at. */
+  const targetId = (a: Placement) =>
+    'vertex' in a ? a.vertex : 'edge' in a ? a.edge : a.hex;
+  let pending = $state<Placement | null>(null),
     targetPlayer = $state('');
   $effect(() => {
-    playerId;
-    round;
+    void [playerId, round];
     tradeOpen = false;
     developmentOpen = '';
     targetPlayer = '';
   });
   $effect(() => {
-    view;
+    void view;
     pending = null;
     showPlacements = false;
   });
   let showPlacements = $state(false);
-  let selected = $state('BUILD_SETTLEMENT'),
+  let selected = $state<'BUILD_ROAD' | 'BUILD_SETTLEMENT' | 'BUILD_CITY'>(
+      'BUILD_SETTLEMENT',
+    ),
     give = $state([0, 0, 0, 0, 0]),
     take = $state([0, 0, 0, 0, 0]),
     discard = $state([0, 0, 0, 0, 0]);
   let pub = $derived(view.public),
     priv = $derived(view.private),
     board = $derived(pub.board),
-    legal = $derived(priv.legalActions as any[]);
-  /** Pieces a seat still has in its box. */
-  const reserve = (p: (typeof pub.players)[number]) => ({
-    roads: 15 - pub.roads.filter((owner) => owner === p.id).length,
-    settlements:
-      5 -
-      pub.buildings.filter((b) => b && b.color === p.color && !b.city).length,
-    cities:
-      4 -
-      pub.buildings.filter((b) => b && b.color === p.color && b.city).length,
+    legal = $derived(priv.legalActions);
+  const turnButtons = ['BUY_DEVELOPMENT', 'END_TURN'] as const,
+    buildButtons = ['BUILD_ROAD', 'BUILD_SETTLEMENT', 'BUILD_CITY'] as const;
+  const bankTrades = $derived(
+    legal.filter(
+      (a): a is Extract<Action, { type: 'BANK_TRADE' }> =>
+        a.type === 'BANK_TRADE',
+    ),
+  );
+  const supply = (p: (typeof pub.players)[number]) => ({
+    roads: p.inventory[0],
+    settlements: p.inventory[1],
+    cities: p.inventory[2],
   });
-  const validOffer = () =>
-    !tradeReason(targetPlayer) &&
-    give.some((n) => n > 0) &&
-    take.some((n) => n > 0) &&
-    give.every(
-      (n, i) =>
-        Number.isInteger(n) &&
-        n >= 0 &&
-        n <= priv.hand[i] &&
-        n <= 24 &&
-        (!n || !take[i]),
-    ) &&
-    take.every((n) => Number.isInteger(n) && n >= 0 && n <= 24);
+  const canSendOffer = () =>
+    !tradeReason(targetPlayer) && validOffer(priv.hand, give, take);
   const names = () => [
     m.catan_wood({}, { locale }),
     m.catan_wool({}, { locale }),
@@ -444,59 +441,83 @@
   ];
   const name = (id: string | undefined) =>
     players.find((p) => p.id === id)?.name ?? id ?? '';
-  const tileX = 50,
-    tileY = 26.75;
   const point = (v: number) => [
     board.vertices[v][0] * tileX,
     board.vertices[v][1] * tileY,
   ];
-  const color = (id: string) =>
-    colors[pub.players.find((p: any) => p.id === id)?.color ?? 0];
-  const allowed = (type: string) => legal.some((a) => a.type === type);
-  const label = (a: any): string => {
-    const labels: Record<string, string> = {
-      VICTORY_POINT: m.catan_victory_point({}, { locale }),
-      MONOPOLY: m.catan_monopoly({}, { locale }),
-      INVENTION: m.catan_invention({}, { locale }),
-      ROLL_DICE: m.catan_roll_dice({}, { locale }),
-      END_TURN: m.catan_end_turn({}, { locale }),
-      BUY_DEVELOPMENT: m.catan_buy_development({}, { locale }),
-      KNIGHT: m.catan_knight({}, { locale }),
-      ROAD_BUILDING: m.catan_road_building({}, { locale }),
-      FINISH_ROADS: m.catan_finish_roads({}, { locale }),
-      WITHDRAW: m.catan_withdraw_offer({}, { locale }),
-      BUILD_ROAD: m.catan_road({}, { locale }),
-      BUILD_SETTLEMENT: m.catan_settlement({}, { locale }),
-      BUILD_CITY: m.catan_city({}, { locale }),
-    };
-    if (a.type === 'BANK_TRADE')
-      return `${m.catan_bank({}, { locale })}: ${names()[a.give]} → ${names()[a.take]}`;
-    if (a.type === 'MONOPOLY' && a.resource !== undefined)
-      return `${m.catan_monopoly({}, { locale })}: ${names()[a.resource]}`;
-    if (a.type === 'INVENTION' && a.resources)
-      return `${m.catan_invention({}, { locale })}: ${a.resources
-        .map((n: number, i: number) => (n ? `${n} ${names()[i]}` : ''))
-        .filter(Boolean)
-        .join(', ')}`;
-    if (a.type === 'STEAL')
-      return `${m.catan_steal_from({}, { locale })} ${name(a.victim)}`;
-    if (a.type === 'ACCEPT')
-      return `${m.catan_accept_offer({}, { locale })} #${a.offer}`;
-    if (a.type === 'DECLINE')
-      return `${m.catan_decline_offer({}, { locale })} #${a.offer}`;
-    if (a.type === 'CONFIRM_TRADE')
-      return `${m.catan_trade_with({}, { locale })} ${name(a.partner)}`;
-    return labels[a.type] ?? a.type;
+  const edgeMiddle = (edge: number) => {
+    const [a, b] = board.edges[edge].map(point);
+    return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
   };
-  let phaseText = $derived(
-    pub.phase.type === 'finished'
-      ? `${name(pub.phase.winner)} ${m.catan_wins({}, { locale })}`
-      : pub.phase.type === 'discard'
-        ? m.catan_discard_instruction({}, { locale })
-        : pub.phase.type === 'setup'
-          ? `${name(pub.phase.player)} · ${pub.phase.settlement == null ? m.catan_place_a_settlement({}, { locale }) : m.catan_place_an_adjacent_road({}, { locale })}`
-          : `${name(pub.phase.player)} · ${pub.phase.type === 'turn' ? (pub.phase.stage === 'production' ? m.catan_roll_dice({}, { locale }) : m.catan_trade_and_build({}, { locale })) : pub.phase.type === 'robber' ? m.catan_move_the_robber({}, { locale }) : pub.phase.type === 'victim' ? m.catan_choose_a_victim({}, { locale }) : m.catan_place_free_roads({}, { locale })}`,
-  );
+  const targetPoint = (a: Placement) =>
+    'vertex' in a
+      ? point(a.vertex)
+      : 'edge' in a
+        ? edgeMiddle(a.edge)
+        : hexCenter(board.hexes[a.hex]);
+  const color = (id: string) =>
+    colors[pub.players.find((p) => p.id === id)?.color ?? 0];
+  const allowed = (type: Action['type']) => legal.some((a) => a.type === type);
+  const typeLabels = $derived<Record<string, string>>({
+    VICTORY_POINT: m.catan_victory_point({}, { locale }),
+    MONOPOLY: m.catan_monopoly({}, { locale }),
+    INVENTION: m.catan_invention({}, { locale }),
+    ROLL_DICE: m.catan_roll_dice({}, { locale }),
+    END_TURN: m.catan_end_turn({}, { locale }),
+    BUY_DEVELOPMENT: m.catan_buy_development({}, { locale }),
+    KNIGHT: m.catan_knight({}, { locale }),
+    ROAD_BUILDING: m.catan_road_building({}, { locale }),
+    FINISH_ROADS: m.catan_finish_roads({}, { locale }),
+    WITHDRAW: m.catan_withdraw_offer({}, { locale }),
+    BUILD_ROAD: m.catan_road({}, { locale }),
+    BUILD_SETTLEMENT: m.catan_settlement({}, { locale }),
+    BUILD_CITY: m.catan_city({}, { locale }),
+  });
+  const typeLabel = (type: string) => typeLabels[type] ?? type;
+  /** An action's button text; actions without parameters share `typeLabel`. */
+  function label(a: Action): string {
+    switch (a.type) {
+      case 'BANK_TRADE':
+        return `${m.catan_bank({}, { locale })}: ${names()[a.give]} → ${names()[a.take]}`;
+      case 'MONOPOLY':
+        return `${typeLabel(a.type)}: ${names()[a.resource]}`;
+      case 'INVENTION':
+        return `${typeLabel(a.type)}: ${a.resources
+          .map((n, i) => (n ? `${n} ${names()[i]}` : ''))
+          .filter(Boolean)
+          .join(', ')}`;
+      case 'STEAL':
+        return `${m.catan_steal_from({}, { locale })} ${name(a.victim)}`;
+      case 'ACCEPT':
+        return `${m.catan_accept_offer({}, { locale })} #${a.offer}`;
+      case 'DECLINE':
+        return `${m.catan_decline_offer({}, { locale })} #${a.offer}`;
+      case 'CONFIRM_TRADE':
+        return `${m.catan_trade_with({}, { locale })} ${name(a.partner)}`;
+      default:
+        return typeLabel(a.type);
+    }
+  }
+  const phaseText = $derived.by(() => {
+    const phase = pub.phase,
+      who = name(phase.player);
+    switch (phase.type) {
+      case 'finished':
+        return `${name(phase.winner)} ${m.catan_wins({}, { locale })}`;
+      case 'discard':
+        return m.catan_discard_instruction({}, { locale });
+      case 'setup':
+        return `${who} · ${phase.settlement == null ? m.catan_place_a_settlement({}, { locale }) : m.catan_place_an_adjacent_road({}, { locale })}`;
+      case 'turn':
+        return `${who} · ${phase.stage === 'production' ? m.catan_roll_dice({}, { locale }) : m.catan_trade_and_build({}, { locale })}`;
+      case 'robber':
+        return `${who} · ${m.catan_move_the_robber({}, { locale })}`;
+      case 'victim':
+        return `${who} · ${m.catan_choose_a_victim({}, { locale })}`;
+      case 'free_roads':
+        return `${who} · ${m.catan_place_free_roads({}, { locale })}`;
+    }
+  });
   let placement = $derived(
     pub.phase.type === 'setup'
       ? pub.phase.settlement == null
@@ -506,25 +527,30 @@
         ? 'BUILD_ROAD'
         : selected,
   );
+  const targets = $derived(
+    legal
+      .filter(isPlacement)
+      .filter((a) => a.type === placement || a.type === 'MOVE_ROBBER'),
+  );
   /** 8-bit island geometry, rasterized once per board on the art-pixel grid. */
   const pixelIsland = $derived.by(() => {
     if (!pixel) return null;
-    const corners = board.hexes.map((h: any) => h.vertices.map(point));
+    const corners = board.hexes.map((h) => h.vertices.map(point));
     return {
-      foam: corners.map((c: number[][]) => polygonPixels(c, 9)).join(''),
-      sand: corners.map((c: number[][]) => polygonPixels(c, 6)).join(''),
+      foam: corners.map((c) => polygonPixels(c, 9)).join(''),
+      sand: corners.map((c) => polygonPixels(c, 6)).join(''),
       sandShade: corners
-        .map((c: number[][]) =>
+        .map((c) =>
           polygonPixels(
             c.map(([x, y]) => [x, y + 2 * P]),
             5,
           ),
         )
         .join(''),
-      ink: corners.map((c: number[][]) => polygonPixels(c, 1)).join(''),
-      tiles: corners.map((c: number[][]) => polygonPixels(c, -0.6)),
+      ink: corners.map((c) => polygonPixels(c, 1)).join(''),
+      tiles: corners.map((c) => polygonPixels(c, -0.6)),
       rings: corners.map(
-        (c: number[][]) => polygonPixels(c, -0.6) + polygonPixels(c, -3.2),
+        (c) => polygonPixels(c, -0.6) + polygonPixels(c, -3.2),
       ),
     };
   });
@@ -548,15 +574,11 @@
     }
     return road;
   }
-  const ownColor = $derived(
-    pub.players.find((p) => p.id === playerId)?.color ?? 0,
-  );
-  const colorIndex = (id: string) =>
-    pub.players.find((p: any) => p.id === id)?.color ?? 0;
-  const center = (h: { q: number; r: number }) => [
-    (2 * h.q + h.r) * tileX,
-    3 * h.r * tileY,
-  ];
+  /** The 8-bit robber stands beside the number token, lower on the desert. */
+  const robberSpot = (h: { q: number; r: number; number: number }) => {
+    const c = hexCenter(h);
+    return [c[0] + (h.number ? 24 : 0), c[1] + (h.number ? 16 : 14)] as const;
+  };
   let bounds = $derived.by(() => {
     const xs = board.vertices.map((v: number[]) => v[0] * tileX),
       ys = board.vertices.map((v: number[]) => v[1] * tileY);
@@ -610,7 +632,7 @@
 
 {#snippet pixelRoadArt(edge: number, fill: string)}
   {@const road = pixelRoad(edge)}
-  <path d={road.ink} fill="#1a0f08" /><path d={road.body} {fill} /><path
+  <path d={road.ink} fill={ink} /><path d={road.body} {fill} /><path
     d={road.light}
     fill={shade(fill, 1.35)}
   />
@@ -619,59 +641,53 @@
 {#snippet pixelToken(x: number, y: number, n: number)}
   {@const hot = n === 6 || n === 8}
   <g class="px-token" aria-hidden="true">
-    <path d={discPixels(x, y + P, 11)} fill="#1a0f0899" />
-    <path d={discPixels(x, y, 11)} fill="#1a0f08" />
+    <path d={discPixels(x, y + P, 11)} fill={ink + '99'} />
+    <path d={discPixels(x, y, 11)} fill={ink} />
     <path d={discPixels(x, y, 10)} fill="#c9a66b" />
     <path d={discPixels(x - P, y - P, 9)} fill="#f6e7c8" />
     <text
       x={snap(x)}
       y={snap(y + 3.6 * P)}
       text-anchor="middle"
-      fill={hot ? '#c8453a' : '#1a0f08'}>{n}</text
+      fill={hot ? '#c8453a' : ink}>{n}</text
     >
     {#each Array(6 - Math.abs(7 - n)) as _, k}<rect
         x={snap(x) + (k * 2 - (6 - Math.abs(7 - n))) * P + P / 2}
         y={snap(y) + 5 * P}
         width={P}
         height={P}
-        fill={hot ? '#c8453a' : '#1a0f08'}
+        fill={hot ? '#c8453a' : ink}
       />{/each}
   </g>
 {/snippet}
 
-{#snippet ghost(action: any)}
+{#snippet ghost(action: Placement)}
   {#if pixel}
-    {#if action.vertex !== undefined}
+    {#if 'vertex' in action}
       {@const p = point(action.vertex)}
       {@render pixelSprite(
         action.type === 'BUILD_CITY' ? 'city' : 'settlement',
-        ramp(colors[ownColor]),
+        ramp(color(playerId)),
         p[0],
         p[1] + 6 * P,
       )}
-    {:else if action.edge !== undefined}
-      {@render pixelRoadArt(action.edge, colors[ownColor])}
+    {:else if 'edge' in action}
+      {@render pixelRoadArt(action.edge, color(playerId))}
     {:else}
-      {@const h = board.hexes[action.hex]}{@const c = center(h)}
-      {@render pixelSprite(
-        'robber',
-        robberRamp,
-        c[0] + (h.number ? 24 : 0),
-        c[1] + (h.number ? 16 : 14),
-      )}
+      {@const h = board.hexes[action.hex]}
+      {@const spot = robberSpot(h)}
+      {@render pixelSprite('robber', robberRamp, spot[0], spot[1])}
     {/if}
-  {:else if action.vertex !== undefined}
+  {:else if 'vertex' in action}
     {@const p = point(action.vertex)}
     <path
       transform={'translate(' + p[0] + ' ' + p[1] + ') scale(1.25)'}
-      d={action.type === 'BUILD_CITY'
-        ? 'M -10 9 V -8 H -2 V -1 H 8 V 9 Z'
-        : 'M -8 8 V -2 L 0 -10 L 8 -2 V 8 Z'}
+      d={buildingPath(action.type === 'BUILD_CITY')}
       fill={color(playerId)}
       stroke="#fff3cb"
       stroke-width="1.5"
     />
-  {:else if action.edge !== undefined}
+  {:else if 'edge' in action}
     {@const a = point(board.edges[action.edge][0])}{@const b = point(
       board.edges[action.edge][1],
     )}
@@ -685,13 +701,9 @@
       stroke-linecap="round"
     />
   {:else}
-    {@const h = board.hexes[action.hex]}
+    {@const c = hexCenter(board.hexes[action.hex])}
     <path
-      transform={'translate(' +
-        ((2 * h.q + h.r) * tileX + 17) +
-        ' ' +
-        (3 * h.r * tileY - 7) +
-        ')'}
+      transform={'translate(' + (c[0] + 17) + ' ' + (c[1] - 7) + ')'}
       d="M-10 5-7-12Q0-26 7-12L11 5Z"
       fill="#3c4550"
       stroke="#fff3cb"
@@ -718,17 +730,16 @@
   onpointerup={up}
   onpointercancel={up}
   onpointerdown={() => {
-    if (sound) audio.unlock();
+    if (preferences.sound) audio.unlock();
   }}
   onkeydown={(e) => {
-    if (sound) audio.unlock();
+    if (preferences.sound) audio.unlock();
     if (e.key === 'Escape') {
       cancelCharge();
       tradeOpen = false;
       developmentOpen = '';
       pending = null;
       settings = false;
-      rulesDialog?.close();
       root?.querySelectorAll('details[open]').forEach((panel) => {
         (panel as HTMLDetailsElement).open = false;
       });
@@ -740,36 +751,22 @@
   class="catan"
   class:px-tokens={pixel}
   class:ca-pixel={pixel}
-  class:still={!motion || reduced}
+  class:still={!motionEnabled}
   aria-label="CATAN"
   style:--ocean={'url("' + ocean + '")'}
   style:--wood-grain={'url("' + woodGrain + '")'}
   style:--px-table={pixel ? `url("${sheets.table}")` : undefined}
 >
   <nav class="table-navigation" aria-label={m.catalog({}, { locale })}>
-    <a href="/" onclick={() => onLeave?.()}
-      ><span aria-hidden="true">←</span> {m.back({}, { locale })}</a
-    >
-    <button onclick={() => rulesDialog.showModal()}
+    <button onclick={() => (rulesOpen = true)}
       ><span aria-hidden="true">▤</span>
       {m.library_rules({}, { locale })}</button
     >
   </nav>
   <div class="table-utilities">
-    {#if onInvite}<button onclick={onInvite}
-        ><span aria-hidden="true">♟♟</span>
-        {copied ? m.copied({}, { locale }) : m.invite({}, { locale })}</button
-      >{:else}<span class="practice-label"
+    {#if practice}<span class="practice-label"
         >{m.catan_practice({}, { locale })}</span
       >{/if}
-    <label class="table-language"
-      ><span aria-hidden="true">◎</span><select
-        aria-label={m.language({}, { locale })}
-        value={locale}
-        onchange={(e) => setLocale(e.currentTarget.value as Locale)}
-        ><option value="en">EN</option><option value="es">ES</option></select
-      ></label
-    >
     <button
       class="settings-trigger"
       aria-label={m.catan_settings({}, { locale })}
@@ -790,13 +787,14 @@
   </div>
   <dialog
     class="rules-dialog"
-    bind:this={rulesDialog}
     aria-label={m.library_rules({}, { locale })}
+    {@attach modal(() => rulesOpen)}
+    onclose={() => (rulesOpen = false)}
   >
     <button
       class="close-rules"
       aria-label={m.catan_cancel({}, { locale })}
-      onclick={() => rulesDialog.close()}>×</button
+      onclick={() => (rulesOpen = false)}>×</button
     >
     {@render rulesContent?.()}
   </dialog>
@@ -814,15 +812,16 @@
         >
       </header>
       <div class="preferences">
-        <button aria-pressed={sound} onclick={() => preference('sound')}
-          >{m.catan_sound({}, { locale })} {sound ? '♪' : '×'}</button
+        <button aria-pressed={preferences.sound} onclick={toggleSound}
+          >{m.catan_sound({}, { locale })}
+          {preferences.sound ? '♪' : '×'}</button
         >
         <button
-          aria-pressed={motion && !reduced}
-          disabled={reduced}
-          onclick={() => preference('motion')}
+          aria-pressed={motionEnabled}
+          disabled={prefersReducedMotion.current}
+          onclick={() => (preferences.motion = !preferences.motion)}
           >{m.catan_motion({}, { locale })}
-          {motion && !reduced ? '✓' : '×'}</button
+          {motionEnabled ? '✓' : '×'}</button
         >
       </div>
       <fieldset class="skin-choice">
@@ -832,11 +831,8 @@
               type="radio"
               name="catan-skin"
               {value}
-              checked={skin === value}
-              onchange={() => {
-                skin = value as Skin;
-                setGameSkin('catan', skin);
-              }}
+              checked={skin.choice === value}
+              onchange={() => skin.choose(value as Skin)}
             />{text}</label
           >{/each}
       </fieldset>
@@ -845,9 +841,14 @@
         <p>{m.catan_help_text({}, { locale })}</p>
         <p>{m.catan_building_costs({}, { locale })}</p>
       </details>
-      {@render settingsContent?.()}
+      <div class="room-controls">
+        {@render settingsContent?.()}
+        {#if canRematch}<button onclick={() => rematch?.()}
+            >{m.rematch({}, { locale })}</button
+          >{/if}
+      </div>
     </div>{/if}
-  <div class="roster" class:extended={pub.players.length > 4}>
+  <div class="roster" class:extended={isExtended(pub.players.length)}>
     {#each pub.players as p}<div
         data-seat={p.id}
         data-position={position(p.id)}
@@ -860,10 +861,10 @@
             aria-hidden="true"
             style={cell(sheets.crests.url, p.color, sheets.crests.cols)}
           ></div>{:else}<div class="crest" aria-hidden="true">
-            {crests[p.color]}
+            {civilizations[p.color].crest}
           </div>{/if}
         <div class="seat-identity">
-          <div class="civilization-name">{civilizations()[p.color]}</div>
+          <div class="civilization-name">{civilization(p.color)}</div>
           {#if chooseSeat}<button
               class="seat-name"
               onclick={() => chooseSeat?.(p.id)}
@@ -923,7 +924,7 @@
             class="px-supply"
             aria-hidden="true"
           >
-            <PieceReserve color={colors[p.color]} {...reserve(p)} />
+            <PieceReserve color={colors[p.color]} {...supply(p)} />
           </div>{/if}
       </div>{/each}
   </div>
@@ -933,7 +934,7 @@
         data-reserve-position={position(p.id)}
         aria-hidden="true"
       >
-        <PieceReserve color={colors[p.color]} {...reserve(p)} />
+        <PieceReserve color={colors[p.color]} {...supply(p)} />
       </div>
     {/each}{/if}
   <BuildingCosts {locale} />
@@ -953,7 +954,7 @@
         style={cell(sheets.crests.url, winner?.color ?? 0, sheets.crests.cols)}
       ></span>
       <strong>{name(pub.phase.winner)} {m.catan_wins({}, { locale })}</strong>
-      <small>{civilizations()[winner?.color ?? 0]}</small>
+      <small>{civilization(winner?.color ?? 0)}</small>
     </div>
   {/if}
   <p class="phase" aria-live="polite">
@@ -1071,10 +1072,10 @@
             <path d={pixelIsland.foam} fill="#bfe9ef" />
             <path d={pixelIsland.sandShade} fill="#b8894a" />
             <path d={pixelIsland.sand} fill="#ecd08a" />
-            <path d={pixelIsland.ink} fill="#1a0f08" />
+            <path d={pixelIsland.ink} fill={ink} />
           </g>
           {#each board.hexes as h, i}
-            {@const c = center(h)}
+            {@const c = hexCenter(h)}
             <g data-hex={i} class="px-hex">
               <g clip-path={`url(#px-tile-${i})`}
                 >{@render sheetSprite(
@@ -1102,14 +1103,14 @@
                   y={c[1] + 33}
                   text-anchor="middle">#{i}</text
                 >{/if}
-              {#if pub.robber === i}<g
+              {#if pub.robber === i}{@const spot = robberSpot(h)}<g
                   data-robber
                   aria-label={m.catan_robber({}, { locale })}
                   >{@render pixelSprite(
                     'robber',
                     robberRamp,
-                    c[0] + (h.number ? 24 : 0),
-                    c[1] + (h.number ? 16 : 14),
+                    spot[0],
+                    spot[1],
                   )}</g
                 >{/if}
             </g>
@@ -1129,6 +1130,7 @@
               />{/each}</g
           >
           {#each board.hexes as h, i}
+            {@const c = hexCenter(h)}
             <polygon
               data-hex={i}
               points={h.vertices
@@ -1139,32 +1141,27 @@
               stroke-width="3.5"
             />
             {#if h.number}<circle
-                cx={(2 * h.q + h.r) * tileX}
-                cy={3 * h.r * tileY}
+                cx={c[0]}
+                cy={c[1]}
                 r="16"
                 class="number-token"
                 fill="#fff0cd"
               /><text
-                x={(2 * h.q + h.r) * tileX}
-                y={3 * h.r * tileY + 6}
+                x={c[0]}
+                y={c[1] + 6}
                 text-anchor="middle"
                 fill={h.number === 6 || h.number === 8 ? '#b73428' : '#31291e'}
                 font-size="18"
                 font-weight="600">{h.number}</text
               >{/if}
             {#if allowed('MOVE_ROBBER')}<text
-                x={(2 * h.q + h.r) * tileX}
-                y={3 * h.r * tileY + 28}
+                x={c[0]}
+                y={c[1] + 28}
                 text-anchor="middle"
                 font-size="10"
                 fill="#fff">#{i}</text
               >{/if}{#if pub.robber === i}
-              <g
-                transform={'translate(' +
-                  ((2 * h.q + h.r) * tileX + 17) +
-                  ' ' +
-                  (3 * h.r * tileY - 7) +
-                  ')'}
+              <g transform={'translate(' + (c[0] + 17) + ' ' + (c[1] - 7) + ')'}
                 ><g data-robber aria-label={m.catan_robber({}, { locale })}>
                   <ellipse
                     cy="10"
@@ -1215,7 +1212,7 @@
                   [cx + (cx / length) * 24, cy + (cy / length) * 24],
                   2,
                 )}
-                fill="#1a0f08"
+                fill={ink}
               /><path
                 d={linePixels(
                   [cx, cy],
@@ -1239,13 +1236,13 @@
                 y={hy + 5 * P}
                 width={(wide ? 26 : 18) * P}
                 height={11 * P}
-                fill="#1a0f08"
+                fill={ink}
               /><rect
                 x={hx - (wide ? 12 : 8) * P}
                 y={hy + 6 * P}
                 width={(wide ? 24 : 16) * P}
                 height={9 * P}
-                fill={wide ? '#f2c14e' : '#f6e7c8'}
+                fill={wide ? gold : '#f6e7c8'}
               />
               {#if port.resource !== null}{@render sheetSprite(
                   sheets.resourcesSmall.url,
@@ -1260,7 +1257,7 @@
                 x={hx + (wide ? 5 : 0) * P}
                 y={hy + 13.5 * P}
                 text-anchor="middle"
-                fill="#1a0f08">{wide ? '2:1' : '3:1'}</text
+                fill={ink}>{wide ? '2:1' : '3:1'}</text
               >
             </g>
           {:else}
@@ -1356,18 +1353,14 @@
               transform={'translate(' + p[0] + ' ' + p[1] + ') scale(1.25)'}
               ><path
                 class="built"
-                d={building.city
-                  ? 'M -10 9 V -8 H -2 V -1 H 8 V 9 Z'
-                  : 'M -8 8 V -2 L 0 -10 L 8 -2 V 8 Z'}
+                d={buildingPath(building.city)}
                 fill={colors[building.color]}
                 stroke={colors[building.color]}
                 stroke-width=".5"
                 style="filter:drop-shadow(1px 3px 1px #142b36aa)"
               /><path
                 pointer-events="none"
-                d={building.city
-                  ? 'M -10 9 V -8 H -2 V -1 H 8 V 9 Z'
-                  : 'M -8 8 V -2 L 0 -10 L 8 -2 V 8 Z'}
+                d={buildingPath(building.city)}
                 fill="url(#piece-shine)"
                 class="piece-finish"
               /><path
@@ -1379,25 +1372,8 @@
                 fill={shade(colors[building.color], 0.72)}
               /></g
             >{/if}{/each}
-        {#each legal.filter((a) => a.type === placement || a.type === 'MOVE_ROBBER') as action}
-          {@const target =
-            action.vertex !== undefined
-              ? point(action.vertex)
-              : action.edge !== undefined
-                ? [
-                    (point(board.edges[action.edge][0])[0] +
-                      point(board.edges[action.edge][1])[0]) /
-                      2,
-                    (point(board.edges[action.edge][0])[1] +
-                      point(board.edges[action.edge][1])[1]) /
-                      2,
-                  ]
-                : [
-                    (2 * board.hexes[action.hex].q +
-                      board.hexes[action.hex].r) *
-                      tileX,
-                    3 * board.hexes[action.hex].r * tileY,
-                  ]}
+        {#each targets as action}
+          {@const target = targetPoint(action)}
           <circle
             class="target"
             cx={target[0]}
@@ -1407,7 +1383,7 @@
             stroke="transparent"
             role="button"
             tabindex="0"
-            aria-label={`${action.type === 'MOVE_ROBBER' ? m.catan_move_robber({}, { locale }) : label(action)} ${action.vertex ?? action.edge ?? action.hex}`}
+            aria-label={`${action.type === 'MOVE_ROBBER' ? m.catan_move_robber({}, { locale }) : label(action)} ${targetId(action)}`}
             onclick={() => {
               if (!dragged) pending = action;
             }}
@@ -1419,8 +1395,7 @@
               }
             }}
             class:chosen={pending?.type === action.type &&
-              (pending.vertex ?? pending.edge ?? pending.hex) ===
-                (action.vertex ?? action.edge ?? action.hex)}
+              targetId(pending) === targetId(action)}
             onkeydown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
@@ -1489,7 +1464,7 @@
               >{/if}</button
           >
         {/if}
-        {#each ['BUY_DEVELOPMENT', 'END_TURN'] as type}<button
+        {#each turnButtons as type}<button
             class:end-turn={type === 'END_TURN'}
             class:buy-development={type === 'BUY_DEVELOPMENT'}
             disabled={!allowed(type) || (type === 'END_TURN' && diceVisible)}
@@ -1503,7 +1478,7 @@
                 style={cell(sheets.cards.url, 5, sheets.cards.cols)}
               ></span>{:else}<span aria-hidden="true"
                 >{type === 'END_TURN' ? '▶' : '▱'}</span
-              >{/if}{label({ type })}</button
+              >{/if}{typeLabel(type)}</button
           >{/each}
         {#each legal.filter( (a) => ['FINISH_ROADS', 'STEAL'].includes(a.type) ) as action}<button
             onclick={() => send(action)}>{label(action)}</button
@@ -1528,7 +1503,7 @@
           {@render marketIcon()}{m.catan_player_offers({}, { locale })} · {incomingOffers()
             .length}</button
         >
-        {#each ['BUILD_ROAD', 'BUILD_SETTLEMENT', 'BUILD_CITY'] as type}<button
+        {#each buildButtons as type}<button
             class="build-choice"
             class:chosen={placement === type}
             aria-pressed={placement === type}
@@ -1552,14 +1527,14 @@
                     transform={`translate(${Math.floor((20 - icon.w) / 2)} ${19 - icon.h})`}
                     >{#each icon.layers as layer}<path
                         d={layer.d}
-                        fill={ramp(colors[ownColor])[layer.key]}
+                        fill={ramp(color(playerId))[layer.key]}
                       />{/each}</g
                   >{:else}<path
                     d="M1 14h4v-2h4v-2h4v-2h4v-2h3v5h-4v2h-4v2h-4v2h-7z"
-                    fill="#1a0f08"
+                    fill={ink}
                   /><path
                     d="M2 15h4v-2h4v-2h4v-2h4v-2h1v3h-4v2h-4v2h-4v2h-5z"
-                    fill={colors[ownColor]}
+                    fill={color(playerId)}
                   />{/if}</svg
               >{:else}<svg
                 class="build-icon"
@@ -1571,12 +1546,8 @@
               >
                 {#if type === 'BUILD_ROAD'}<path
                     d="M-9 6 7-9 11-5-5 10Z"
-                  />{:else}<path
-                    d={type === 'BUILD_CITY'
-                      ? 'M -10 9 V -8 H -2 V -1 H 8 V 9 Z'
-                      : 'M -8 8 V -2 L 0 -10 L 8 -2 V 8 Z'}
-                  />{/if}
-              </svg>{/if}{label({ type })}</button
+                  />{:else}<path d={buildingPath(type === 'BUILD_CITY')} />{/if}
+              </svg>{/if}{typeLabel(type)}</button
           >{/each}
       </div>
 
@@ -1585,10 +1556,10 @@
             >{pending.type === 'MOVE_ROBBER'
               ? m.catan_move_robber({}, { locale })
               : label(pending)}
-            {pending.vertex ?? pending.edge ?? pending.hex}</b
+            {targetId(pending)}</b
           ><button
             onclick={() => {
-              send(pending);
+              if (pending) send(pending);
               pending = null;
             }}>{m.catan_confirm({}, { locale })}</button
           ><button onclick={() => (pending = null)}
@@ -1635,7 +1606,7 @@
         <b class="quantity"
           >{priv.development.filter((c) => c.kind === kind).length}</b
         >
-        <span class="card-title">{label({ type: kind })}</span>
+        <span class="card-title">{typeLabel(kind)}</span>
         {#if pixel}<span
             class="card-art px-sprite"
             style={cell(
@@ -1688,7 +1659,7 @@
         <button>{m.catan_confirm_discard({}, { locale })}</button>
       </form>{/if}
     {#if developmentOpen}
-      <h3>{label({ type: developmentOpen })}</h3>
+      <h3>{typeLabel(developmentOpen)}</h3>
       <p>{m.catan_development_instruction({}, { locale })}</p>
       <div class="actions">
         {#each legal.filter((a) => a.type === developmentOpen) as action}<button
@@ -1710,7 +1681,7 @@
       {#if pub.phase.type === 'turn' && pub.phase.stage === 'actions' && !pub.paired}<form
           onsubmit={(e) => {
             e.preventDefault();
-            if (validOffer()) {
+            if (canSendOffer()) {
               submittedOfferAfter = Math.max(0, ...pub.offers.map((o) => o.id));
               send({
                 type: 'OFFER',
@@ -1727,7 +1698,8 @@
                 ><b>{resource}</b>
                 {#each ['give', 'take'] as direction}
                   {@const amounts = direction === 'give' ? give : take}
-                  {@const maximum = direction === 'give' ? priv.hand[i] : 24}
+                  {@const maximum =
+                    direction === 'give' ? priv.hand[i] : OFFER_LIMIT}
                   <span class="stepper-label"
                     >{direction === 'give'
                       ? m.catan_give({}, { locale })
@@ -1763,11 +1735,11 @@
                 {/each}
               </div>{/each}
           </div>
-          {#if !validOffer()}<p role="status">
+          {#if !canSendOffer()}<p role="status">
               {tradeReason(targetPlayer) ||
                 m.catan_offer_resources_reason({}, { locale })}
             </p>{/if}
-          <button disabled={!validOffer()}
+          <button disabled={!canSendOffer()}
             >{m.catan_send_offer({}, { locale })}</button
           >
         </form>{/if}
@@ -1776,7 +1748,7 @@
       <h3>🏛 {m.catan_bank({}, { locale })}</h3>
       <p>{m.catan_bank_help({}, { locale })}</p>
       <div class="actions">
-        {#each legal.filter((a) => a.type === 'BANK_TRADE') as action}
+        {#each bankTrades as action}
           <button onclick={() => send(action)}
             ><span class="exchange-icon"
               ><ResourceArt resource={action.give} /></span
@@ -1823,7 +1795,7 @@
               </div>
             {/each}
             <div class="actions">
-              {#each legal.filter((a) => (a.offer === offer.id && ['ACCEPT', 'DECLINE', 'CONFIRM_TRADE'].includes(a.type)) || (own && a.type === 'WITHDRAW')) as action}
+              {#each legal.filter((a) => ('offer' in a && a.offer === offer.id) || (own && a.type === 'WITHDRAW')) as action}
                 <button onclick={() => send(action)}>{label(action)}</button>
               {/each}
             </div>
@@ -1857,8 +1829,6 @@
     z-index: 1;
   }
   button,
-  .table-navigation a,
-  .table-language,
   .table-connection {
     background: var(--wood);
     color: #fff1d6;
@@ -1877,13 +1847,10 @@
     padding: 10px 13px;
     cursor: pointer;
   }
-  button:hover:not(:disabled):not([aria-disabled='true']),
-  .table-navigation a:hover {
+  button:hover:not(:disabled):not([aria-disabled='true']) {
     filter: brightness(1.16);
   }
-  button:focus-visible,
-  a:focus-visible,
-  select:focus-visible {
+  button:focus-visible {
     outline: 3px solid #ffe29b;
     outline-offset: 3px;
   }
@@ -1906,12 +1873,6 @@
     gap: 10px;
     z-index: 7;
   }
-  .table-navigation a {
-    text-decoration: none;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
   .table-navigation button {
     display: flex;
     align-items: center;
@@ -1931,7 +1892,6 @@
     z-index: 7;
   }
   .table-utilities button,
-  .table-language,
   .table-connection {
     font-size: clamp(11px, 0.95vw, 16px);
     padding: 9px 10px;
@@ -1940,24 +1900,6 @@
     font-size: 21px;
     vertical-align: middle;
     color: #f1d594;
-  }
-  .table-language {
-    display: flex;
-    align-items: center;
-    padding: 0 7px;
-    gap: 4px;
-  }
-  .table-language select {
-    appearance: none;
-    width: auto;
-    border: 0;
-    background: transparent;
-    color: #fff1d6;
-    font: inherit;
-    padding: 5px 0;
-  }
-  .table-language option {
-    color: #302111;
   }
   .table-connection {
     display: flex;
@@ -2581,8 +2523,7 @@
     text-align: center;
     margin: 3px 0 8px;
   }
-  input,
-  select {
+  input {
     color: #322411;
     padding: 5px;
   }
@@ -2714,6 +2655,30 @@
     font-size: 24px;
     margin: 0;
   }
+  .room-controls {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .room-controls :global(a),
+  .room-controls :global(button),
+  .room-controls :global(select) {
+    background: var(--wood);
+    color: #fff1d6;
+    border: 1px solid var(--gold);
+    border-radius: 5px;
+    font:
+      15px/1.15 Georgia,
+      serif;
+    padding: 10px 13px;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .room-controls :global([role='status']) {
+    font-size: 13px;
+    text-align: center;
+  }
   .preferences {
     display: flex;
     gap: 8px;
@@ -2809,7 +2774,6 @@
     .table-utilities {
       gap: 5px;
     }
-    .table-navigation a,
     .table-navigation button {
       font-size: 12px;
       padding: 9px;
@@ -2888,7 +2852,6 @@
       left: 8px;
       gap: 5px;
     }
-    .table-navigation a,
     .table-navigation button {
       font-size: 10px;
       padding: 8px;
@@ -2906,14 +2869,6 @@
       font-size: 10px;
       padding: 6px;
     }
-    .table-utilities > button:first-child > span {
-      display: none;
-    }
-    .table-language {
-      font-size: 11px;
-      padding: 0 4px;
-    }
-    .table-language > span,
     .settings-label,
     .table-connection,
     .practice-label {
@@ -3150,7 +3105,6 @@
     .seat-stats {
       font-size: 9px;
     }
-    .table-navigation a,
     .table-navigation button {
       font-size: 10px;
       padding: 7px;
@@ -3159,12 +3113,6 @@
       font-size: 18px;
     }
     .table-utilities .settings-label {
-      display: none;
-    }
-    .table-utilities > button:first-child {
-      font-size: 10px;
-    }
-    .table-utilities > button:first-child > span {
       display: none;
     }
     .table-connection {

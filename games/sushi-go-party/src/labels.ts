@@ -1,23 +1,12 @@
-import { m } from '@board-games/shared/messages';
 import type { Locale } from '@board-games/shared/runtime';
+import { message } from '@board-games/shared/ui';
 import type { Face } from './cards.js';
-/** All copy is compiled by Paraglide, including the searchable rule guide. */
-export function t(
+/** A `sgp_` message by short key; the key itself shows when none exists. */
+export const t = (
   key: string,
   values: Record<string, string | number> = {},
   locale?: Locale,
-): string {
-  const fn = (
-    m as unknown as Record<
-      string,
-      (
-        values: Record<string, string | number>,
-        options: { locale?: Locale },
-      ) => string
-    >
-  )[`sgp_${key}`];
-  return fn ? fn(values, { locale }) : key;
-}
+) => message(`sgp_${key}`, values, locale) ?? key;
 export function variation(c: Face, locale?: Locale): string {
   if (c.kind === 'fruit')
     return c.fruit

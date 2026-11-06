@@ -1,4 +1,13 @@
-import type { GameDefinition } from '@board-games/game-core';
+import { shuffled, type GameDefinition } from '@board-games/game-core';
+import { games, seats } from '@board-games/shared/games';
+import {
+  boardSize,
+  canChooseRole,
+  canStart,
+  clueLength,
+  deal,
+  maxClueCount,
+} from './setup.js';
 import type {
   Assignment,
   Cell,
@@ -10,21 +19,19 @@ import type {
   Team,
   View,
 } from './types.js';
-import { packVersion, words } from './words.js';
+import { words } from './words.js';
 export type * from './types.js';
 const other = (team: Team): Team => (team === 'red' ? 'blue' : 'red');
 const fail = (): never => {
   throw new Error('cn_error');
 };
-function shuffle<T>(source: T[], random: () => number): T[] {
-  const a = [...source];
-  for (let i = a.length - 1; i > 0; i--) {
+/** The rules refuse a random source that returns anything but a number in [0, 1). */
+function checked(random: () => number) {
+  return () => {
     const n = random();
     if (!Number.isFinite(n) || n < 0 || n >= 1) fail();
-    const j = Math.floor(n * (i + 1));
-    [a[i], a[j]] = [a[j]!, a[i]!];
-  }
-  return a;
+    return n;
+  };
 }
 export function create(
   players: string[],
@@ -32,8 +39,8 @@ export function create(
   input?: unknown,
 ): State {
   if (
-    players.length < 4 ||
-    players.length > 12 ||
+    players.length < games.codenames.minPlayers ||
+    players.length > games.codenames.maxPlayers ||
     new Set(players).size !== players.length ||
     players.some((p) => typeof p !== 'string' || !p)
   )
@@ -49,7 +56,6 @@ export function create(
     options: {
       boardLanguage: o.boardLanguage ?? 'en',
     },
-    packVersion,
     setupVersion: 0,
     ready: [],
     connectedPlayers: [...players],
@@ -66,18 +72,6 @@ export function create(
     actionSequence: 0,
     events: [],
   };
-}
-export function validRoster(s: State): boolean {
-  return (
-    s.players.every((p) => s.assignments[p]) &&
-    (['red', 'blue'] as Team[]).every((team) => {
-      const a = Object.values(s.assignments).filter((a) => a.team === team);
-      return (
-        a.filter((a) => a.role === 'spymaster').length === 1 &&
-        a.some((a) => a.role === 'operative')
-      );
-    })
-  );
 }
 export function presence(
   s: State,
@@ -113,12 +107,7 @@ export function apply(
   n.actionSequence++;
   n.events = [];
   const emit = (e: Event) => {
-    const event = {
-      ...e,
-      sequence: n.actionSequence,
-      index: n.events.length,
-    } as PublicEvent;
-    n.events.push(event);
+    n.events.push({ ...e, sequence: n.actionSequence } as PublicEvent);
   };
   const next = () => {
     n.activeTeam = other(n.activeTeam);
@@ -168,14 +157,13 @@ export function apply(
       typeof a.card !== 'number' ||
       !Number.isInteger(a.card) ||
       a.card < 0 ||
-      a.card >= 25 ||
+      a.card >= boardSize ||
       !n.board[a.card] ||
       n.board[a.card]!.revealed
     )
       fail();
     return a.card as number;
   };
-  const actor = s.assignments[player];
   if (a.type === 'chooseRole') {
     if (
       s.phase !== 'setup' ||
@@ -185,14 +173,12 @@ export function apply(
     )
       fail();
     if (
-      (actor?.team === a.team && actor.role === a.role) ||
-      (a.role === 'spymaster' &&
-        s.players.some(
-          (p) =>
-            p !== player &&
-            s.assignments[p]?.team === a.team &&
-            s.assignments[p]?.role === 'spymaster',
-        ))
+      !canChooseRole(
+        s.assignments,
+        player,
+        a.team as Team,
+        a.role as Assignment['role'],
+      )
     )
       fail();
     n.assignments[player] = {
@@ -202,25 +188,21 @@ export function apply(
     n.ready = [];
     n.setupVersion++;
   } else if (a.type === 'ready') {
-    if (
-      s.phase !== 'setup' ||
-      a.version !== s.setupVersion ||
-      !validRoster(s) ||
-      s.players.some((p) => !s.connectedPlayers.includes(p))
-    )
+    if (s.phase !== 'setup' || a.version !== s.setupVersion || !canStart(s))
       fail();
     if (n.ready.includes(player)) fail();
     n.ready.push(player);
     if (n.ready.length === n.players.length) {
-      const pool = shuffle(words[n.options.boardLanguage], random);
+      const draw = checked(random);
+      const pool = shuffled(words[n.options.boardLanguage], draw);
       n.startingTeam = random() < 0.5 ? 'red' : 'blue';
       const identities: Identity[] = [
-        ...Array<Identity>(9).fill(n.startingTeam),
-        ...Array<Identity>(8).fill(other(n.startingTeam)),
-        ...Array<Identity>(7).fill('civilian'),
+        ...Array<Identity>(deal.first).fill(n.startingTeam),
+        ...Array<Identity>(deal.second).fill(other(n.startingTeam)),
+        ...Array<Identity>(deal.civilians).fill('civilian'),
         'assassin',
       ];
-      n.board = shuffle(identities, random).map((identity, i): Cell => ({
+      n.board = shuffled(identities, draw).map((identity, i): Cell => ({
         word: pool[i]!,
         identity,
         revealed: false,
@@ -242,13 +224,13 @@ export function apply(
     ].length;
     if (
       length < 1 ||
-      length > 80 ||
+      length > clueLength ||
       !(
         a.count === 'unlimited' ||
         (typeof a.count === 'number' &&
           Number.isInteger(a.count) &&
           a.count >= 0 &&
-          a.count <= 9)
+          a.count <= maxClueCount)
       )
     )
       fail();
@@ -279,93 +261,39 @@ export function apply(
   } else fail();
   return n;
 }
-function publicEvent(e: PublicEvent): PublicEvent {
-  const id = { sequence: e.sequence, index: e.index };
-  switch (e.type) {
-    case 'clueSubmitted':
-      return {
-        ...id,
-        type: e.type,
-        clue: { word: e.clue.word, count: e.clue.count, team: e.clue.team },
-      };
-    case 'turnEnded':
-    case 'boardDealt':
-      return { ...id, type: e.type, team: e.team };
-    case 'cardRevealed':
-      return {
-        ...id,
-        type: e.type,
-        card: e.card,
-        word: e.word,
-        identity: e.identity,
-      };
-    case 'gameFinished':
-      return {
-        ...id,
-        type: e.type,
-        result: { team: e.result.team, reason: e.result.reason },
-      };
-  }
-}
 export function view(s: State, player: string): View {
   if (!s.players.includes(player)) fail();
-  const assignment = s.assignments[player]
-    ? { team: s.assignments[player]!.team, role: s.assignments[player]!.role }
-    : null;
-  return {
+  const assignment = s.assignments[player] ?? null;
+  const revealAll = s.phase === 'finished';
+  const remaining = (team: Team) =>
+    s.board.filter((c) => c.identity === team && !c.revealed).length;
+  // Explicit allowlist: the board shows identities only once revealed.
+  return structuredClone({
     public: {
-      players: [...s.players],
-      assignments: Object.fromEntries(
-        Object.entries(s.assignments).map(([p, a]) => [
-          p,
-          { team: a.team, role: a.role },
-        ]),
-      ),
-      options: {
-        boardLanguage: s.options.boardLanguage,
-      },
+      players: s.players,
+      assignments: s.assignments,
+      options: s.options,
       setupVersion: s.setupVersion,
-      ready: [...s.ready],
-      connectedPlayers: [...s.connectedPlayers],
+      ready: s.ready,
+      connectedPlayers: s.connectedPlayers,
       phase: s.phase,
       board: s.board.map((c, index) => ({
         index,
         word: c.word,
         revealed: c.revealed,
-        ...(c.revealed || s.phase === 'finished'
-          ? { identity: c.identity }
-          : {}),
+        ...(c.revealed || revealAll ? { identity: c.identity } : {}),
       })),
       startingTeam: s.startingTeam,
       activeTeam: s.activeTeam,
       turn: s.turn,
-      clue: s.clue
-        ? { word: s.clue.word, count: s.clue.count, team: s.clue.team }
-        : null,
-      budget:
-        s.budget.kind === 'finite'
-          ? { kind: 'finite', cap: s.budget.cap }
-          : { kind: 'unlimited' },
+      clue: s.clue,
+      budget: s.budget,
       used: s.used,
-      clueHistory: s.clueHistory.map((record) => ({
-        turn: record.turn,
-        team: record.team,
-        word: record.word,
-        count: record.count,
-        guesses: record.guesses
-          .filter((g) => s.board[g.card]?.revealed)
-          .map((g) => ({ card: g.card, word: g.word, identity: g.identity })),
-      })),
-      result: s.result
-        ? { team: s.result.team, reason: s.result.reason }
-        : null,
-      remaining: {
-        red: s.board.filter((c) => c.identity === 'red' && !c.revealed).length,
-        blue: s.board.filter((c) => c.identity === 'blue' && !c.revealed)
-          .length,
-      },
+      clueHistory: s.clueHistory,
+      result: s.result,
+      remaining: { red: remaining('red'), blue: remaining('blue') },
       actionSequence: s.actionSequence,
-      events: s.events.map(publicEvent),
+      events: s.events,
     },
     private: {
       assignment,
@@ -373,12 +301,10 @@ export function view(s: State, player: string): View {
         ? { key: s.board.map((c) => c.identity) }
         : {}),
     },
-  };
+  });
 }
-export const codenames: GameDefinition<State> = {
-  id: 'codenames',
-  minPlayers: 4,
-  maxPlayers: 12,
+export const codenames: GameDefinition<State, View> = {
+  ...seats('codenames'),
   create,
   apply,
   view,

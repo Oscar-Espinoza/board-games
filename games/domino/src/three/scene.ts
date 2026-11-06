@@ -3,6 +3,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import type { End } from '../index.js';
 import type { Placement, Pose } from '../layout.js';
+import { HARD_SLAM, flightMs3d } from '../constants.js';
 import { buildProps } from './props.js';
 import { FAR_Z, OUT_X, T, buildTable } from './table.js';
 import { art, loadFont, plaqueTexture } from './textures.js';
@@ -380,8 +381,8 @@ export function createTable(
 
     // Table tiles.
     const seen = new Set<number>();
-    const landing = 380 - (last?.force ?? 0) * 140;
-    const hard = (last?.force ?? 0) > 0.55;
+    const landing = flightMs3d(last?.force ?? 0);
+    const hard = (last?.force ?? 0) > HARD_SLAM;
     for (const p of next.placements) {
       seen.add(p.id);
       let mesh = placed.get(p.id);

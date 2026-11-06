@@ -1,5 +1,6 @@
 import type { GameView } from '@board-games/game-core';
-import type { Action, Card, Color } from './index.js';
+import type { Card, Color } from './cards.js';
+import type { Action } from './index.js';
 
 /** Practice opponents know their own hand and the server's legal choices only. */
 export function botAction(view: GameView): Action | null {

@@ -1,8 +1,17 @@
+/** Venezuelan pairs domino: double-six, four seats, partners opposite. */
 import { shuffle } from '@board-games/game-core';
 import type { GameDefinition } from '@board-games/game-core';
+import { games, seats } from '@board-games/shared/games';
+import {
+  HAND_SIZE,
+  HARD_SLAM,
+  MAX_TEAM_NAME,
+  SEATS,
+  SLAM_SPAN,
+} from './constants.js';
 import { idealPoses, plug, separate, type Pose } from './layout.js';
 
-/** Venezuelan pairs domino: double-six, four seats, partners opposite. */
+/** Points that win the match. */
 export const TARGET = 100;
 export type Tile = { id: number; a: number; b: number };
 export const TILES: readonly Tile[] = Object.freeze(
@@ -12,7 +21,7 @@ export const TILES: readonly Tile[] = Object.freeze(
     .flat()
     .map((t, id) => Object.freeze({ ...t, id })),
 );
-export const DOUBLE_SIX = TILES.findIndex((t) => t.a === 6 && t.b === 6);
+const DOUBLE_SIX = TILES.findIndex((t) => t.a === 6 && t.b === 6);
 export const pips = (id: number) => TILES[id].a + TILES[id].b;
 export type End = 'left' | 'right';
 /** A placed tile with its pips oriented left→right along the chain. */
@@ -69,7 +78,7 @@ function deal(s: State, random: () => number) {
   const ids = TILES.map((t) => t.id);
   shuffle(ids, random);
   s.hands = s.players.map((_, i) =>
-    ids.slice(i * 7, i * 7 + 7).sort((x, y) => x - y),
+    ids.slice(i * HAND_SIZE, (i + 1) * HAND_SIZE).sort((x, y) => x - y),
   );
   s.chain = [];
   s.poses = {};
@@ -79,9 +88,18 @@ function deal(s: State, random: () => number) {
   s.phase = 'playing';
   s.turn = s.leader;
 }
+/** Every rejection carries the one message the table can show. */
+function fail(): never {
+  throw new Error('domino_error');
+}
 export function create(players: string[], random: () => number): State {
-  if (players.length !== 4 || new Set(players).size !== 4)
-    throw new Error('DOMINO_PLAYERS');
+  const { minPlayers, maxPlayers } = games.domino;
+  if (
+    players.length < minPlayers ||
+    players.length > maxPlayers ||
+    new Set(players).size !== players.length
+  )
+    fail();
   const s: State = {
     players: [...players],
     hands: [],
@@ -99,41 +117,46 @@ export function create(players: string[], random: () => number): State {
     revision: 0,
   };
   deal(s, random);
-  // The double six opens the first hand.
   s.leader = s.turn = s.hands.findIndex((h) => h.includes(DOUBLE_SIX));
   return s;
 }
-export const ends = (chain: Link[]) =>
+const ends = (chain: Link[]) =>
   chain.length
     ? { left: chain[0].left, right: chain[chain.length - 1].right }
     : null;
-export function legalFor(s: State, seat: number): Legal[] {
+/** The first tile has no ends to choose between; it always goes on the right. */
+const OPENING_END: End = 'right';
+const endFor = (s: State, action: { end: End }): End =>
+  s.chain.length ? action.end : OPENING_END;
+/** The ends of the chain a tile can be attached to. */
+function fits(id: number, open: { left: number; right: number }): End[] {
+  const { a, b } = TILES[id];
+  return [
+    ...(a === open.left || b === open.left ? (['left'] as const) : []),
+    ...(a === open.right || b === open.right ? (['right'] as const) : []),
+  ];
+}
+function legalFor(s: State, seat: number): Legal[] {
   if (s.phase !== 'playing' || s.turn !== seat) return [];
   const hand = s.hands[seat];
-  if (!s.chain.length) {
+  const open = ends(s.chain);
+  if (!open) {
     const opening =
       s.handNumber === 1 ? hand.filter((id) => id === DOUBLE_SIX) : hand;
-    return opening.map((tileId) => ({ type: 'PLAY', tileId, end: 'right' }));
+    return opening.map((tileId) => ({
+      type: 'PLAY',
+      tileId,
+      end: OPENING_END,
+    }));
   }
-  const e = ends(s.chain)!;
-  const legal: Legal[] = [];
-  for (const tileId of hand) {
-    const { a, b } = TILES[tileId];
-    if (a === e.left || b === e.left)
-      legal.push({ type: 'PLAY', tileId, end: 'left' });
-    if (a === e.right || b === e.right)
-      legal.push({ type: 'PLAY', tileId, end: 'right' });
-  }
+  const legal = hand.flatMap((tileId) =>
+    fits(tileId, open).map((end): Legal => ({ type: 'PLAY', tileId, end })),
+  );
   return legal.length ? legal : [{ type: 'PASS' }];
 }
 const canPlay = (s: State, seat: number) => {
-  const e = ends(s.chain);
-  return (
-    !e ||
-    s.hands[seat].some((id) =>
-      [TILES[id].a, TILES[id].b].some((v) => v === e.left || v === e.right),
-    )
-  );
+  const open = ends(s.chain);
+  return !open || s.hands[seat].some((id) => fits(id, open).length > 0);
 };
 function object(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -144,16 +167,14 @@ function exact(value: Record<string, unknown>, keys: string[]) {
     keys.every((k) => Object.hasOwn(value, k))
   );
 }
-export function validate(s: State, actor: string, input: unknown): Action {
+function validate(s: State, actor: string, input: unknown): Action {
   const seat = s.players.indexOf(actor);
-  if (seat < 0) throw new Error('DOMINO_SEAT');
-  if (!object(input) || typeof input.type !== 'string')
-    throw new Error('DOMINO_ACTION');
+  if (seat < 0 || !object(input) || typeof input.type !== 'string') fail();
   switch (input.type) {
     case 'ARRANGE':
     case 'NEXT_HAND':
     case 'PASS':
-      if (!exact(input, ['type'])) throw new Error('DOMINO_ACTION');
+      if (!exact(input, ['type'])) fail();
       break;
     case 'RENAME_TEAM':
       if (
@@ -161,9 +182,9 @@ export function validate(s: State, actor: string, input: unknown): Action {
         (input.team !== 0 && input.team !== 1) ||
         typeof input.name !== 'string' ||
         !input.name.trim() ||
-        input.name.trim().length > 16
+        input.name.trim().length > MAX_TEAM_NAME
       )
-        throw new Error('DOMINO_NAME');
+        fail();
       break;
     case 'PLAY':
       if (
@@ -173,27 +194,25 @@ export function validate(s: State, actor: string, input: unknown): Action {
         typeof input.force !== 'number' ||
         !(input.force >= 0 && input.force <= 1)
       )
-        throw new Error('DOMINO_ACTION');
+        fail();
       break;
     default:
-      throw new Error('DOMINO_ACTION');
+      fail();
   }
   const action = input as Action;
-  if (action.type === 'NEXT_HAND' && s.phase !== 'scored')
-    throw new Error('DOMINO_PHASE');
+  if (action.type === 'NEXT_HAND' && s.phase !== 'scored') fail();
   if (action.type === 'PASS' || action.type === 'PLAY') {
     const legal = legalFor(s, seat);
-    if (!legal.length) throw new Error('DOMINO_TURN');
     const ok =
       action.type === 'PASS'
-        ? legal[0].type === 'PASS'
+        ? legal[0]?.type === 'PASS'
         : legal.some(
             (l) =>
               l.type === 'PLAY' &&
               l.tileId === action.tileId &&
-              (s.chain.length === 0 || l.end === action.end),
+              l.end === endFor(s, action),
           );
-    if (!ok) throw new Error('DOMINO_ILLEGAL');
+    if (!ok) fail();
   }
   return action;
 }
@@ -204,8 +223,8 @@ function scatter(
   force: number,
   random: () => number,
 ) {
-  if (force <= 0.55) return;
-  const k = (force - 0.55) / 0.45;
+  if (force <= HARD_SLAM) return;
+  const k = (force - HARD_SLAM) / SLAM_SPAN;
   const at = s.chain.findIndex((l) => l.id === placed);
   const home = idealPoses(s.chain);
   const clamp = (v: number, c: number, m: number) =>
@@ -278,14 +297,14 @@ export function apply(
     s.teams[action.team] = action.name.trim();
   else if (action.type === 'NEXT_HAND') {
     s.handNumber++;
-    s.leader = (s.leader + 1) % 4;
+    s.leader = (s.leader + 1) % SEATS;
     deal(s, random);
   } else if (action.type === 'PASS') {
     s.passes++;
     s.last = { type: 'pass', seat };
-    s.turn = (s.turn + 1) % 4;
+    s.turn = (s.turn + 1) % SEATS;
   } else {
-    const end = s.chain.length ? action.end : 'right';
+    const end = endFor(s, action);
     s.chain = attach(s.chain, action.tileId, end);
     s.poses[action.tileId] = plug(s.chain, s.poses, action.tileId);
     s.hands[seat] = s.hands[seat].filter((id) => id !== action.tileId);
@@ -301,12 +320,13 @@ export function apply(
     if (!s.hands[seat].length) score(s, 'domino', seat);
     else if (s.players.every((_, i) => !canPlay(s, i)))
       score(s, 'tranque', null);
-    else s.turn = (s.turn + 1) % 4;
+    else s.turn = (s.turn + 1) % SEATS;
   }
   return s;
 }
-export function view(s: State, playerId?: string): View {
-  const seat = playerId ? s.players.indexOf(playerId) : -1;
+export function view(s: State, playerId: string): View {
+  const seat = s.players.indexOf(playerId);
+  if (seat < 0) fail();
   const { hands, ...rest } = s;
   return {
     public: structuredClone({
@@ -314,16 +334,11 @@ export function view(s: State, playerId?: string): View {
       handCounts: hands.map((h) => h.length),
       ends: ends(s.chain),
     }),
-    private: {
-      hand: seat >= 0 ? [...hands[seat]] : [],
-      legal: seat >= 0 ? legalFor(s, seat) : [],
-    },
+    private: { hand: [...hands[seat]], legal: legalFor(s, seat) },
   };
 }
 export const domino: GameDefinition<State> = {
-  id: 'domino',
-  minPlayers: 4,
-  maxPlayers: 4,
+  ...seats('domino'),
   create,
   apply,
   view,

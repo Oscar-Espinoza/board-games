@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./codenames": "./src/codenames/live.ts"
+    "./codenames": "./src/codenames/live.ts",
+    "./codenames/http": "./src/codenames/http.ts"
+  },
+  "dependencies": {
+    "@board-games/codenames": "workspace:*"
   }
 }

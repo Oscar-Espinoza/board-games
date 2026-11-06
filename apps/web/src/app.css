@@ -229,13 +229,6 @@ p {
     order: 3;
     width: 100%;
   }
-  .join-form {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .game-art {
-    height: 150px;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   *,

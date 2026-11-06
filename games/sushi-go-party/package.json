@@ -4,9 +4,9 @@
   "type": "module",
   "exports": {
     "./server": "./src/index.ts",
-    "./Board.svelte": "./src/Board.svelte",
     "./practice": "./src/practice.ts",
-    "./Dish.svelte": "./src/Dish.svelte"
+    "./Dish.svelte": "./src/Dish.svelte",
+    "./client": "./src/client.ts"
   },
   "dependencies": {
     "@board-games/game-core": "workspace:*",

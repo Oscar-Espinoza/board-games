@@ -1,64 +1,41 @@
 <script lang="ts">
-  import { onMount, untrack, type Snippet } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { m } from '@board-games/shared/messages';
-  import type { View, Team, Identity, PublicEvent } from './types.js';
+  import { games } from '@board-games/shared/games';
+  import type { View, Team, Identity, PublicEvent, Action } from './types.js';
+  import { canChooseRole, canStart, maxClueCount } from './setup.js';
   import Icon from './Icon.svelte';
   import './tokens.css';
   import wood from './table/wood.webp';
-  import { eventGate, readJson, write } from '@board-games/shared/ui';
   import {
-    gameSkin,
-    setGameSkin,
-    type Skin,
-  } from '@board-games/shared/ui/pixel';
+    createAudio,
+    message,
+    eventGate,
+    modal,
+    viewerPreferences,
+    ViewerSkin,
+    type BoardProps,
+  } from '@board-games/shared/ui';
   import { prefersReducedMotion } from 'svelte/motion';
-  import { soundEffects } from './effects.js';
+  import { playCue } from './effects.js';
   let {
     view,
     playerId,
     players,
     send,
+    locale,
     round = 0,
     connected = true,
     pending = false,
     settingsContent,
     rulesContent,
     canRematch = false,
-    rematch = async () => {},
-    errorCode = null,
-    roomId,
-    maxPlayers = 12,
-    onInvite,
-    copied = false,
-    practice = false,
+    rematch,
+    errorCode,
     note = '',
-  }: {
+  }: BoardProps<View, Action> & {
     /** Short status line shown with the turn controls (e.g. a bot's last move). */
     note?: string;
-    roomId?: string;
-    maxPlayers?: number;
-    onInvite?: () => Promise<void>;
-    copied?: boolean;
-    view: View;
-    playerId: string;
-    players: {
-      id: string;
-      name: string;
-      connected: boolean;
-      reservedUntil?: number | null;
-    }[];
-    send: (action: unknown) => unknown;
-    locale?: string;
-    round?: number;
-    connected?: boolean;
-    pending?: boolean;
-    practice?: boolean;
-    canConfigure?: boolean;
-    settingsContent?: Snippet;
-    rulesContent?: Snippet;
-    canRematch?: boolean;
-    rematch?: () => Promise<void>;
-    errorCode?: string | null;
   } = $props();
   const s = $derived(view.public),
     mine = $derived(view.private.assignment);
@@ -72,24 +49,12 @@
       civilian: m.cn_civilian,
       assassin: m.cn_assassin,
     })[identity]();
+  const roles = ['spymaster', 'operative'] as const;
   const disabled = $derived(!connected || pending);
   const guessing = $derived(
     s.phase === 'guessing' &&
       mine?.role === 'operative' &&
       mine.team === s.activeTeam,
-  );
-  const rosterReady = $derived(
-    s.players.every((p) => s.assignments[p]) &&
-      (['red', 'blue'] as Team[]).every(
-        (team) =>
-          Object.values(s.assignments).some(
-            (a) => a.team === team && a.role === 'spymaster',
-          ) &&
-          Object.values(s.assignments).some(
-            (a) => a.team === team && a.role === 'operative',
-          ),
-      ) &&
-      s.players.every((p) => s.connectedPlayers.includes(p)),
   );
   let selected = $state<number | null>(null),
     localError = $state('');
@@ -103,18 +68,22 @@
     | 'players'
     | 'key'
     | 'clue';
-  let panel = $state<Panel | null>(null),
-    dialog: HTMLDialogElement,
-    opener: HTMLElement | null = null;
-  let sound = $state(true),
-    volume = $state(0.5),
-    reduced = $state(false),
-    mounted = $state(false),
+  let panel = $state<Panel | null>(null);
+  const prefs = viewerPreferences('codenames', {
+    sound: true,
+    volume: 0.5,
+    motion: true,
+    layout: 'center' as 'left' | 'center' | 'right',
+  });
+  const still = $derived(prefersReducedMotion.current || !prefs.motion);
+  const dialogOpen = $derived(panel !== null);
+  const isNarrow = () => window.innerWidth < 1024;
+  let mounted = $state(false),
     enlarged = $state(false),
-    narrow = $state(window.innerWidth < 1024),
+    narrow = $state(isNarrow()),
     clueWord = $state(''),
-    clueCount = $state<string>('2'),
-    layout = $state<'left' | 'center' | 'right'>('center');
+    clueCount = $state<string>('2');
+  const compact = $derived(narrow || enlarged);
   const canClue = $derived(
     s.phase === 'clue' &&
       mine?.role === 'spymaster' &&
@@ -144,19 +113,10 @@
       : m.cn_guesses_unlimited(),
   );
   let root: HTMLElement;
-  const gate = eventGate<PublicEvent>(
-      stopEffects,
-      (event, i, sequence) => event.sequence === sequence && event.index === i,
-    ),
-    audio = soundEffects();
-  /** Viewer-only look; the 8-bit stylesheet loads the first time it is chosen. */
-  let skin = $state<Skin>(gameSkin('codenames')),
-    pixelReady = $state(false);
-  $effect(() => {
-    if (skin === 'pixel' && !pixelReady)
-      void import('./pixel.css').then(() => (pixelReady = true));
-  });
-  const pixel = $derived(skin === 'pixel' && pixelReady);
+  const gate = eventGate<PublicEvent>(stopEffects),
+    audio = createAudio(),
+    skin = new ViewerSkin('codenames', () => import('./pixel.css')),
+    pixel = $derived(skin.pixel);
   /** Agent card art that covers a revealed word, like the physical game: two looks
    * per team and for bystanders, stable per card, drawn for the current skin. */
   const cardArt = (identity: Identity, index: number) =>
@@ -169,13 +129,10 @@
   function stopEffects() {
     for (const animation of animations) animation.cancel();
     animations.clear();
-    audio.cancel();
-  }
-  function cancelEffects() {
-    gate.reset();
+    audio.stop();
   }
   function settleEffects() {
-    cancelEffects();
+    gate.reset();
     gate.consume(
       `${round}:${playerId}:${mine?.role ?? ''}`,
       s.actionSequence,
@@ -185,21 +142,17 @@
     );
   }
   function gesture() {
-    if (sound) void audio.unlock();
+    if (prefs.sound) void audio.unlock();
   }
   function open(next: Panel, source?: HTMLElement) {
     if (source) gesture();
-    opener = source ?? null;
     panel = next;
-    if (!dialog.open) dialog.showModal();
   }
   function close() {
     panel = null;
     selected = null;
-    dialog.close();
-    opener?.focus();
   }
-  async function act(action: unknown) {
+  async function act(action: Action) {
     if (disabled) return;
     gesture();
     if (panel === 'confirm') close();
@@ -211,8 +164,9 @@
         close();
         clueWord = '';
       }
-    } catch {
-      localError = m.cn_error();
+    } catch (error) {
+      localError =
+        message((error as Error).message, {}, locale) ?? m.cn_error();
     } finally {
       selected = null;
     }
@@ -251,7 +205,7 @@
     delay = 0,
     easing = 'ease-out',
   ) {
-    if (!element || reduced || systemReduced) return;
+    if (!element || still) return;
     const animation = element.animate(frames, {
       duration,
       delay,
@@ -261,19 +215,14 @@
     animation.onfinish = () => animations.delete(animation);
   }
   $effect(() => {
-    const seat = playerId,
-      r = round;
+    void [playerId, round];
     untrack(() => {
       localError = '';
     });
   });
   $effect(() => {
-    const seq = s.actionSequence,
-      seat = playerId,
-      r = round,
-      phase = s.phase,
-      turn = s.turn,
-      online = connected,
+    void [s.actionSequence, playerId, round, s.phase, s.turn];
+    const online = connected,
       code = errorCode;
     untrack(() => {
       if (panel === 'confirm' || (panel === 'clue' && (!online || !canClue)))
@@ -290,7 +239,7 @@
     untrack(() => {
       const accepted = gate.consume(identity, sequence, events, online, s);
       if (!mounted || document.hidden) {
-        cancelEffects();
+        gate.reset();
         return;
       }
       for (const event of accepted) {
@@ -363,40 +312,24 @@
         : accepted.some((e) => e.type === 'cardRevealed')
           ? 'reveal'
           : null;
-      if (sound && cue) audio.play(volume, cue, pixel);
+      if (prefs.sound && cue) playCue(audio, cue, prefs.volume, pixel);
     });
   });
   $effect(() => {
-    const motion = reduced,
-      preference = systemReduced;
+    void still;
     untrack(settleEffects);
   });
-  const systemReduced = $derived(prefersReducedMotion.current);
   $effect(() => {
-    if (mounted) {
-      write('codenames:preferences', {
-        sound,
-        volume,
-        reduced,
-        layout,
-      });
-      if (!sound) audio.cancel();
-    }
+    if (!prefs.sound) audio.stop();
   });
   onMount(() => {
-    const p = readJson('codenames:preferences');
-    sound = p.sound !== false;
-    if (typeof p.volume === 'number' && Number.isFinite(p.volume))
-      volume = Math.min(1, Math.max(0, p.volume));
-    reduced = p.reduced === true;
-    if (p.layout === 'left' || p.layout === 'right') layout = p.layout;
-    narrow = window.innerWidth < 1024;
+    narrow = isNarrow();
     const textObserver = new ResizeObserver(([entry]) => {
       enlarged = (entry?.contentRect.width ?? 16) > 22;
     });
     textObserver.observe(root.querySelector('.text-measure')!);
     const reset = () => {
-      narrow = window.innerWidth < 1024;
+      narrow = isNarrow();
       settleEffects();
       if (panel === 'confirm') close();
       selected = null;
@@ -405,8 +338,8 @@
     document.addEventListener('visibilitychange', reset);
     mounted = true;
     return () => {
-      cancelEffects();
-      audio.dispose();
+      gate.reset();
+      audio.close();
       textObserver.disconnect();
       window.removeEventListener('resize', reset);
       document.removeEventListener('visibilitychange', reset);
@@ -523,7 +456,7 @@
         class="turn-pill {s.result?.team ?? s.activeTeam}"
         >{s.result
           ? m.cn_winner({ team: teamLabel(s.result.team) })
-          : narrow || enlarged
+          : compact
             ? teamLabel(s.activeTeam)
             : m.cn_team_turn({ team: teamLabel(s.activeTeam) })}</strong
       >
@@ -624,16 +557,16 @@
 <section
   data-phase={s.phase}
   data-active-team={s.activeTeam}
-  data-layout={layout}
+  data-layout={prefs.layout}
   class="cn-table cn-table-tokens"
   class:px-tokens={pixel}
   class:cn-pixel={pixel}
   style:--cn-wood-image={pixel
     ? 'url("/games/codenames/pixel/table.webp")'
     : `url("${wood}")`}
-  class:reduced={reduced || systemReduced}
+  class:reduced={still}
   class:enlarged
-  class:compact={narrow || enlarged}
+  class:compact
   bind:this={root}
   aria-label={m.cn_title()}
 >
@@ -678,7 +611,7 @@
       /></svg
     ></button
   >
-  {#if s.phase !== 'setup' && !(narrow || enlarged)}<p class="wordmark">
+  {#if s.phase !== 'setup' && !compact}<p class="wordmark">
       <Icon name="logo" />{m.cn_title()}
     </p>{/if}
   {#if !connected}<p class="notice" role="status">{m.cn_offline()}</p>{/if}
@@ -692,14 +625,9 @@
           <section class="team-panel {team}">
             <h3>{teamLabel(team)}</h3>
             <div class="role-actions">
-              {#each ['spymaster', 'operative'] as role}<button
+              {#each roles as role}<button
                   disabled={disabled ||
-                    (mine?.team === team && mine?.role === role) ||
-                    (role === 'spymaster' &&
-                      Object.entries(s.assignments).some(
-                        ([id, a]) =>
-                          id !== playerId && a.team === team && a.role === role,
-                      ))}
+                    !canChooseRole(s.assignments, playerId, team, role)}
                   aria-pressed={mine?.team === team && mine?.role === role}
                   onclick={() =>
                     act({
@@ -736,15 +664,14 @@
       </div>
       <button
         class="primary"
-        disabled={disabled || !rosterReady || s.ready.includes(playerId)}
+        disabled={disabled || !canStart(s) || s.ready.includes(playerId)}
         onclick={() => act({ type: 'ready', version: s.setupVersion })}
         >{s.ready.includes(playerId) ? m.cn_ready_done() : m.cn_ready()} · {s
           .ready.length}/{s.players.length}</button
       >
       <p class="hint">{m.cn_wait_ready()}</p>
     </div>
-  {:else if narrow || enlarged}
-    <!-- Compact: slim status bar, the board, and a drawer for history and players. -->
+  {:else if compact}
     <div class="table-layout">
       <div class="team-row">
         {@render teamStatus('red')}{@render turnBanner()}{@render teamStatus(
@@ -771,7 +698,7 @@
           >{/if}
       </nav>
     </div>
-  {:else if layout === 'center'}
+  {:else if prefs.layout === 'center'}
     <div class="table-layout">
       {#each ['red', 'blue'] as t}{@const team = t as Team}
         <div class="cell score-{team}">{@render teamStatus(team)}</div>
@@ -821,16 +748,12 @@
   class="cn-dialog cn-table-tokens"
   class:px-tokens={pixel}
   class:cn-pixel={pixel}
-  bind:this={dialog}
+  {@attach modal(() => dialogOpen)}
   class:confirmation={panel === 'confirm'}
   class:result={panel === 'result'}
-  onclose={() => {
-    if (dialog.open) return;
-    panel = null;
-    selected = null;
-    opener?.focus();
+  onclose={(e) => {
+    if (!e.currentTarget.open) close();
   }}
-  oncancel={close}
   aria-label={panel ? labels[panel] : m.cn_settings()}
 >
   <header>
@@ -866,7 +789,7 @@
       >
       <label
         >{m.cn_count()}<select bind:value={clueCount}
-          >{#each Array.from( { length: 10 }, (_, i) => String(i) ) as count}<option
+          >{#each Array.from( { length: maxClueCount + 1 }, (_, i) => String(i) ) as count}<option
               value={count}>{count}</option
             >{/each}<option value="unlimited">∞</option></select
         ></label
@@ -900,7 +823,7 @@
       <button
         class="primary"
         {disabled}
-        onclick={() => act({ type: 'guess', card: selected })}
+        onclick={() => act({ type: 'guess', card: selected! })}
         >{m.cn_reveal({ word: s.board[selected]!.word })}</button
       >
       <button onclick={close}>{m.cn_cancel()}</button>
@@ -920,7 +843,7 @@
         onclick={() => {
           gesture();
           close();
-          void rematch();
+          void rematch?.();
         }}>{m.cn_rematch()}</button
       >{/if}
   {:else if panel === 'settings'}
@@ -947,17 +870,14 @@
         >{/if}
     {/if}
     <fieldset class="layout-choice skin-choice">
-      <legend>{m.cn_skin()}</legend>
-      {#each [['classic', m.cn_skin_classic()], ['pixel', m.cn_skin_pixel()]] as [value, label]}<label
+      <legend>{m.skin()}</legend>
+      {#each [['classic', m.skin_classic()], ['pixel', m.skin_pixel()]] as [value, label]}<label
           ><input
             type="radio"
             name="cn-skin"
             {value}
-            checked={skin === value}
-            onchange={() => {
-              skin = value as Skin;
-              setGameSkin('codenames', skin);
-            }}
+            checked={skin.choice === value}
+            onchange={() => skin.choose(value as 'classic' | 'pixel')}
           />{label}</label
         >{/each}
     </fieldset>
@@ -968,30 +888,22 @@
             type="radio"
             name="cn-layout"
             {value}
-            bind:group={layout}
+            bind:group={prefs.layout}
           />{label}</label
         >{/each}
     </fieldset>
-    {#if practice || roomId}<p class="room-line">
-        {#if practice}{m.cn_practice()}{:else if roomId}<button
-            class="invite"
-            disabled={!onInvite}
-            onclick={() => void onInvite?.()}
-            ><span>{m.cn_room({ room: roomId })}</span><Icon name="invite" />
-            {copied ? m.copied() : m.invite()}</button
-          >{/if}
-        <span><Icon name="players" /> {players.length}/{maxPlayers}</span>
-        {#if viewer}<span
-            >{viewer.name} · {connected
-              ? m.cn_online()
-              : m.disconnected()}</span
-          >{/if}
-      </p>{/if}
+    <p class="room-line">
+      <span
+        ><Icon name="players" />
+        {players.length}/{games.codenames.maxPlayers}</span
+      >
+      {#if viewer}<span>{viewer.name}</span>{/if}
+    </p>
     <div class="preferences">
       <label
         ><input
           type="checkbox"
-          bind:checked={sound}
+          bind:checked={prefs.sound}
           onchange={gesture}
         />{m.cn_sound()}</label
       >
@@ -1001,11 +913,15 @@
           min="0"
           max="1"
           step=".05"
-          bind:value={volume}
+          bind:value={prefs.volume}
         /></label
       >
       <label
-        ><input type="checkbox" bind:checked={reduced} />{m.cn_motion()}</label
+        ><input
+          type="checkbox"
+          checked={!prefs.motion}
+          onchange={(e) => (prefs.motion = !e.currentTarget.checked)}
+        />{m.cn_motion()}</label
       >
     </div>
     {@render settingsContent?.()}

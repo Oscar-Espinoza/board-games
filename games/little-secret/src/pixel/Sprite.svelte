@@ -62,10 +62,8 @@
   }: {
     sheet: Sheet;
     frame: string;
-    /** Whole-pixel magnification of the logical cell. */
     scale?: number;
     row?: number;
-    /** Stretch to the parent box instead of using `scale`. */
     fill?: boolean;
   } = $props();
   const s = $derived(sheets[sheet]);

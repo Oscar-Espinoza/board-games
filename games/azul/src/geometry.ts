@@ -1,4 +1,4 @@
-export type AzulLayoutMode = 'tabletop' | 'compact';
+type AzulLayoutMode = 'tabletop' | 'compact';
 
 /** Bounds include the controls and the photographed plate, not only its tiles. */
 export function ringGeometry(count: number, mode: AzulLayoutMode) {
@@ -29,7 +29,6 @@ export function ringGeometry(count: number, mode: AzulLayoutMode) {
     center: { width: compact ? 146 : 198, height: 160 },
   };
 }
-/** Stable within a colour cluster, including a distinct location for every tile. */
 export function scatter(slot: number) {
   return {
     x: (slot * 7) % 17,

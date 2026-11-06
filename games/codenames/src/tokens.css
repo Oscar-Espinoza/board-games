@@ -21,9 +21,6 @@ body:has(.cn-table) {
   overflow: hidden;
   background: #3f2415;
 }
-body:has(.cn-table) .site-header {
-  display: none;
-}
 .cn-table-tokens {
   --cn-font: 'Codenames Roboto Condensed', Arial, Helvetica, sans-serif;
   --cn-wood-base: #3f2415;
@@ -906,11 +903,6 @@ body:has(.cn-table) .site-header {
   width: 18px;
   height: 18px;
   vertical-align: -4px;
-}
-.cn-dialog .invite {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
 }
 .cn-dialog {
   box-sizing: border-box;

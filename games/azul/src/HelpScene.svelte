@@ -1,7 +1,7 @@
 <script lang="ts">
   let { scene, step = 2 }: { scene: string; step?: number } = $props();
   import { palette as paints } from './palette.js';
-  import { colors } from './index.js';
+  import { colors, penalties, wallColors } from './index.js';
   const palette = colors.map((color) => paints[color].glaze);
 </script>
 
@@ -29,7 +29,7 @@
       >{step === 2 ? '= 7' : '◇'}</text
     >
   {:else if scene === 'marker' || scene === 'penalty'}
-    {#each [1, 1, 2, 2, 2, 3, 3] as penalty, i}<text
+    {#each penalties as penalty, i}<text
         x={38 + i * 49}
         y="46"
         fill="#f8edcc"
@@ -61,7 +61,7 @@
           width="22"
           height="22"
           rx="3"
-          fill={palette[(c - r + 5) % 5]}
+          fill={paints[wallColors[r][c]].glaze}
           opacity={scene === 'finish'
             ? r === 0 || c === 0
               ? 1

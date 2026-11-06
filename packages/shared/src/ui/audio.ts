@@ -25,6 +25,8 @@ export type Noise = {
   attack?: number;
 };
 
+export const clamp01 = (volume: number) => Math.min(1, Math.max(0, volume));
+
 export function createAudio() {
   let context: AudioContext | undefined;
   const live = new Set<AudioScheduledSourceNode>();

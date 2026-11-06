@@ -135,5 +135,8 @@ export function identity(c: Face): Face {
     fruit: [...c.fruit],
   };
 }
+/** Hand size, and so the number of picks in a round, for a table of this size. */
+export const picksPerRound = (players: number) =>
+  players <= 3 ? 10 : players <= 5 ? 9 : players <= 7 ? 8 : 7;
 export const isDessert = (c: Face & { boxed?: boolean }) =>
   !c.boxed && (desserts as readonly string[]).includes(c.kind);

@@ -6,31 +6,6 @@
       "name": "wood",
       "prompt": "A high-resolution landscape photograph of only a warm dark walnut wooden tabletop, directly overhead, edge-to-edge wood, no objects. Natural subtle grain, fine worn pores, narrow unobtrusive seams between broad horizontal planks, matte oiled surface, warm diffused light from upper left and gently darker lower right. Brown tones, not orange. Surface for a realistic Codenames tabletop app, no text, no graphics, no vignette frame. 1536x1024.",
       "source": "/home/oscar/.codex/generated_images/01a09c27-70d8-77f1-8f2e-6c3875918314/exec-02a1a6a7-bd50-493a-936b-e08c2ecf3e0f.png"
-    },
-    {
-      "name": "foliage",
-      "prompt": "A photorealistic top-down cutout of a loose pothos plant with organic trailing foliage, 12-18 individually varied green leaves, delicate stems and natural veins, some overlapping leaves, irregular silhouette. Warm soft light from upper left, gentle contact shadows to lower right. Entire plant visible with margin. Actual transparent background, no pot, no table, no text. Decorative image asset for a realistic wooden tabletop app. 1024x1024.",
-      "source": "/home/oscar/.codex/generated_images/01a09c27-70d8-77f1-8f2e-6c3875918314/exec-95dd0169-9506-41d8-959a-dff7d3caa489.png"
-    },
-    {
-      "name": "mug",
-      "prompt": "A photorealistic overhead cutout of one ivory ceramic coffee mug containing dark black coffee, handle pointing right. Matte warm white glaze with slight irregularities and realistic rim, natural coffee reflection, not a vector or illustration. Warm diffused light from upper left, soft contact shadow to lower right. Entire mug visible with margin. Actual transparent background. No coaster, no table, no text, no branding, no artwork on mug. 1024x1024.",
-      "source": "/home/oscar/.codex/generated_images/01a09c27-70d8-77f1-8f2e-6c3875918314/exec-eee40718-2ec5-46c3-ab1a-ac5606f5570b.png"
-    },
-    {
-      "name": "coaster",
-      "prompt": "A photorealistic directly overhead cutout of one round natural cork coaster, small irregular cork particles, thin realistic edge, matte warm tan cork, no decoration or grooves. Warm soft light from upper left and gentle contact shadow to lower right. Entire coaster visible, actual transparent background. No mug, no table, no text or branding. 1024x1024.",
-      "source": "/home/oscar/.codex/generated_images/01a09c27-70d8-77f1-8f2e-6c3875918314/exec-ef793097-91de-45f4-ad90-5a3726086898.png"
-    },
-    {
-      "name": "notepad",
-      "prompt": "A photorealistic top-down cutout of a small blank spiral notepad, portrait shape, ivory subtly fibrous paper, fine warm metallic wire binding across top, thin stacked paper edges, slightly imperfect corners. The pages are entirely BLANK, no lines, lettering, writing, symbols or branding. Warm soft light from upper left, gentle contact shadow to lower right. Entire object visible with margin, actual transparent background, no table or other objects. 1024x1024.",
-      "source": "/home/oscar/.codex/generated_images/01a09c27-70d8-77f1-8f2e-6c3875918314/exec-49d57b50-1ed9-443e-bb71-baff35671539.png"
-    },
-    {
-      "name": "books",
-      "prompt": "A photorealistic directly overhead cutout of two small unlettered clothbound books, one muted tan linen and one dark olive-brown cloth, casually stacked with a small rotation difference. Completely blank covers and spines, no titles, letters, symbols or branding. Fine linen fibres and thin ivory page edges, restrained wear. Warm soft light from upper left, gentle contact shadow to lower right. Entire stack visible with margin, actual transparent background, no tabletop. 1024x1024.",
-      "source": "/home/oscar/.codex/generated_images/01a09c27-70d8-77f1-8f2e-6c3875918314/exec-087547c8-c82a-4d23-a73e-d91fad3e453d.png"
     }
   ]
 }

@@ -2,14 +2,13 @@ import { onMount, untrack } from 'svelte';
 import { prefersReducedMotion } from 'svelte/motion';
 import {
   RevisionGate,
+  ViewerSkin,
   createAudio,
-  read,
-  write,
+  viewerPreferences,
   type Audio,
+  type BoardProps,
 } from '@board-games/shared/ui';
 import { m } from '@board-games/shared/messages';
-import type { Locale } from '@board-games/shared/runtime';
-import type { Player } from '@board-games/game-core';
 import {
   attach,
   pips,
@@ -18,19 +17,23 @@ import {
   type End,
   type View,
 } from './index.js';
+import { CHARGE_MS, COMPACT, MAX_TEAM_NAME, SEATS } from './constants.js';
 import { idealPoses, plug } from './layout.js';
-import { COMPACT, lookOf, type Look } from './look.js';
 
-export type GameProps = {
-  view: View;
-  playerId: string;
-  players: Player[];
-  send: (action: unknown) => void;
-  locale: Locale;
-  round: number;
-  connected: boolean;
-  pending: boolean;
-};
+/** The Board props the controller reads; `locale` and `round` are filled in by the Board. */
+type GameProps = Required<
+  Pick<
+    BoardProps<View, Action>,
+    | 'view'
+    | 'playerId'
+    | 'players'
+    | 'send'
+    | 'locale'
+    | 'round'
+    | 'connected'
+    | 'pending'
+  >
+>;
 /** How a table sounds. Each look brings its own. */
 export type Sounds = {
   select(): void;
@@ -38,10 +41,10 @@ export type Sounds = {
   play(force: number): void;
   pass(): void;
   /** It just became your turn. */
-  turn(): void;
+  turn?(): void;
   /** A hand ended: your team won (true), lost (false) or tied (null). */
-  end(won: boolean | null): void;
-  /** Milliseconds between a play being accepted and the tile landing. */
+  end?(won: boolean | null): void;
+  /** Milliseconds between a play being accepted and the tile landing: the look's flight time. */
   land(force: number): number;
 };
 /** An accepted play or pass, seen once, in order. */
@@ -78,7 +81,6 @@ export class DominoGame {
       };
     });
     $effect(() => {
-      // Drop a stale selection once the turn or hand moves on.
       if (
         !this.myTurn ||
         (this.selected !== null && !this.playable.has(this.selected))
@@ -87,7 +89,6 @@ export class DominoGame {
         this.chosenEnd = null;
       }
     });
-    $effect(() => write('domino:camera', String(this.camera)));
     // Sounds and table events only across consecutive revisions.
     $effect(() => {
       const revision = this.pub.revision,
@@ -105,15 +106,14 @@ export class DominoGame {
       moved = key !== this.#seen.last,
       ended = !!pub.result && !this.#seen.ended,
       sound = (fn: (s: Sounds) => void) => {
-        if (this.soundOn && this.sounds) fn(this.sounds);
+        if (this.preferences.sound && this.sounds) fn(this.sounds);
       };
     this.#seen = { last: key, ended: !!pub.result };
     if (!fresh) return;
     if (ended) {
       const won = this.#won(pub.result!.winner);
-      sound((s) => s.end(won));
-    } else if (this.myTurn && moved) sound((s) => s.turn());
-    // Only a new play or pass is an event; other updates keep the last one.
+      sound((s) => s.end?.(won));
+    } else if (this.myTurn && moved) sound((s) => s.turn?.());
     if (!last || !moved) return;
     if (last.type === 'pass') {
       sound((s) => s.pass());
@@ -177,8 +177,8 @@ export class DominoGame {
     Math.max(0, this.pub.players.indexOf(this.props.playerId)),
   );
   /** 0 = you (front), 1 = right, 2 = partner (far side), 3 = left. */
-  rel = (seat: number) => (seat - this.own + 4) % 4;
-  seatAt = (r: number) => (this.own + r) % 4;
+  rel = (seat: number) => (seat - this.own + SEATS) % SEATS;
+  seatAt = (r: number) => (this.own + r) % SEATS;
   name = (seat: number) =>
     this.props.players.find((p) => p.id === this.pub.players[seat])?.name ??
     `#${seat + 1}`;
@@ -211,8 +211,7 @@ export class DominoGame {
     return this.props.pending;
   }
 
-  // Selection lifts a tile and shows a ghost on each end it fits; pressing a
-  // ghost plays there, harder the longer it is held.
+  // Selecting a tile shows a ghost on each end it fits; holding a ghost charges the strike.
   selected = $state<number | null>(null);
   chosenEnd = $state<End | null>(null);
   readonly options = $derived(
@@ -230,7 +229,7 @@ export class DominoGame {
     if (!this.myTurn || !this.playable.has(id)) return;
     this.selected = this.selected === id ? null : id;
     this.chosenEnd = null;
-    if (this.soundOn) this.sounds?.select();
+    if (this.preferences.sound) this.sounds?.select();
   };
   /** Ghosts plug onto each open end exactly where that end tile lies now. */
   readonly ghosts = $derived(
@@ -247,7 +246,6 @@ export class DominoGame {
         })),
   );
 
-  // Strength: hold to charge, release to strike.
   charge = $state(0);
   charging = $state(false);
   #started = 0;
@@ -259,7 +257,10 @@ export class DominoGame {
     this.charging = true;
     this.#started = performance.now();
     const tick = () => {
-      this.charge = Math.min(1, (performance.now() - this.#started) / 1100);
+      this.charge = Math.min(
+        1,
+        (performance.now() - this.#started) / CHARGE_MS,
+      );
       if (this.charging) this.#frame = requestAnimationFrame(tick);
     };
     tick();
@@ -292,42 +293,26 @@ export class DominoGame {
     }
   };
 
-  // Phones get a compact layout.
   compact = $state(media(COMPACT));
-  look = $state<Look>(lookOf());
-  setLook = (look: Look) => {
-    this.look = look;
-    write('domino:look', look);
-  };
-
-  // Camera (3D): 0 = seated at the table, 1 = straight overhead.
-  camera = $state(
-    ((stored) =>
-      stored !== null && Number.isFinite(Number(stored))
-        ? Number(stored)
-        : 0.15)(read('domino:camera')),
-  );
-
-  // Preferences.
-  soundOn = $state(read('domino:sound') !== 'off');
-  motionSetting = $state(read('domino:motion'));
+  /** The classic skin is the three.js patio. */
+  readonly skin = new ViewerSkin('domino');
+  /** `camera` (3D): 0 = seated at the table, 1 = straight overhead. */
+  readonly preferences = viewerPreferences('domino', {
+    sound: true,
+    motion: null,
+    camera: 0.15,
+  });
   settingsOpen = $state(false);
   rulesOpen = $state(false);
   readonly motion = $derived(
-    this.motionSetting
-      ? this.motionSetting !== 'off'
-      : !prefersReducedMotion.current,
+    this.preferences.motion ?? !prefersReducedMotion.current,
   );
-  preference = (kind: 'sound' | 'motion', on: boolean) => {
-    write(`domino:${kind}`, on ? 'on' : 'off');
-    if (kind === 'sound') {
-      this.soundOn = on;
-      if (!on) this.audio.stop();
-      this.audio.unlock();
-    } else this.motionSetting = on ? 'on' : 'off';
+  setSound = (on: boolean) => {
+    this.preferences.sound = on;
+    if (!on) this.audio.stop();
+    this.audio.unlock();
   };
 
-  // Team names on the scoreboard.
   editing = $state<0 | 1 | null>(null);
   draft = $state('');
   startEdit = (team: 0 | 1) => {
@@ -336,7 +321,7 @@ export class DominoGame {
   };
   commitEdit = () => {
     const team = this.editing,
-      value = this.draft.trim().slice(0, 16);
+      value = this.draft.trim().slice(0, MAX_TEAM_NAME);
     this.editing = null;
     if (team !== null && value && value !== this.pub.teams[team])
       this.act({ type: 'RENAME_TEAM', team, name: value });

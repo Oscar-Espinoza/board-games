@@ -5,9 +5,9 @@
   "type": "module",
   "exports": {
     "./server": "./src/index.ts",
-    "./Board.svelte": "./src/Board.svelte",
     "./TileArt.svelte": "./src/TileArt.svelte",
-    "./practice": "./src/practice.ts"
+    "./practice": "./src/practice.ts",
+    "./client": "./src/client.ts"
   },
   "dependencies": {
     "@board-games/game-core": "workspace:*",

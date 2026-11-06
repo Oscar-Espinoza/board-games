@@ -1,8 +1,20 @@
 /** Live Jev operative, the lab's best setup: Noul per card (v2) → group Choice over the top 6,
  * never past the clue's count, plus one leftover guess only when its Noul is at least 0.8.
- * Situations (below) can override that caution when the score makes waiting a likely loss. */
+ * When the score makes waiting a likely loss it gambles past that caution (`lastChance`). */
+import {
+  boardSize,
+  clueLength,
+  maxClueCount,
+} from '@board-games/codenames/setup';
 import { ask, usdPerToken } from '../jev.ts';
-import { prompts, type View } from './prompts.ts';
+import {
+  cardQuestions,
+  combinations,
+  questionKey,
+  unfinishedClues,
+} from './judging.ts';
+import { prompts } from './prompts.ts';
+import type { View } from './types.ts';
 
 /** Public score: agents each team still has to find. */
 export interface Score {
@@ -13,46 +25,20 @@ export interface Score {
 export interface Plan {
   /** Words to guess in order; the caller stops at the first miss and then ends the turn. */
   guesses: string[];
-  /** The situation that changed the normal policy, if any. */
-  situation: Situation['id'] | null;
+  situation: 'last-chance' | null;
   usd: number;
-  ms: number;
 }
 
-interface Context {
-  score: Score;
-  /** The clue's number; 0 for 0 or unlimited. */
-  count: number;
-  /** Guesses the rules allow this turn (Infinity for 0 / unlimited). */
-  budget: number;
-}
-
-/** A game state where the normal, careful policy loses more often than a gamble.
- * Add new ones here; the first that applies wins. */
-interface Situation {
-  id: 'last-chance';
-  applies(c: Context): boolean;
-  /** Minimum Noul for guesses beyond the clue's own words. */
-  extraTau: number;
-  /** Use every guess the rules allow instead of stopping at the clue's number. */
-  useFullBudget: boolean;
-}
-
-const situations: Situation[] = [
-  {
-    // The opponent needs one agent: after this turn they very likely win.
-    // If the careful guesses cannot finish our team, gamble on the best remaining words;
-    // hitting the assassin loses, but so does stopping.
-    id: 'last-chance',
-    applies: (c) => c.score.theirs <= 1 && c.score.ours > (c.count || 1),
-    extraTau: 0,
-    useFullBudget: true,
-  },
-];
+/** The opponent needs one agent, so after this turn they very likely win. If the careful
+ * guesses cannot finish our team, gamble on the best remaining words: hitting the assassin
+ * loses, but so does stopping. */
+const lastChance = (score: Score, count: number) =>
+  score.theirs <= 1 && score.ours > (count || 1);
 
 /** Chosen before a match. The first guess is always the best word; these only change
  * how sure Jev must be to keep going. */
-export type Personality = 'conservative' | 'normal' | 'risky';
+export const personalityNames = ['conservative', 'normal', 'risky'] as const;
+export type Personality = (typeof personalityNames)[number];
 const personalities: Record<
   Personality,
   {
@@ -71,17 +57,18 @@ const personalities: Record<
 
 const prompt = prompts.v2!;
 
-/** Codenames bounds (games/codenames): 25 cards, clues of at most 80 graphemes (≤ 320 UTF-16 units here) counting 0–9,
+/** Codenames bounds (games/codenames): clues of at most 80 graphemes (≤ 4 UTF-16 units each here),
  * and every turn reveals a card, so board + revealed and board + past clues stay within 25. */
-const cards = 25;
+const cards = boardSize;
 const text = (x: unknown) =>
-  typeof x === 'string' && x.length > 0 && x.length <= 320;
+  typeof x === 'string' && x.length > 0 && x.length <= clueLength * 4;
 const words = (x: unknown) =>
   Array.isArray(x) && x.length <= cards && x.every(text);
 const number = (x: unknown) =>
-  typeof x === 'number' && Number.isInteger(x) && x >= 0 && x <= 9;
+  typeof x === 'number' && Number.isInteger(x) && x >= 0 && x <= maxClueCount;
 
-/** Guards the HTTP route: a view a real game can produce, rebuilt so extra fields never reach Jev. */
+/** Guards the HTTP route: a view a real game can produce, rebuilt so extra fields never reach Jev.
+ * `guessedThisTurn` from older clients is ignored: a live turn is judged before any guess. */
 export function parseView(x: unknown): View | null {
   const v = x as View;
   const valid =
@@ -106,8 +93,7 @@ export function parseView(x: unknown): View | null {
         number(h.count) &&
         words(h.guessed),
     ) &&
-    v.history.reduce((n, h) => n + h.guessed.length, 0) <= cards &&
-    words(v.guessedThisTurn);
+    v.history.reduce((n, h) => n + h.guessed.length, 0) <= cards;
   return valid
     ? {
         lang: v.lang,
@@ -120,58 +106,43 @@ export function parseView(x: unknown): View | null {
           count,
           guessed,
         })),
-        guessedThisTurn: v.guessedThisTurn,
+        guessedThisTurn: [],
       }
     : null;
 }
 
-/** Board × clues peaks at 13 × 13 for a valid view; anything larger is not a real game. */
-const maxQuestions = 169;
+/** Board × clues peaks at ⌈25/2⌉² for a valid view; anything larger is not a real game. */
+const maxQuestions = Math.ceil(cards / 2) ** 2;
 /** Server callers waiting for a Jev slot; more are refused instead of queued. */
 const queue = 16;
 
-function combinations<T>(items: T[], k: number): T[][] {
-  if (k === 0) return [[]];
-  return items.flatMap((x, i) =>
-    combinations(items.slice(i + 1), k - 1).map((rest) => [x, ...rest]),
-  );
-}
-
-/** `view.clue.count` 0 or unlimited plays as "the best word, then only words the personality trusts". */
+/** `view.clue.count` 0 plays as "the best word, then only words the personality trusts". */
 export async function plan(
   view: View,
-  unlimited = false,
-  score?: Score,
-  personality: Personality = 'normal',
-  signal?: AbortSignal,
+  {
+    score,
+    personality = 'normal',
+    signal,
+  }: { score?: Score; personality?: Personality; signal?: AbortSignal } = {},
 ): Promise<Plan> {
   const style = personalities[personality];
-  const started = performance.now();
   let tokens = 0;
   const identity = new Map(view.revealed.map((r) => [r.word, r.identity]));
-  const leftovers = view.history.flatMap((h, k) =>
-    h.team === 'ours' &&
-    h.guessed.filter((w) => identity.get(w) === 'ours').length < h.count
-      ? [`history[${k}]`]
-      : [],
-  );
-  const refs = ['clue', ...leftovers];
+  const refs = [
+    'clue',
+    ...unfinishedClues(view.history, (w) => identity.get(w) === 'ours'),
+  ];
   if (refs.length * view.board.length > maxQuestions)
     throw new Error('Too many questions');
-  const first = await ask(
-    view,
-    Object.fromEntries(
-      refs.flatMap((ref, r) =>
-        view.board.map((_, i) => [`r${r}w${i}`, prompt.card(ref, i)]),
-      ),
-    ),
-    { queue, signal },
-  );
+  const first = await ask(view, cardQuestions(refs, view.board, prompt.card), {
+    queue,
+    signal,
+  });
   tokens += first.inputTokens;
   const scores = refs.map((_, r) =>
     view.board
       .map((word, i) => {
-        const a = first.answers[`r${r}w${i}`]!;
+        const a = first.answers[questionKey(r, i)]!;
         if (a.type !== 'noul') throw new Error('Expected a Noul answer');
         return { word, p: a.noul };
       })
@@ -180,7 +151,7 @@ export async function plan(
   const ranked = scores[0]!;
 
   let guesses: string[];
-  const count = unlimited ? 0 : view.clue.count;
+  const count = view.clue.count;
   if (count === 0)
     guesses = [
       ranked[0]!.word,
@@ -223,23 +194,12 @@ export async function plan(
     .filter(([word]) => !guesses.includes(word))
     .sort((a, b) => b[1] - a[1]);
 
-  const context: Context = {
-    score: score ?? { ours: Infinity, theirs: Infinity },
-    count,
-    budget: count === 0 ? Infinity : count + 1,
-  };
-  const situation = score
-    ? (situations.find((s) => s.applies(context)) ?? null)
-    : null;
-  if (situation?.useFullBudget) {
-    // Never guess more than the agents we still need: the last one wins the game.
-    const room = Math.min(context.budget, context.score.ours) - guesses.length;
-    guesses.push(
-      ...extras
-        .filter(([, p]) => p >= situation.extraTau)
-        .slice(0, Math.max(0, room))
-        .map(([word]) => word),
-    );
+  const gamble = !!score && lastChance(score, count);
+  if (gamble) {
+    // Use every guess the rules allow, but never more than the agents we still need.
+    const allowed = count === 0 ? Infinity : count + 1;
+    const room = Math.min(allowed, score.ours) - guesses.length;
+    guesses.push(...extras.slice(0, Math.max(0, room)).map(([word]) => word));
   } else if (
     count > 0 &&
     guesses.length === Math.min(count, view.board.length)
@@ -254,8 +214,7 @@ export async function plan(
   }
   return {
     guesses,
-    situation: situation?.id ?? null,
+    situation: gamble ? 'last-chance' : null,
     usd: tokens * usdPerToken,
-    ms: performance.now() - started,
   };
 }

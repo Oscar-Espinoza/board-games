@@ -1,11 +1,10 @@
 <script lang="ts">
-  import type { Component, Snippet } from 'svelte';
+  import type { Component } from 'svelte';
   import { m } from '@board-games/shared/messages';
-  import type { Locale } from '@board-games/shared/runtime';
-  import type { Player } from '@board-games/game-core';
-  import type { View } from './index.js';
+  import type { BoardProps } from '@board-games/shared/ui';
+  import type { Skin } from '@board-games/shared/ui/pixel';
+  import type { Action, View } from './index.js';
   import { DominoGame } from './game.svelte.js';
-  import type { Look } from './look.js';
   import Hud from './Hud.svelte';
   import Loading from './Loading.svelte';
 
@@ -14,7 +13,7 @@
     playerId,
     players,
     send,
-    locale,
+    locale = 'en',
     round = 0,
     connected = true,
     pending = false,
@@ -22,20 +21,7 @@
     rematch,
     rulesContent,
     settingsContent,
-  }: {
-    view: View;
-    playerId: string;
-    players: Player[];
-    send: (action: unknown) => void;
-    locale: Locale;
-    round?: number;
-    connected?: boolean;
-    pending?: boolean;
-    canRematch?: boolean;
-    rematch?: () => void;
-    rulesContent?: Snippet;
-    settingsContent?: Snippet;
-  } = $props();
+  }: BoardProps<View, Action> = $props();
 
   const game = new DominoGame(() => ({
     view,
@@ -49,19 +35,22 @@
   }));
 
   // Each look is its own chunk: the 8-bit table never downloads three.js.
-  const tables: Record<Look, () => Promise<{ default: Component<any> }>> = {
-    '3d': () => import('./three/Table3D.svelte'),
+  const tables: Record<Skin, () => Promise<{ default: Component<any> }>> = {
+    classic: () => import('./three/Table3D.svelte'),
     pixel: () => import('./pixel/PixelTable.svelte'),
   };
   let Table = $state<Component<any> | null>(null),
     failed = $state(false);
   $effect(() => {
-    const look = game.look;
+    const skin = game.skin.choice;
     let alive = true;
     Table = null;
-    tables[look]()
+    failed = false;
+    tables[skin]()
       .then((v) => alive && (Table = v.default))
-      .catch(() => (failed = true));
+      .catch(() => {
+        if (alive) failed = true;
+      });
     return () => (alive = false);
   });
 </script>
@@ -72,7 +61,7 @@
     </p>{:else}<Loading
       progress={0.05}
       label={m.domino_loading({}, game.L)}
-      pixel={game.look === 'pixel'}
+      pixel={game.skin.choice === 'pixel'}
     />{/if}
 </Hud>
 

@@ -9,27 +9,35 @@
   } from '@board-games/shared/runtime';
   import { m } from '@board-games/shared/messages';
   import { setTheme, theme } from '$lib/theme.svelte';
+  import { joinRequest } from '$lib/home/state.svelte';
   import '../app.css';
   let { children } = $props();
   const languageName = (locale: Locale) =>
     new Intl.DisplayNames([locale], { type: 'language' }).of(locale) ?? locale;
+  const home = $derived(page.url.pathname === '/');
   onMount(() => {
     document.documentElement.lang = getLocale();
+  });
+  /** The home page restyles the chrome through `html[data-home]`: its look is the theme. */
+  $effect(() => {
+    if (!home) return;
+    document.documentElement.dataset.home = theme.value;
+    return () => {
+      delete document.documentElement.dataset.home;
+    };
   });
 </script>
 
 <header class="site-header">
   <a class="brand" href="/">◈ {m.catalog()}</a>
-  {#if page.url.pathname === '/' && theme.value === 'pixel'}<nav
-      class="store-nav"
-    >
+  {#if home && theme.value === 'pixel'}<nav class="store-nav">
       <a href="/">{m.pixel_home()}</a><a href="#pixel-games"
         >{m.pixel_games()}</a
       ><a href="#pixel-categories">{m.pixel_categories()}</a>
     </nav>{/if}
-  {#if page.url.pathname === '/'}<button
+  {#if home}<button
       class="catalog-join"
-      onclick={() => window.dispatchEvent(new Event('catalog-join'))}
+      onclick={() => (joinRequest.pending = true)}
       >{m.library_join()} <span aria-hidden="true">↗</span></button
     >{/if}
   <label class="language"
@@ -43,11 +51,7 @@
         >{/each}
     </select></label
   >
-  {#if page.url.pathname === '/'}<div
-      class="theme-switch"
-      role="group"
-      aria-label={m.theme_label()}
-    >
+  {#if home}<div class="theme-switch" role="group" aria-label={m.theme_label()}>
       {#each ['classic', 'pixel'] as const as option}<button
           aria-pressed={theme.value === option}
           onclick={() => setTheme(option)}
@@ -109,13 +113,13 @@
     background: #3f9a4a;
     border-color: #1f5a27;
   }
-  :global(body:has(.pixel-store) .site-header) {
+  :global(html[data-home='pixel'] .site-header) {
     border: 0;
     background: #2a1a10;
     color: #f6e7c8;
     padding: 10px;
   }
-  :global(body:has(.pixel-store) .brand) {
+  :global(html[data-home='pixel'] .brand) {
     font-size: 1.35rem;
     text-transform: uppercase;
     color: #f2c14e;
@@ -125,37 +129,37 @@
     padding: 8px 14px;
     text-shadow: 2px 2px 0 #1e110a;
   }
-  :global(body:has(.pixel-store)) .catalog-join,
-  :global(body:has(.pixel-store) .language select) {
+  :global(html[data-home='pixel']) .catalog-join,
+  :global(html[data-home='pixel'] .language select) {
     color: #f6e7c8;
   }
-  :global(body:has(.pixel-store) .language option) {
+  :global(html[data-home='pixel'] .language option) {
     color: #2a1a10;
   }
-  :global(body:has(.pixel-store)) .theme-switch {
+  :global(html[data-home='pixel']) .theme-switch {
     border: 2px solid #1e110a;
     border-radius: 0;
   }
-  :global(body:has(.pixel-store)) .theme-switch button {
+  :global(html[data-home='pixel']) .theme-switch button {
     color: #f6e7c8;
   }
-  :global(body:has(.pixel-store)) .theme-switch button[aria-pressed='true'] {
+  :global(html[data-home='pixel']) .theme-switch button[aria-pressed='true'] {
     background: #3f9a4a;
   }
   @media (max-width: 720px) {
     .store-nav {
       display: none;
     }
-    :global(body:has(.pixel-store) .site-header) {
+    :global(html[data-home='pixel'] .site-header) {
       flex-wrap: wrap;
       gap: 8px;
       padding: 10px 16px;
     }
-    :global(body:has(.pixel-store) .brand) {
+    :global(html[data-home='pixel'] .brand) {
       font-size: 1rem;
       padding: 6px 10px;
     }
-    :global(body:has(.pixel-store)) .catalog-join {
+    :global(html[data-home='pixel']) .catalog-join {
       margin-right: 0;
     }
   }
@@ -173,14 +177,14 @@
     .catalog-join span {
       display: none;
     }
-    :global(body:has(.library) .site-header) {
+    :global(html[data-home='classic'] .site-header) {
       padding: 12px 18px;
       gap: 8px;
     }
-    :global(body:has(.library) .brand) {
+    :global(html[data-home='classic'] .brand) {
       font-size: 0.85rem;
     }
-    :global(body:has(.library) .language select) {
+    :global(html[data-home='classic'] .language select) {
       padding: 8px 0;
       font-size: 0.8rem;
     }

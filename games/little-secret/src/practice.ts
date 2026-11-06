@@ -1,7 +1,9 @@
-import { seeded } from '@board-games/game-core';
 /** Local fixtures and a small independent pack. Never imported by room creation. */
-import { rules } from './engine.js';
-import type { Packs, State, Power } from './types.js';
+import { seeded } from '@board-games/game-core';
+import type { PracticeTable } from '@board-games/shared/ui';
+import { nextActor, rules, type Packs } from './engine.js';
+import { powersFrom } from './limits.js';
+import type { Power, Role, View } from './types.js';
 export const scenarios = [
   'basic',
   'journalist',
@@ -13,6 +15,16 @@ export const scenarios = [
   'scores',
 ] as const;
 export type Scenario = (typeof scenarios)[number];
+const seatCount: Record<Scenario, number> = {
+  basic: 3,
+  journalist: 5,
+  powers: 6,
+  sage: 6,
+  rps: 3,
+  revenant: 6,
+  nine: 9,
+  scores: 3,
+};
 const examples: Record<'en' | 'es', string[]> = {
   en: [
     'violin|guitar',
@@ -65,36 +77,42 @@ const pack = (lang: 'en' | 'es'): Packs['en'] =>
     words: line.split('|') as [string, string],
     aliases: [[], []],
   }));
-const packs: Packs = { en: pack('en'), es: pack('es') };
-export const practiceRules = rules(packs);
+const practiceRules = rules({ en: pack('en'), es: pack('es') });
+const names = ['Ada', 'Bea', 'Leo', 'Sol', 'Max', 'Luz', 'Eva', 'Noa', 'Paz'];
+
 export function practice(
   scenario: Scenario = 'basic',
   language: 'en' | 'es' = 'en',
-) {
-  const count =
-    scenario === 'nine'
-      ? 9
-      : ['powers', 'sage', 'revenant'].includes(scenario)
-        ? 6
-        : scenario === 'journalist'
-          ? 5
-          : 3;
-  const seats = ['Ada', 'Bea', 'Leo', 'Sol', 'Max', 'Luz', 'Eva', 'Noa', 'Paz']
-    .slice(0, count)
-    .map((name, i) => ({ id: `training-${i}`, name, connected: true }));
+): PracticeTable<View> {
+  const count = seatCount[scenario];
+  const players = names.slice(0, count).map((name, i) => ({
+    id: `training-${i}`,
+    name,
+    connected: true as const,
+    reservedUntil: null,
+  }));
   const random = seeded(26912),
-    ids = seats.map((p) => p.id),
+    ids = players.map((p) => p.id),
     hostId = ids[0]!;
   let state = practiceRules.create(ids, random, {
     wordLanguage: language,
-    powers: count >= 6,
+    powers: count >= powersFrom,
   });
   const send = (actor: string, action: unknown) => {
     state = practiceRules.apply(state, actor, action, random, { hostId });
   };
   for (const id of ids) send(id, { type: 'ready', version: 0 });
-  const vote = (victim: string) => {
-    send(ids[0]!, { type: 'volunteer', mission: state.mission });
+  const roles = () => {
+    state.roles = Object.fromEntries(
+      ids.map((p, i): [string, Role] => [
+        p,
+        i === 4 ? 'journalist' : i === 3 ? 'infiltrator' : 'disciple',
+      ]),
+    );
+  };
+  /** A volunteer opens the round, everyone gives a clue and the host opens the vote. */
+  const discuss = () => {
+    send(hostId, { type: 'volunteer', mission: state.mission });
     while (state.phase === 'clues')
       send(state.speaker!, {
         type: 'clue',
@@ -107,6 +125,9 @@ export function practice(
       mission: state.mission,
       cycle: state.cycle,
     });
+  };
+  const vote = (victim: string) => {
+    discuss();
     for (const id of ids)
       send(id, {
         type: 'vote',
@@ -124,39 +145,17 @@ export function practice(
       ]),
     );
   if (scenario === 'journalist') {
-    state.roles = Object.fromEntries(
-      ids.map((p, i) => [
-        p,
-        i === 4 ? 'journalist' : i === 3 ? 'infiltrator' : 'disciple',
-      ]),
-    );
+    roles();
     vote(ids[4]!);
   }
   if (scenario === 'revenant') {
     state.powers[ids[0]!] = 'revenant';
     state.powers[ids[4]!] = 'adept';
-    state.roles = Object.fromEntries(
-      ids.map((p, i) => [
-        p,
-        i === 4 ? 'journalist' : i === 3 ? 'infiltrator' : 'disciple',
-      ]),
-    );
+    roles();
     vote(ids[0]!);
   }
   if (scenario === 'sage' || scenario === 'rps') {
-    send(hostId, { type: 'volunteer', mission: state.mission });
-    while (state.phase === 'clues')
-      send(state.speaker!, {
-        type: 'clue',
-        text: 'echo',
-        mission: state.mission,
-        cycle: state.cycle,
-      });
-    send(hostId, {
-      type: 'openVote',
-      mission: state.mission,
-      cycle: state.cycle,
-    });
+    discuss();
     const targets = scenario === 'sage' ? [1, 0, 1, 1, 2, 0] : [1, 2, 0];
     for (let i = 0; i < ids.length; i++)
       send(ids[i]!, {
@@ -175,29 +174,15 @@ export function practice(
     vote(ids[2]!);
   }
   return {
-    seats,
-    get state(): State {
-      return state;
-    },
+    players,
+    host: hostId,
     get actor() {
-      return (
-        state.prompt?.actor ??
-        state.speaker ??
-        (state.phase === 'setup'
-          ? ids.find((p) => !state.ready.includes(p))
-          : state.phase === 'vote'
-            ? ids.find(
-                (p) => !state.eliminated.includes(p) && !state.ballots[p],
-              )
-            : state.phase === 'tie'
-              ? state.candidates.find((p) => !state.rps[p])
-              : state.phase === 'missionResult'
-                ? ids.find((p) => !state.continued.includes(p))
-                : hostId) ??
-        hostId
-      );
+      return nextActor(state) ?? hostId;
     },
-    view: (p: string) => practiceRules.view(state, p),
-    send,
+    get finished() {
+      return state.phase === 'finished';
+    },
+    view: (seat) => practiceRules.view(state, seat),
+    send: (seat, action) => send(seat, action),
   };
 }

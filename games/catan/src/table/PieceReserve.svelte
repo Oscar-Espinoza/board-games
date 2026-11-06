@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { getContext } from 'svelte';
+  import { useSkin } from './skin.js';
+  import { ink } from './shapes.js';
   import { shade } from './artwork.js';
   import { ramp, sprites } from '../pixel/sprites.js';
   let {
@@ -9,11 +10,11 @@
     cities,
   }: { color: string; roads: number; settlements: number; cities: number } =
     $props();
-  const pixel = getContext<(() => boolean) | undefined>('catan:pixel');
+  const pixel = useSkin();
   const palette = $derived(ramp(color));
 </script>
 
-{#if pixel?.()}
+{#if pixel()}
   <!-- 8-bit: the same hand-pixelled pieces as the island, in art pixels. -->
   <svg
     class="px-reserve"
@@ -37,7 +38,7 @@
       >{/each}
     {#each Array(Math.max(0, roads)) as _, i}<g
         transform={`translate(${(i % 5) * 9} ${34 + Math.floor(i / 5) * 4})`}
-        ><rect width="8" height="3" fill="#1a0f08" /><rect
+        ><rect width="8" height="3" fill={ink} /><rect
           x="1"
           y="1"
           width="6"

@@ -13,7 +13,7 @@ Operatives never receive unrevealed identities. Setup readiness is versioned and
 unanimous. Only unchanged readiness retries; clues, guesses and end-turn do not.
 The host can rematch. Production packs and practice fixtures stay separate.
 
-Original optimized WebP table materials are bundled under `src/table/` with
+The optimized WebP table material is bundled under `src/table/` with
 provenance. All interface text/cards use Svelte/CSS. Archivo is self-hosted.
 No runtime dependencies or sounds were added. Build and deploy client/server together.
 

@@ -1,6 +1,6 @@
 import { tiles, type Region } from '../tiles.js';
 import { cityPath, roadPath } from '../art.js';
-import type { Feature } from '../features.js';
+import { adjacent, type Feature } from '../features.js';
 
 // Presentation-only standing scenery. Every layout is a pure function of the
 // tile definition and its board key, so reconnects and replays draw the same
@@ -108,8 +108,8 @@ export function distance([x, y]: Pt, line: Pt[]) {
   return best;
 }
 
-/** Deterministic 0..1 hash stream. */
-export function seeded(text: string) {
+/** A 0..1 stream derived from the text alone, so a tile always looks the same. */
+export function hashStream(text: string) {
   let h = 2166136261;
   for (const c of text) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
   return () => {
@@ -179,7 +179,6 @@ function along(line: Pt[], at: number): Pt {
 const houses = ['houses-a', 'houses-b', 'houses-c', 'houses-d'];
 const singles = ['house-single-a', 'house-single-b'];
 
-/** Houses and towers standing inside one city region. */
 export function cityLayout(
   tileId: string,
   regionId: string,
@@ -190,7 +189,7 @@ export function cityLayout(
   const r = tile.regions.find((v) => v.id === regionId)!;
   const poly = flatten(cityPath(r))[0];
   const walls = wallLines(r);
-  const rand = seeded(`${tileId}/${regionId}/${key}`);
+  const rand = hashStream(`${tileId}/${regionId}/${key}`);
   const anchors = tile.regions.map((v) => v.anchor);
   const slots: Slot[] = [];
   const clear = (p: Pt, gap: number) =>
@@ -286,7 +285,7 @@ function openMeadow(tileId: string) {
 /** A flat wheat or vineyard patch on some tiles with room for one. */
 export function decal(tileId: string) {
   const open = openMeadow(tileId);
-  const rand = seeded(`${tileId}/decal`);
+  const rand = hashStream(`${tileId}/decal`);
   if (rand() > 0.45) return null;
   const spots: Pt[] = [
     [28, 28],
@@ -311,11 +310,10 @@ export function decal(tileId: string) {
   return null;
 }
 
-/** Trees, sheep and the occasional windmill on a tile's open meadow. */
 export function meadowLayout(tileId: string, key: string): Slot[] {
   const open = openMeadow(tileId);
   const patch = decal(tileId);
-  const rand = seeded(`${tileId}/${key}/meadow`);
+  const rand = hashStream(`${tileId}/${key}/meadow`);
   const slots: Slot[] = [];
   const candidates: Pt[] = [];
   for (let y = 12; y <= 88; y += 19)
@@ -369,7 +367,6 @@ export function bridges(tileId: string) {
   return out;
 }
 
-/** Completed cities and monasteries that the newly placed tile finished. */
 export function risingFeatures(features: Feature[], placed: string): string[] {
   const [px, py] = placed.split(',').map(Number);
   return features
@@ -378,7 +375,7 @@ export function risingFeatures(features: Feature[], placed: string): string[] {
       if (f.kind === 'city') return f.tiles.includes(placed);
       if (f.kind === 'monastery' || f.kind === 'garden') {
         const [x, y] = f.tiles[0].split(',').map(Number);
-        return Math.abs(x - px) <= 1 && Math.abs(y - py) <= 1;
+        return adjacent({ x, y }, { x: px, y: py });
       }
       return false;
     })

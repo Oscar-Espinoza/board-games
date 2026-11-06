@@ -3,6 +3,7 @@
   import { gameSkin } from '@board-games/shared/ui/pixel';
   import Badge from './Badge.svelte';
   import Sprite from './pixel/Sprite.svelte';
+  import { powers } from './limits.js';
   import type { Power } from './types.js';
   let {
     lesson,
@@ -15,16 +16,9 @@
     };
     step: number;
   } = $props();
-  const powers = [
-    'mime',
-    'novice',
-    'elder',
-    'sage',
-    'revenant',
-    'dictator',
-    'adept',
-  ];
-  // The guide follows the viewer's Little Secret table style (or the home theme).
+  const isPower = (scene: string): scene is Power =>
+    (powers as readonly string[]).includes(scene);
+  // The guide follows the viewer's table style (or the home theme).
   const pixel = gameSkin('little-secret') === 'pixel';
   if (pixel) void import('./pixel.css');
   const marks = $derived(
@@ -60,8 +54,8 @@
             ><Sprite
               sheet="envelope"
               frame={step > 0 && i === 0 ? 'open' : 'closed'}
-            />{#if powers.includes(lesson.scene) && i === 0}<Badge
-                power={lesson.scene as Power}
+            />{#if isPower(lesson.scene) && i === 0}<Badge
+                power={lesson.scene}
                 pixel
               />{:else}<strong class="px-bubble" class:no={marks[i] === '✕'}
                 >{marks[i]}</strong
@@ -92,15 +86,9 @@
             d="M39 37h12m-6-6v12"
             stroke="#e2b66d"
           /></svg
-        >{#if powers.includes(lesson.scene) && i === 0}<Badge
-            power={lesson.scene as Power}
-          />{:else}<strong
-            >{step === 0
-              ? '?'
-              : step === 1
-                ? ['♪', '♫', '?'][i]
-                : ['✓', '✕', '✓'][i]}</strong
-          >{/if}
+        >{#if isPower(lesson.scene) && i === 0}<Badge
+            power={lesson.scene}
+          />{:else}<strong>{marks[i]}</strong>{/if}
       </div>{/each}
     <p>{[m.ls_loop_0, m.ls_loop_1, m.ls_loop_2][step]()}</p>
   </div>

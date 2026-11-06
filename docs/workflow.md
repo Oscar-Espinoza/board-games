@@ -10,15 +10,22 @@ Side project, optimized for speed of change and of the shipped app.
 
 Reuse these before writing new plumbing:
 
-| Need                                                   | Use                                                        |
-| ------------------------------------------------------ | ---------------------------------------------------------- |
-| Web Audio cues (gesture unlock, tones, filtered noise) | `createAudio()` — `@board-games/shared/ui`                 |
-| Safe localStorage                                      | `read` / `readJson` / `write` — `@board-games/shared/ui`   |
-| Presentation gating (no replay on reconnect)           | `RevisionGate`, `eventGate()` — `@board-games/shared/ui`   |
-| `<dialog>` open/close + focus return                   | `{@attach modal(() => open)}` — `@board-games/shared/ui`   |
-| Reduced motion                                         | `prefersReducedMotion` from `svelte/motion`                |
-| Seeded RNG / shuffles                                  | `seeded`, `shuffle`, `shuffled` — `@board-games/game-core` |
-| In-game rules                                          | pass `rulesContent` → `$lib/catalog/Rulebook.svelte`       |
+| Need                                                   | Use                                                                        |
+| ------------------------------------------------------ | -------------------------------------------------------------------------- |
+| Web Audio cues (gesture unlock, tones, filtered noise) | `createAudio()` — `@board-games/shared/ui`                                 |
+| Safe localStorage                                      | `read` / `readJson` / `write` — `@board-games/shared/ui`                   |
+| Presentation gating (no replay on reconnect)           | `RevisionGate`, `eventGate()` — `@board-games/shared/ui`                   |
+| `<dialog>` open/close + focus return                   | `{@attach modal(() => open)}` — `@board-games/shared/ui`                   |
+| Reduced motion                                         | `prefersReducedMotion` from `svelte/motion`                                |
+| Seeded RNG / shuffles                                  | `seeded`, `shuffle`, `shuffled` — `@board-games/game-core`                 |
+| In-game rules                                          | pass `rulesContent` → `$lib/catalog/Rulebook.svelte`                       |
+| Board props from any host                              | `BoardProps<View, Action>` — `@board-games/shared/ui`                      |
+| Sound / volume / motion settings per viewer            | `viewerPreferences(game, defaults)` — `@board-games/shared/ui`             |
+| Lazy 8-bit skin                                        | `new ViewerSkin(game, load)` — `@board-games/shared/ui`                    |
+| 8-bit tones                                            | `chipNote(audio)`, `playChiptune` — `@board-games/shared/ui/pixel`         |
+| Rule rejections and message-by-key                     | throw a message key; `errorText()`, `message()` — `@board-games/shared/ui` |
+| Practice route                                         | `PracticeTable` + `$lib/practice/Practice.svelte`                          |
+| Game identity and seat limits                          | `games`, `seats(id)` — `@board-games/shared/games`                         |
 
 ## Svelte conventions
 
@@ -26,4 +33,4 @@ Svelte 5 runes only (`compilerOptions.runes` is enforced). Prefer `$derived` ove
 
 ## Adding a game
 
-See [architecture › Adding a game](architecture.md#adding-a-game). Register the server definition in `apps/server/src/index.ts`, the lazy client in `apps/web/src/lib/games.ts`, catalog metadata in `packages/shared`, messages in `packages/shared/messages/{en,es}.json`, and write `docs/games/<id>.md` with an **Invariants** section.
+See [architecture › Adding a game](architecture.md#adding-a-game). Register the server definition in `apps/server/src/index.ts`, the game's `./client` entry in `apps/web/src/lib/games.ts`, its identity in `packages/shared/src/games.ts` and catalog description in `packages/shared`, messages in `packages/shared/messages/{en,es}.json`, and write `docs/games/<id>.md` with an **Invariants** section.

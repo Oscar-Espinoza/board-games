@@ -5,10 +5,12 @@
   "type": "module",
   "exports": {
     "./server": "./src/index.ts",
-    "./Board.svelte": "./src/Board.svelte",
     "./practice": "./src/practice.ts",
     "./guide": "./src/guide.ts",
-    "./GuideScene.svelte": "./src/GuideScene.svelte"
+    "./GuideScene.svelte": "./src/GuideScene.svelte",
+    "./client": "./src/client.ts",
+    "./setup": "./src/setup.ts",
+    "./words": "./src/words.ts"
   },
   "dependencies": {
     "@board-games/game-core": "workspace:*",

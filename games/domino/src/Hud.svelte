@@ -3,6 +3,7 @@
   import { modal } from '@board-games/shared/ui';
   import { m } from '@board-games/shared/messages';
   import { TILES, TARGET } from './index.js';
+  import { MAX_TEAM_NAME, SEAT_INDEXES } from './constants.js';
   import type { DominoGame } from './game.svelte.js';
   import Tile from './Tile.svelte';
   import { tileUrl } from './pixel/sprites.js';
@@ -36,7 +37,7 @@
 <section
   class="domino"
   class:compact={g.compact}
-  class:pixel={g.look === 'pixel'}
+  class:pixel={g.skin.choice === 'pixel'}
 >
   {@render children()}
 
@@ -92,7 +93,7 @@
       <div class="team" class:ours={team === g.myTeam}>
         {#if g.editing === team}<input
             {@attach focus}
-            maxlength="16"
+            maxlength={MAX_TEAM_NAME}
             aria-label={t.rename}
             bind:value={g.draft}
             onblur={g.commitEdit}
@@ -129,12 +130,12 @@
           )}{/if}
       </p>
       <ul>
-        {#each [0, 1, 2, 3] as seat}
+        {#each SEAT_INDEXES as seat}
           <li class:winner={result.seat === seat}>
             <span>{g.name(seat)}</span>
             <span class="revealed"
               >{#each g.tiles(seat) as id}<span class="mini"
-                  >{#if g.look === 'pixel'}<img
+                  >{#if g.skin.choice === 'pixel'}<img
                       src={tileUrl(TILES[id].a, TILES[id].b, false)}
                       alt=""
                     />{:else}<Tile
@@ -149,10 +150,7 @@
       </ul>
       {#if pub.phase === 'finished'}
         <p class="winner-line">
-          {m.domino_match_won(
-            { team: pub.teams[pub.scores[0] >= TARGET ? 0 : 1] },
-            L,
-          )}
+          {m.domino_match_won({ team: pub.teams[result.winner!] }, L)}
         </p>
         {#if canRematch && rematch}<button class="wood" onclick={rematch}
             >{m.domino_new_match({}, L)}</button
@@ -187,33 +185,33 @@
     <div class="panel-body">
       <div class="looks" role="group" aria-label={t.look}>
         <span>{t.look}</span>
-        {#each ['3d', 'pixel'] as const as look}<button
-            aria-pressed={g.look === look}
-            onclick={() => g.setLook(look)}
-            >{look === '3d' ? t.look3d : t.lookPixel}</button
+        {#each ['classic', 'pixel'] as const as look}<button
+            aria-pressed={g.skin.choice === look}
+            onclick={() => g.skin.choose(look)}
+            >{look === 'classic' ? t.look3d : t.lookPixel}</button
           >{/each}
       </div>
       <label class="toggle"
         ><input
           type="checkbox"
-          checked={g.soundOn}
-          onchange={(e) => g.preference('sound', e.currentTarget.checked)}
+          checked={g.preferences.sound}
+          onchange={(e) => g.setSound(e.currentTarget.checked)}
         />{t.sound}</label
       >
       <label class="toggle"
         ><input
           type="checkbox"
           checked={g.motion}
-          onchange={(e) => g.preference('motion', e.currentTarget.checked)}
+          onchange={(e) => (g.preferences.motion = e.currentTarget.checked)}
         />{t.motion}</label
       >
-      <label hidden={g.compact || g.look !== '3d'}
+      <label hidden={g.compact || g.skin.choice !== 'classic'}
         >{t.view}<input
           type="range"
           min="0"
           max="1"
           step="0.01"
-          bind:value={g.camera}
+          bind:value={g.preferences.camera}
         /></label
       >
       {@render settingsContent?.()}

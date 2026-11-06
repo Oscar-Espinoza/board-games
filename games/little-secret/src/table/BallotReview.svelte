@@ -20,7 +20,7 @@
   );
 </script>
 
-<div class="ballot-review" class:px={pixel()} data-testid="ls-ballot-review">
+<div class="ballot-review" class:px={pixel()}>
   {#if pixel()}<Sprite sheet="icons" frame="ballot" scale={2} />{/if}
   <h3>{suspects.length > 1 ? m.ls_table_tied() : m.ls_table_suspect()}</h3>
   <div class="suspects">

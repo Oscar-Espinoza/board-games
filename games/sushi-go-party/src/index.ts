@@ -1,11 +1,13 @@
 import { shuffle } from '@board-games/game-core';
 import type { GameDefinition } from '@board-games/game-core';
+import { games, seats } from '@board-games/shared/games';
 import {
   manifest,
   identity,
   publicCard,
   isDessert,
   kinds,
+  picksPerRound,
   type Card,
   type Face,
   type Played,
@@ -16,14 +18,11 @@ import { presets, menuKinds, validMenu, type Menu } from './menus.js';
 import {
   roundGroups,
   dessertGroups,
+  uramakiPrize,
   type Receipt,
   type Group,
 } from './scoring.js';
-import {
-  projectPresentation,
-  type Presentation,
-  type Event,
-} from './presentation.js';
+import type { Presentation, Event } from './presentation.js';
 export type Pick = {
   type: 'PICK';
   round: number;
@@ -125,10 +124,11 @@ function emit(s: State, event: Event) {
 function renew(s: State, seat: number, random: () => number) {
   s.hands[seat] = s.hands[seat].map((c) => entry(c, random));
 }
-export function create(players: string[], _random: () => number): State {
+export function create(players: string[]): State {
+  const { minPlayers, maxPlayers } = games['sushi-go-party'];
   if (
-    players.length < 2 ||
-    players.length > 8 ||
+    players.length < minPlayers ||
+    players.length > maxPlayers ||
     new Set(players).size !== players.length
   )
     fail();
@@ -160,7 +160,7 @@ export function create(players: string[], _random: () => number): State {
     receipts: [],
     winners: [],
     serial: 0,
-    presentation: { sequence: 0, round: 0, turn: 0, events: [] },
+    presentation: { sequence: 0, events: [] },
   };
 }
 function deal(s: State, random: () => number) {
@@ -195,15 +195,7 @@ function deal(s: State, random: () => number) {
   ];
   s.deck.push(...s.reserve.splice(0, additions));
   shuffle(s.deck, random);
-  const size =
-    s.players.length <= 3
-      ? 10
-      : s.players.length <= 5
-        ? 9
-        : s.players.length <= 7
-          ? 8
-          : 7;
-  for (let i = 0; i < size; i++)
+  for (let i = 0; i < picksPerRound(s.players.length); i++)
     for (let seat = 0; seat < s.players.length; seat++) {
       const c = s.deck.pop();
       if (!c) throw new Error('Sushi deck conservation invariant');
@@ -324,7 +316,7 @@ function race(s: State, residual: boolean) {
     const seats = totals
       .map((n, i) => (n === total ? i : -1))
       .filter((i) => i >= 0);
-    const points = [8, 5, 2][s.uramakiPlace] ?? 0;
+    const points = uramakiPrize(s.uramakiPlace);
     if (!points) break;
     for (const seat of seats) {
       const cards = s.tableaus[seat].filter(
@@ -742,8 +734,6 @@ export function apply(
   const s = structuredClone(original);
   s.presentation = {
     sequence: original.presentation.sequence + 1,
-    round: s.round,
-    turn: s.turn,
     events: [],
   };
   if (action.type === 'SET_MENU') {
@@ -824,7 +814,7 @@ export function view(s: State, player: string) {
       receipts: structuredClone(s.receipts),
       winners: [...s.winners],
       uramakiPlace: s.uramakiPlace,
-      presentation: projectPresentation(s.presentation),
+      presentation: structuredClone(s.presentation),
     },
     private: {
       hand: visibleHand.map(handView),
@@ -897,28 +887,8 @@ export function view(s: State, player: string) {
     },
   };
 }
-export function assertConservation(s: State) {
-  const ids = [
-    ...s.deck,
-    ...s.reserve,
-    ...s.hands.flat(),
-    ...s.commitments.flatMap((c) => (c ? [c.card] : [])),
-    ...s.tableaus.flat(),
-    ...s.desserts.flat(),
-    ...s.discard,
-    ...(s.prompt?.offer ?? []),
-  ].map((c) => c.physical);
-  if (
-    ids.length !== s.manifest.length ||
-    new Set(ids).size !== ids.length ||
-    s.manifest.some((c) => !ids.includes(c.physical))
-  )
-    throw new Error('Sushi physical card conservation failed');
-}
 export const sushiGoParty = {
-  id: 'sushi-go-party',
-  minPlayers: 2,
-  maxPlayers: 8,
+  ...seats('sushi-go-party'),
   create,
   apply,
   view,

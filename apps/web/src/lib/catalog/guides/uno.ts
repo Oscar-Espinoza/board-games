@@ -48,6 +48,17 @@ export default {
     {
       id: 'actions',
       title: m.learn_uno_actions_chapter_title,
+      reference: {
+        title: m.library_dictionary,
+        layout: 'symbols',
+        entries: [
+          [() => '⊘', m.library_skip],
+          [() => '↺', m.library_reverse],
+          [() => '+2', m.library_draw_two],
+          [() => '✦', m.library_wild],
+          [() => '+4', m.library_wild_four],
+        ],
+      },
       lessons: [
         {
           id: 'skip',

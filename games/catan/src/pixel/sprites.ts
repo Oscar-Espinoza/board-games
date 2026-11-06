@@ -1,4 +1,5 @@
 import { shade } from '../table/artwork.js';
+import { gold, ink } from '../table/shapes.js';
 
 /**
  * Hand-pixelled player pieces and the robber. At 10–17 art pixels a generated
@@ -94,22 +95,20 @@ export const sprites = Object.fromEntries(
   { w: number; h: number; layers: { key: string; d: string }[] }
 >;
 
-const INK = '#1a0f08';
-/** Four-tone wooden ramp of a seat colour. */
 export function ramp(color: string): Record<string, string> {
   return {
-    k: INK,
+    k: ink,
     h: shade(color, 1.4),
     b: color,
     s: shade(color, 0.62),
     L: shade(color, 1.15),
     m: shade(color, 0.86),
     d: shade(color, 0.4),
-    y: '#f2c14e',
+    y: gold,
   };
 }
 export const robberRamp: Record<string, string> = {
-  k: INK,
+  k: ink,
   h: '#7a766f',
   b: '#4a4744',
   s: '#2c2a28',

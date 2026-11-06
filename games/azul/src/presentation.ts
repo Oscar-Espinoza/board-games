@@ -1,4 +1,13 @@
 import type { PublicState, Color, Event } from './index.js';
+import {
+  centerMarker,
+  centerTile,
+  discard,
+  floorSlot,
+  markerSpot,
+  parseLocation,
+  patternSlot,
+} from './locations.js';
 export type Flight = {
   color: Color | 'marker';
   from: string;
@@ -6,6 +15,8 @@ export type Flight = {
   at: number;
   duration: number;
   sound?: 'tile' | 'marker' | 'score';
+  /** Part of the round-end sweep (pattern lines, floors, marker hand-back). */
+  cleanup?: boolean;
 };
 export type PresentationStep = {
   at: number;
@@ -19,6 +30,21 @@ export type Presentation = {
   flights: Flight[];
   duration: number;
 };
+
+// Milliseconds on the presentation timeline.
+const TRAVEL = 310;
+const SPILL_AT = 80;
+const WALL_START = 380;
+const WALL_STEP = 230;
+const WALL_FLIGHT = 240;
+const WALL_END_MIN = 390;
+const PENALTY_GAP = 80;
+const CLEANUP_GAP = 100;
+const CLEANUP = 150;
+const DEAL_GAP = 50;
+/** The next deal waits for the wall scoring, or starts early when nothing scores. */
+const DEAL_AFTER_WALLS = 1740;
+const DEAL_WITHOUT_WALLS = 430;
 
 /** Replays only public accepted facts. No rule evaluation, randomness or canonical mutation. */
 export function planPresentation(
@@ -42,33 +68,42 @@ export function planPresentation(
     accepted.roundNumber !== previous.roundNumber ||
     accepted.phase === 'finished';
   const walls = accepted.events.filter((e) => e.type === 'wall');
-  const wallEnd = Math.max(390, ...walls.map((e) => 380 + e.row * 230 + 240));
-  const penaltyAt = wallEnd + 80;
-  const cleanupAt = penaltyAt + 100;
-  const cleanupEnd = cleanupAt + 150;
-  const dealAt = Math.max(walls.length ? 1740 : 430, cleanupEnd + 50);
+  const wallEnd = Math.max(
+    WALL_END_MIN,
+    ...walls.map((e) => WALL_START + e.row * WALL_STEP + WALL_FLIGHT),
+  );
+  const penaltyAt = wallEnd + PENALTY_GAP;
+  const cleanupAt = penaltyAt + CLEANUP_GAP;
+  const cleanupEnd = cleanupAt + CLEANUP;
+  const dealAt = Math.max(
+    walls.length ? DEAL_AFTER_WALLS : DEAL_WITHOUT_WALLS,
+    cleanupEnd + DEAL_GAP,
+  );
   let sounded = false;
   for (const e of accepted.events) {
     if (e.type !== 'travel') continue;
-    const at = e.reason === 'deal' ? dealAt : e.reason === 'spill' ? 80 : 0;
+    const at =
+      e.reason === 'deal' ? dealAt : e.reason === 'spill' ? SPILL_AT : 0;
+    const origin = parseLocation(e.from),
+      target = parseLocation(e.to);
     let from = e.from,
       to = e.to;
-    if (from.startsWith('center/') && e.color !== 'marker') {
+    if (origin.kind === 'center' && e.color !== 'marker') {
       const slot = sourceSlots.get(e.color) ?? 0;
       sourceSlots.set(e.color, slot + 1);
-      from += `/${slot}`;
+      from = centerTile(e.color, slot);
     }
-    if (to.startsWith('center/') && e.color !== 'marker') {
+    if (target.kind === 'center' && e.color !== 'marker') {
       const slot = centerCounts.get(e.color) ?? 0;
       centerCounts.set(e.color, slot + 1);
-      to += `/${slot}`;
+      to = centerTile(e.color, slot);
     }
     flights.push({
       color: e.color,
       from,
       to,
       at,
-      duration: 310,
+      duration: TRAVEL,
       sound:
         e.reason === 'marker'
           ? 'marker'
@@ -80,27 +115,28 @@ export function planPresentation(
     jobs.push({
       at,
       run: () => {
-        if (e.from.startsWith('factory/'))
-          state.factories[Number(e.from.split('/')[1])] = [];
-        if (e.from.startsWith('center/') && e.color !== 'marker')
+        if (origin.kind === 'factory') state.factories[origin.factory] = [];
+        if (origin.kind === 'center' && e.color !== 'marker')
           state.center = state.center.filter((c) => c !== e.color);
-        if (e.color === 'marker') state.markerOwner = e.to.split('/')[0];
+        if (e.color === 'marker' && 'player' in target)
+          state.markerOwner = target.player;
       },
     });
     jobs.push({
-      at: at + 310,
+      at: at + TRAVEL,
       run: () => {
-        const [id, kind, row, slot] = e.to.split('/');
-        if (id === 'center' && e.color !== 'marker') state.center.push(e.color);
-        else if (id === 'factory' && e.color !== 'marker')
-          state.factories[Number(kind)][Number(row)] = e.color;
-        else if (id === 'discard') state.discardCount++;
-        else if (kind === 'pattern' && e.color !== 'marker')
-          board(id).patterns[Number(row)] = {
+        if (target.kind === 'discard') state.discardCount++;
+        else if (target.kind === 'floor')
+          board(target.player).floor[target.slot] = e.color;
+        else if (e.color === 'marker') return;
+        else if (target.kind === 'center') state.center.push(e.color);
+        else if (target.kind === 'factory')
+          state.factories[target.factory][target.slot] = e.color;
+        else if (target.kind === 'pattern')
+          board(target.player).patterns[target.row] = {
             color: e.color,
-            count: Number(slot) + 1,
+            count: target.slot + 1,
           };
-        else if (kind === 'floor') board(id).floor[Number(row)] = e.color;
       },
     });
   }
@@ -108,21 +144,22 @@ export function planPresentation(
   const filled = structuredClone(previous.boards);
   for (const e of accepted.events)
     if (e.type === 'travel' && e.reason !== 'deal') {
-      const [id, kind, row, slot] = e.to.split('/');
-      const b = filled[previous.players.indexOf(id)];
+      const to = parseLocation(e.to);
+      if (to.kind !== 'pattern' && to.kind !== 'floor') continue;
+      const b = filled[previous.players.indexOf(to.player)];
       if (!b) continue;
-      if (kind === 'pattern' && e.color !== 'marker')
-        b.patterns[Number(row)] = { color: e.color, count: Number(slot) + 1 };
-      if (kind === 'floor') b.floor[Number(row)] = e.color;
+      if (to.kind === 'pattern' && e.color !== 'marker')
+        b.patterns[to.row] = { color: e.color, count: to.slot + 1 };
+      if (to.kind === 'floor') b.floor[to.slot] = e.color;
     }
   for (const e of walls) {
-    const at = 380 + e.row * 230;
+    const at = WALL_START + e.row * WALL_STEP;
     flights.push({
       color: e.color,
       from: e.from,
       to: e.to,
       at,
-      duration: 240,
+      duration: WALL_FLIGHT,
       sound: 'score',
     });
     jobs.push({
@@ -132,7 +169,7 @@ export function planPresentation(
       },
     });
     jobs.push({
-      at: at + 240,
+      at: at + WALL_FLIGHT,
       run: () => {
         const b = board(e.player);
         b.wall[e.row][e.column] = true;
@@ -148,10 +185,11 @@ export function planPresentation(
     )
       flights.push({
         color: e.color,
-        from: `${e.player}/pattern/${e.row}/${slot}`,
-        to: 'discard',
+        from: patternSlot(e.player, e.row, slot),
+        to: discard,
         at: cleanupAt,
-        duration: 150,
+        duration: CLEANUP,
+        cleanup: true,
       });
   }
   for (const e of accepted.events) {
@@ -180,37 +218,39 @@ export function planPresentation(
       b.floor.forEach((color, slot) => {
         flights.push({
           color,
-          from: `${previous.players[i]}/floor/${slot}`,
+          from: floorSlot(previous.players[i], slot),
           to:
             color === 'marker'
               ? accepted.markerOwner
-                ? `${accepted.markerOwner}/marker`
-                : 'center/marker'
-              : 'discard',
+                ? markerSpot(accepted.markerOwner)
+                : centerMarker
+              : discard,
           at: cleanupAt,
-          duration: 150,
+          duration: CLEANUP,
+          cleanup: true,
         });
       }),
     );
     const marker =
       previous.markerOwner ??
-      accepted.events.flatMap((e) =>
-        e.type === 'travel' && e.reason === 'marker'
-          ? [e.to.split('/')[0]]
-          : [],
-      )[0];
+      accepted.events.flatMap((e) => {
+        if (e.type !== 'travel' || e.reason !== 'marker') return [];
+        const to = parseLocation(e.to);
+        return 'player' in to ? [to.player] : [];
+      })[0];
     if (
       marker &&
       !filled[previous.players.indexOf(marker)].floor.includes('marker')
     )
       flights.push({
         color: 'marker',
-        from: `${marker}/marker`,
+        from: markerSpot(marker),
         to: accepted.markerOwner
-          ? `${accepted.markerOwner}/marker`
-          : 'center/marker',
+          ? markerSpot(accepted.markerOwner)
+          : centerMarker,
         at: cleanupAt,
-        duration: 150,
+        duration: CLEANUP,
+        cleanup: true,
       });
     jobs.push({
       at: cleanupAt,
@@ -225,7 +265,7 @@ export function planPresentation(
       run: () => {
         state.markerOwner = accepted.markerOwner;
         state.discardCount += flights.filter(
-          (f) => f.duration === 150 && f.to === 'discard',
+          (f) => f.cleanup && f.to === discard,
         ).length;
       },
     });

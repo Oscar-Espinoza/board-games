@@ -1,6 +1,8 @@
 /** Hand-authored guesser positions. We are always the red team; the key never reaches Jev.
- * Board words come from the game's pack; each board is 9 ours / 8 theirs / 7 civilians / 1 assassin. */
-import { words as pack } from '../../../../games/codenames/src/words.ts';
+ * Board words come from the game's pack; each board is dealt like the game's: 9 ours / 8 theirs / 7 civilians / 1 assassin. */
+import { deal } from '@board-games/codenames/setup';
+import { words as pack } from '@board-games/codenames/words';
+import type { PastClue } from './types.ts';
 
 export type Identity = 'ours' | 'theirs' | 'civilian' | 'assassin';
 export type Category =
@@ -13,13 +15,6 @@ export type Category =
   | 'weak'
   /** Same board as a failing scenario, with a clue that avoids the competing words. */
   | 'fixed';
-
-export interface PastClue {
-  team: 'ours' | 'theirs';
-  word: string;
-  count: number;
-  guessed: string[];
-}
 
 export interface Scenario {
   id: string;
@@ -413,10 +408,10 @@ function build(id: string, d: Draft): Scenario {
   const split = (s: string) => s.split(' ');
   const key: Record<string, Identity> = {};
   const groups: [Identity, string[], number][] = [
-    ['ours', split(d.ours), 9],
-    ['theirs', split(d.theirs), 8],
-    ['civilian', split(d.civilians), 7],
-    ['assassin', [d.assassin], 1],
+    ['ours', split(d.ours), deal.first],
+    ['theirs', split(d.theirs), deal.second],
+    ['civilian', split(d.civilians), deal.civilians],
+    ['assassin', [d.assassin], deal.assassin],
   ];
   for (const [identity, list, size] of groups) {
     if (list.length !== size)

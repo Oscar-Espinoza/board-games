@@ -1,88 +1,55 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { goto, replaceState } from '$app/navigation';
+  import { goto } from '$app/navigation';
   import { catalog } from '@board-games/shared';
   import { m } from '@board-games/shared/messages';
-  import { connect, create, leave, session } from '$lib/session.svelte';
+  import { modal, read, write } from '@board-games/shared/ui';
+  import {
+    connect,
+    create,
+    leave,
+    nameKey,
+    session,
+  } from '$lib/session.svelte';
   import BoxArt from '$lib/catalog/BoxArt.svelte';
   import SummaryStep from '$lib/catalog/SummaryStep.svelte';
   import Rulebook from '$lib/catalog/Rulebook.svelte';
+  import { finishRecovery, recoveredRulebook } from '$lib/catalog/recovery';
+  import { summaries, loops } from '$lib/catalog/summaries';
   import type { GameId } from '$lib/catalog/types';
+  import { joinRequest, type Panel } from '$lib/home/state.svelte';
   import { theme } from '$lib/theme.svelte';
+  const setupModes = ['variable', 'beginner'] as const;
   let selected = $state<GameId>('uno');
-  let panel = $state<'start' | 'summary' | 'rules' | 'join' | null>(null);
+  let panel = $state<Panel | null>(null);
   let secretPowers = $state(false);
   let boardLanguage = $state('en');
   let name = $state(''),
     code = $state(''),
-    setup = $state('variable'),
+    setup = $state<(typeof setupModes)[number]>('variable'),
     busy = $state(false);
   let dialog: HTMLDialogElement;
-  let opener: HTMLElement | null = null;
   let hoverTimer: ReturnType<typeof setTimeout>;
   const selectedIndex = $derived(catalog.findIndex((g) => g.id === selected));
   const game = $derived(catalog[selectedIndex]!);
-  const summaries = {
-    'little-secret': m.ls_summary,
-    azul: m.library_azul_summary,
-    codenames: m.library_cn_summary,
-    'sushi-go-party': m.sgp_summary,
-    uno: m.library_uno_summary,
-    catan: m.library_catan_summary,
-    carcassonne: m.library_carcassonne_summary,
-    domino: m.library_domino_summary,
-  };
-  const loops = {
-    'little-secret': [m.ls_loop_0, m.ls_loop_1, m.ls_loop_2],
-    azul: [m.library_azul_loop_0, m.library_azul_loop_1, m.library_azul_loop_2],
-    codenames: [m.library_cn_loop_0, m.library_cn_loop_1, m.library_cn_loop_2],
-    'sushi-go-party': [m.sgp_loop_0, m.sgp_loop_1, m.sgp_loop_2],
-    uno: [m.library_uno_loop_0, m.library_uno_loop_1, m.library_uno_loop_2],
-    catan: [
-      m.library_catan_loop_0,
-      m.library_catan_loop_1,
-      m.library_catan_loop_2,
-    ],
-    carcassonne: [
-      m.library_carcassonne_loop_0,
-      m.library_carcassonne_loop_1,
-      m.library_carcassonne_loop_2,
-    ],
-    domino: [
-      m.library_domino_loop_0,
-      m.library_domino_loop_1,
-      m.library_domino_loop_2,
-    ],
-  };
   onMount(() => {
     leave();
     connect();
-    try {
-      name = localStorage.getItem('board-games:name') ?? '';
-    } catch {}
-    const recovering = catalog.find(
-      (item) => window.location.hash === `#rules-${item.id}`,
-    );
+    name = read(nameKey) ?? '';
+    const recovering = recoveredRulebook();
     if (recovering) {
-      selected = recovering.id;
+      selected = recovering;
       void tick().then(() => {
-        const restored = new URL(window.location.href);
-        restored.searchParams.delete('_guideRetry');
-        replaceState(restored.pathname + restored.search, {});
-        document
-          .querySelector<HTMLButtonElement>(
-            '.primary-actions button:last-child',
-          )
-          ?.focus();
+        finishRecovery();
         open('rules');
       });
     }
-    const join = () => open('join');
-    window.addEventListener('catalog-join', join);
-    return () => {
-      clearTimeout(hoverTimer);
-      window.removeEventListener('catalog-join', join);
-    };
+    return () => clearTimeout(hoverTimer);
+  });
+  $effect(() => {
+    if (!joinRequest.pending) return;
+    joinRequest.pending = false;
+    open('join');
   });
   function select(id: GameId) {
     clearTimeout(hoverTimer);
@@ -94,12 +61,7 @@
       hoverTimer = setTimeout(() => (selected = id), 80);
     }
   }
-  function open(next: typeof panel) {
-    if (!panel)
-      opener =
-        document.activeElement instanceof HTMLElement
-          ? document.activeElement
-          : null;
+  function open(next: Panel) {
     clearTimeout(hoverTimer);
     session.error = '';
     panel = next;
@@ -107,28 +69,23 @@
       if (dialog) dialog.scrollTop = 0;
     });
   }
-  function close() {
-    panel = null;
-    opener?.focus();
-  }
-  $effect(() => {
-    if (panel) {
-      dialog?.showModal();
-      const previous = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = previous;
-      };
-    } else dialog?.close();
-  });
+  const close = () => (panel = null);
+  const isOpen = $derived(panel !== null);
+  /** Page behind an open dialog does not scroll. */
+  const lockScroll = (locked: () => boolean) => () => {
+    if (!locked()) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  };
   async function createRoom(practice = false) {
     if (busy) return;
     busy = true;
     session.error = '';
     try {
-      try {
-        localStorage.setItem('board-games:name', name.trim());
-      } catch {}
+      write(nameKey, name.trim());
       const credentials = await create(
         selected,
         practice ? name.trim() || 'Player' : name.trim(),
@@ -180,12 +137,11 @@
       <div class="box-stage" data-selected={selected} aria-hidden="true">
         <div class="sun-disc"></div>
         {#each catalog as item, i}<div
-            class="game-box {item.id}"
+            class="game-box"
             class:front={selected === item.id}
             class:previous={i ===
               (selectedIndex + catalog.length - 1) % catalog.length}
             class:next={i === (selectedIndex + 1) % catalog.length}
-            data-box={item.id}
           >
             <BoxArt game={item.id} />
           </div>{/each}
@@ -203,13 +159,17 @@
           <button class="start" onclick={() => open('start')}
             >{m.library_start()} <span aria-hidden="true">↗</span></button
           ><button onclick={() => open('summary')}>{m.library_summary()}</button
-          ><button onclick={() => open('rules')}>{m.library_rules()}</button>
+          ><button data-rules onclick={() => open('rules')}
+            >{m.library_rules()}</button
+          >
         </div>
       </div>
     </section>
   </main>{/if}
 <dialog
   bind:this={dialog}
+  {@attach modal(() => isOpen)}
+  {@attach lockScroll(() => isOpen)}
   onclose={close}
   oncancel={close}
   class:rule-dialog={panel === 'rules'}
@@ -279,7 +239,7 @@
       {#if selected === 'catan'}<fieldset>
           <legend>{m.setup()}</legend>
           <div class="choice-row">
-            {#each ['variable', 'beginner'] as mode}<button
+            {#each setupModes as mode}<button
                 type="button"
                 aria-pressed={setup === mode}
                 onclick={() => (setup = mode)}
@@ -295,7 +255,7 @@
         disabled={!name.trim() || !session.connected || busy}
         >{busy ? m.library_creating() : m.create()} →</button
       >
-      {#if selected === 'uno'}<button
+      {#if game.practice === 'room'}<button
           type="button"
           disabled={!session.connected || busy}
           onclick={() => createRoom(true)}
@@ -329,11 +289,11 @@
 </dialog>
 
 <style>
-  :global(body:has(.library)) {
+  :global(html[data-home='classic'] body) {
     background: #f6ebd9;
     color: #35291f;
   }
-  :global(body:has(.library) .site-header) {
+  :global(html[data-home='classic'] .site-header) {
     border: 0;
     color: #705c48;
     background: transparent;
@@ -673,7 +633,7 @@
   .summary-actions button {
     flex: 1;
   }
-  :global(body:has(.pixel-store)) dialog {
+  :global(html[data-home='pixel']) dialog {
     font-family: 'Pixelify Sans', system-ui, sans-serif;
     background: #f6e7c8;
     color: #2a1a10;
@@ -683,29 +643,29 @@
       inset 0 0 0 3px #8a5a32,
       0 10px 0 #1a0f08;
   }
-  :global(body:has(.pixel-store)) .dialog-top {
+  :global(html[data-home='pixel']) .dialog-top {
     background: #f6e7c8;
   }
-  :global(body:has(.pixel-store)) dialog :is(h2, h3) {
+  :global(html[data-home='pixel']) dialog :is(h2, h3) {
     font-family: inherit;
   }
-  :global(body:has(.pixel-store)) dialog h2 {
+  :global(html[data-home='pixel']) dialog h2 {
     text-transform: uppercase;
     letter-spacing: 0.03em;
   }
-  :global(body:has(.pixel-store)) dialog button,
-  :global(body:has(.pixel-store)) .practice,
-  :global(body:has(.pixel-store)) dialog input {
+  :global(html[data-home='pixel']) dialog button,
+  :global(html[data-home='pixel']) .practice,
+  :global(html[data-home='pixel']) dialog input {
     border-radius: 0;
     border: 2px solid #3a2213;
     box-shadow: inset 0 -3px 0 #00000033;
   }
-  :global(body:has(.pixel-store)) .solid {
+  :global(html[data-home='pixel']) .solid {
     background: #3f9a4a !important;
     border-color: #1f5a27 !important;
     text-transform: uppercase;
   }
-  :global(body:has(.pixel-store)) dialog .close {
+  :global(html[data-home='pixel']) dialog .close {
     border: 0;
     box-shadow: none;
   }

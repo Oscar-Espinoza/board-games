@@ -51,11 +51,6 @@
 </div>
 
 <style>
-  @font-face {
-    font-family: 'Domino Plaque';
-    src: url('/fonts/carcassonne/marcellus.woff2') format('woff2');
-    font-display: swap;
-  }
   .loading {
     position: absolute;
     inset: 0;
@@ -159,11 +154,6 @@
     }
   }
   /* 8-bit: the pixel patio, hard shadows and stepped motion. */
-  @font-face {
-    font-family: 'Pixelify Sans';
-    src: url('/fonts/pixel/pixelify-sans-400.woff2') format('woff2');
-    font-display: swap;
-  }
   .pixel {
     background:
       linear-gradient(rgb(14 10 18 / 0.72), rgb(14 10 18 / 0.72)),

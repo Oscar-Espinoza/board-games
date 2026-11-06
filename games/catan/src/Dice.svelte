@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { getContext } from 'svelte';
+  import { useSkin } from './table/skin.js';
   let { values }: { values: number[] | null } = $props();
-  const pixel = getContext<(() => boolean) | undefined>('catan:pixel');
+  const pixel = useSkin();
   const faces = (front: number) => {
     const sides = [1, 2, 3, 4, 5, 6].filter(
       (n) => n !== front && n !== 7 - front,
@@ -20,13 +20,13 @@
 
 <div
   class="dice"
-  class:px-dice={pixel?.()}
+  class:px-dice={pixel()}
   aria-live="polite"
   aria-label={values ? values.join(' + ') : '—'}
 >
   {#each [0, 1] as i}
     <div class="die-space">
-      {#if pixel?.()}
+      {#if pixel()}
         <!-- 8-bit: flat faces stacked; the tumble flicks between them. -->
         <div class="die" class:red={i === 1} data-value={values?.[i] ?? 1}>
           {#each [1, 2, 3, 4, 5, 6] as value}

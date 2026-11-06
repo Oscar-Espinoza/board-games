@@ -5,7 +5,7 @@ import type {
   Credentials,
   RoomView,
   ReplyErrorCode,
-} from '@board-games/shared';
+} from '@board-games/game-core';
 
 type Seat = {
   id: string;
@@ -14,7 +14,7 @@ type Seat = {
   bot?: boolean;
   socketId: string | null;
   reservedUntil: number | null;
-  accepted: Map<string, number>;
+  accepted: Set<string>;
 };
 type Room = {
   id: string;
@@ -38,6 +38,10 @@ export class RoomError extends Error {
     this.name = 'RoomError';
   }
 }
+/** Pause between bot moves (and before the first) so practice plays stay readable. */
+const BOT_DELAY = 900;
+/** Bots never disconnect; a person is present while a socket holds the seat. */
+const present = (seat: Seat) => !!seat.bot || seat.socketId !== null;
 const fail = (message: string, code?: ReplyErrorCode): never => {
   throw new RoomError(message, code);
 };
@@ -86,7 +90,7 @@ export class Rooms {
       token: randomBytes(32).toString('hex'),
       socketId,
       reservedUntil: null,
-      accepted: new Map(),
+      accepted: new Set(),
     };
   }
   private credentials(room: Room, seat: Seat): Credentials {
@@ -120,7 +124,7 @@ export class Rooms {
       state: null,
       options: request.options,
       practice,
-      botAt: this.now() + 900,
+      botAt: this.now() + BOT_DELAY,
       round: 0,
       revision: 0,
       touched: this.now(),
@@ -136,7 +140,7 @@ export class Rooms {
           token: '',
           socketId: null,
           reservedUntil: null,
-          accepted: new Map(),
+          accepted: new Set(),
           bot: true,
         });
       }
@@ -190,7 +194,7 @@ export class Rooms {
         token: incoming.token,
         socketId,
         reservedUntil: null,
-        accepted: new Map(),
+        accepted: new Set(),
       });
     else room.seats.push(seat);
     this.syncPresence(room, vacant?.id);
@@ -205,8 +209,7 @@ export class Rooms {
     if (seat.id !== room.hostId) fail('Only the room host can start');
     if (room.state !== null && !room.definition.isFinished(room.state))
       fail('Game already started');
-    if (room.seats.some((s) => !s.socketId && !s.bot))
-      fail('Wait for every seat to connect');
+    if (!room.seats.every(present)) fail('Wait for every seat to connect');
     if (room.seats.length < room.definition.minPlayers)
       fail('Not enough players');
     room.state = room.definition.create(
@@ -214,7 +217,7 @@ export class Rooms {
       this.random,
       room.options,
     );
-    room.botAt = this.now() + 900;
+    room.botAt = this.now() + BOT_DELAY;
     room.round++;
     room.revision++;
     room.touched = this.now();
@@ -226,7 +229,7 @@ export class Rooms {
     const id = text(request.id, 64);
     if (request.round !== room.round)
       fail('Round changed; try again', 'MATCH_CHANGED');
-    if (seat.accepted.has(id)) return;
+    if (seat.accepted.has(id)) return false;
     if (request.revision !== room.revision)
       fail('Table updated; try again', 'STALE_REVISION');
     if (room.state === null) fail('Game has not started');
@@ -238,11 +241,12 @@ export class Rooms {
       { hostId: room.hostId },
     );
     room.revision++;
-    room.botAt = this.now() + 900;
+    room.botAt = this.now() + BOT_DELAY;
     room.touched = this.now();
-    seat.accepted.set(id, room.revision);
+    seat.accepted.add(id);
     if (seat.accepted.size > 256)
       seat.accepted.delete(seat.accepted.keys().next().value!);
+    return true;
   }
   synchronize(
     roomId: string,
@@ -277,7 +281,7 @@ export class Rooms {
     if (room.state !== null && room.definition.presence)
       room.state = room.definition.presence(
         room.state,
-        room.seats.filter((s) => s.socketId || s.bot).map((s) => s.id),
+        room.seats.filter(present).map((s) => s.id),
         replacedPlayer,
       );
   }
@@ -336,7 +340,7 @@ export class Rooms {
         );
         room.revision++;
         room.touched = this.now();
-        room.botAt = this.now() + 900;
+        room.botAt = this.now() + BOT_DELAY;
         changed.push(room.id);
         break;
       }
@@ -377,7 +381,7 @@ export class Rooms {
       players: room.seats.map((s) => ({
         id: s.id,
         name: s.name,
-        connected: !!s.bot || s.socketId !== null,
+        connected: present(s),
         ...(s.bot ? { bot: true } : {}),
         reservedUntil: s.reservedUntil,
       })),

@@ -1,7 +1,7 @@
 import { Server } from 'socket.io';
 import type { Server as HttpServer } from 'node:http';
 import { RoomError, Rooms } from './rooms.js';
-import type { ActionRequest, Reply } from '@board-games/shared';
+import type { ActionRequest, Reply } from '@board-games/game-core';
 export function attachSockets(server: HttpServer, rooms: Rooms) {
   const io = new Server(server, {
     maxHttpBufferSize: 16_384,
@@ -15,6 +15,7 @@ export function attachSockets(server: HttpServer, rooms: Rooms) {
   };
   io.on('connection', (socket) => {
     let roomId: string | null = null;
+    const unchanged = Symbol('unchanged');
     let count = 0;
     let window = Date.now();
     // Only accepted mutations rebuild every seat's projection; rejected
@@ -36,8 +37,8 @@ export function attachSockets(server: HttpServer, rooms: Rooms) {
           if (!request || typeof request !== 'object' || Array.isArray(request))
             throw new Error('Invalid request');
           const data = fn(request);
-          reply({ ok: true, data });
-          if (broadcast && roomId) publish(roomId);
+          reply({ ok: true, data: data === unchanged ? undefined : data });
+          if (broadcast && data !== unchanged && roomId) publish(roomId);
         } catch (error) {
           reply({
             ok: false,
@@ -51,7 +52,6 @@ export function attachSockets(server: HttpServer, rooms: Rooms) {
     handle('create', (request) => {
       const credentials = rooms.create(socket.id, request);
       roomId = credentials.roomId;
-      void socket.join(roomId);
       return credentials;
     });
     handle('join', (request) => {
@@ -59,7 +59,6 @@ export function attachSockets(server: HttpServer, rooms: Rooms) {
       if (result.replacedSocket)
         io.sockets.sockets.get(result.replacedSocket)?.disconnect(true);
       roomId = result.credentials.roomId;
-      void socket.join(roomId);
       return result.credentials;
     });
     handle('start', () => {
@@ -76,7 +75,7 @@ export function attachSockets(server: HttpServer, rooms: Rooms) {
     );
     handle('action', (request: ActionRequest) => {
       if (!roomId) throw new Error('Join first');
-      rooms.action(roomId, socket.id, request);
+      if (!rooms.action(roomId, socket.id, request)) return unchanged;
     });
     socket.on('disconnect', () => {
       const id = rooms.disconnect(socket.id);

@@ -61,7 +61,6 @@ interface Outcome {
   turn: Turn;
 }
 
-/** Per-scenario verdict: what a good operative should have done with this clue. */
 function score(o: Outcome) {
   const { s, turn } = o;
   const ids = turn.guesses.map((g) => g.identity);

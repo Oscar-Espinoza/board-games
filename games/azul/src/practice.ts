@@ -1,4 +1,5 @@
-import { seeded } from '@board-games/game-core';
+import { seeded, type Player } from '@board-games/game-core';
+import type { PracticeTable } from '@board-games/shared/ui';
 /** Local-only, conserved fixtures. Never imported by server or catalog metadata. */
 import {
   create,
@@ -6,10 +7,12 @@ import {
   view,
   colors,
   wallColors,
+  TILES_PER_COLOR,
   type State,
   type Color,
+  type View,
 } from './index.js';
-export const seats = ['Ada', 'Bea', 'Clara', 'Diego'].map((name, i) => ({
+const seats: Player[] = ['Ada', 'Bea', 'Clara', 'Diego'].map((name, i) => ({
   id: `workshop-${i}`,
   name,
   connected: true,
@@ -28,7 +31,7 @@ export const scenarios = [
   'finish',
 ] as const;
 export type Scenario = (typeof scenarios)[number];
-export function inventory(s: State) {
+function inventory(s: State) {
   const total = Object.fromEntries(colors.map((c) => [c, 0])) as Record<
     Color,
     number
@@ -50,7 +53,7 @@ export function inventory(s: State) {
   });
   return total;
 }
-export function fixture(scenario: Scenario = 'start2'): State {
+function fixture(scenario: Scenario = 'start2'): State {
   const s = create(
     seats
       .slice(0, scenario === 'start4' ? 4 : scenario === 'start3' ? 3 : 2)
@@ -103,23 +106,28 @@ export function fixture(scenario: Scenario = 'start2'): State {
   }
   const used = inventory(s);
   for (const c of colors) {
-    if (used[c] > 20) throw new Error('Invalid practice inventory');
-    s.bag.push(...Array<Color>(20 - used[c]).fill(c));
+    if (used[c] > TILES_PER_COLOR)
+      throw new Error('Invalid practice inventory');
+    s.bag.push(...Array<Color>(TILES_PER_COLOR - used[c]).fill(c));
   }
   return s;
 }
-export function practice(scenario: Scenario = 'start2') {
+export function practice(scenario: Scenario = 'start2'): PracticeTable<View> {
   const random = seeded(789);
   let state = fixture(scenario);
   return {
     get actor() {
       return state.players[state.turn];
     },
+    followsActor: false,
+    get finished() {
+      return state.phase === 'finished';
+    },
     get players() {
       return seats.filter((p) => state.players.includes(p.id));
     },
-    view: (seat: string) => view(state, seat),
-    send: (seat: string, action: unknown) => {
+    view: () => view(state),
+    send: (seat, action) => {
       state = apply(state, seat, action, random);
     },
   };

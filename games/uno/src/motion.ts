@@ -1,12 +1,13 @@
-import { createAudio } from '@board-games/shared/ui';
 import { movements, type UnoView } from './presentation.js';
+
+/** Most card backs flown for one draw, however big the penalty. */
+const MAX_FLIGHTS = 5;
 
 export function cardMotion(
   root: HTMLElement,
   playerId: string,
   sound: () => void,
-  /** The 8-bit skin flies cards flat, in stepped frames. */
-  pixel: () => boolean = () => false,
+  pixel: () => boolean,
 ) {
   let previous: UnoView | undefined;
   let generation = 0;
@@ -127,7 +128,7 @@ export function cardMotion(
     void animation.finished.then(finish, finish);
   }
   return {
-    /** Capture old geometry before Svelte patches the hand; run returned callback after tick. */
+    /** Captures geometry before Svelte patches the DOM; run the returned callback after `tick()`. */
     prepare(next: UnoView, enabled: boolean, connected: boolean) {
       if (!connected || document.hidden) {
         clear();
@@ -168,7 +169,7 @@ export function cardMotion(
       return () => {
         if (generation !== batch || !root.isConnected) return;
         if (moves.length) sound();
-        if (!enabled || typeof Element.prototype.animate !== 'function') return;
+        if (!enabled) return;
         let offset = 0;
         for (const { move, rect, face } of prepared) {
           if (!rect) continue;
@@ -189,7 +190,7 @@ export function cardMotion(
               inline: 'nearest',
               behavior: 'instant',
             });
-          for (let i = 0; i < Math.min(move.count, 5); i++)
+          for (let i = 0; i < Math.min(move.count, MAX_FLIGHTS); i++)
             flight(
               appearance,
               rect,
@@ -207,52 +208,5 @@ export function cardMotion(
       clear();
       previous = undefined;
     },
-  };
-}
-
-/** Short, quiet filtered-paper sound. No music, external assets or continuous audio. */
-export function cardAudio() {
-  const audio = createAudio();
-  let enabled = true;
-  let last = -Infinity;
-  return {
-    /** The shared Web Audio voice, for the 8-bit chiptune pack. */
-    audio,
-    get enabled() {
-      return enabled;
-    },
-    setEnabled(value: boolean) {
-      enabled = value;
-      if (!value) audio.stop();
-    },
-    unlock() {
-      if (enabled) void audio.unlock();
-    },
-    play() {
-      const now = performance.now() / 1000;
-      if (!enabled || !audio.ready || now - last < 0.08) return;
-      last = now;
-      audio.noise({
-        duration: 0.18,
-        volume: 0.045,
-        frequency: 1300,
-        sweep: 380,
-        attack: 0.025,
-      });
-    },
-    /** Bright two-note call when someone says UNO. */
-    call() {
-      if (!enabled || !audio.ready) return;
-      audio.tone({ from: 660, duration: 0.12, volume: 0.05, type: 'triangle' });
-      audio.tone({
-        delay: 0.1,
-        from: 880,
-        to: 990,
-        duration: 0.22,
-        volume: 0.05,
-        type: 'triangle',
-      });
-    },
-    dispose: audio.close,
   };
 }

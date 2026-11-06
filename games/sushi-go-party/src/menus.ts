@@ -1,4 +1,9 @@
+import { games } from '@board-games/shared/games';
 import { rolls, appetizers, specials, desserts, type Kind } from './cards.js';
+const { minPlayers, maxPlayers } = games['sushi-go-party'];
+/** A menu is one roll, one dessert, this many appetizers and this many specials. */
+export const APPETIZER_SLOTS = 3;
+export const SPECIAL_SLOTS = 2;
 export type Menu = {
   roll: Kind;
   appetizers: Kind[];
@@ -64,8 +69,13 @@ export const presets = {
 export function menuKinds(m: Menu): Kind[] {
   return ['nigiri', m.roll, ...m.appetizers, ...m.specials, m.dessert];
 }
+/** Kinds the rules leave out of a table of this size. */
+export const unavailable = (kind: Kind, players: number) =>
+  (players === 2 && (kind === 'spoon' || kind === 'edamame')) ||
+  (players >= 7 && (kind === 'menu' || kind === 'special_order'));
 export function validMenu(value: unknown, count: number): value is Menu {
-  if (!Number.isInteger(count) || count < 2 || count > 8) return false;
+  if (!Number.isInteger(count) || count < minPlayers || count > maxPlayers)
+    return false;
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const m = value as Menu;
   if (Object.keys(m).sort().join() !== 'appetizers,dessert,roll,specials')
@@ -77,20 +87,20 @@ export function validMenu(value: unknown, count: number): value is Menu {
     return false;
   if (
     !Array.isArray(m.appetizers) ||
-    m.appetizers.length !== 3 ||
+    m.appetizers.length !== APPETIZER_SLOTS ||
     !m.appetizers.every((k) => (appetizers as readonly unknown[]).includes(k))
   )
     return false;
   if (
     !Array.isArray(m.specials) ||
-    m.specials.length !== 2 ||
+    m.specials.length !== SPECIAL_SLOTS ||
     !m.specials.every((k) => (specials as readonly unknown[]).includes(k))
   )
     return false;
   const types = menuKinds(m);
+  // Every kind on the menu differs from the others, nigiri included.
   return (
-    new Set(types).size === 8 &&
-    !(count === 2 && types.some((k) => k === 'spoon' || k === 'edamame')) &&
-    !(count >= 7 && types.some((k) => k === 'menu' || k === 'special_order'))
+    new Set(types).size === types.length &&
+    !types.some((k) => unavailable(k, count))
   );
 }

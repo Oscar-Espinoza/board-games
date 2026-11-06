@@ -23,7 +23,7 @@ export type PresentationEvent =
   | { type: 'turn'; player: string }
   | { type: 'award'; player: string; award: 'longest' | 'army' }
   | { type: 'win'; player: string };
-export type PrivateEvent =
+type PrivateEvent =
   | { type: 'stolen'; resource: number; from: string; to: string }
   | { type: 'drawn'; kind: Development };
 export interface Presentation {
@@ -41,17 +41,19 @@ export function present(
   const events: PresentationEvent[] = [];
   const recipients: Record<string, PrivateEvent[]> = {};
   const i = after.players.indexOf(player);
-  if (action.type.startsWith('BUILD_'))
+  if (action.type === 'BUILD_ROAD')
     events.push({
       type: 'placement',
       player,
-      piece:
-        action.type === 'BUILD_CITY'
-          ? 'city'
-          : action.type === 'BUILD_ROAD'
-            ? 'road'
-            : 'settlement',
-      location: (action.vertex ?? action.edge)!,
+      piece: 'road',
+      location: action.edge,
+    });
+  if (action.type === 'BUILD_SETTLEMENT' || action.type === 'BUILD_CITY')
+    events.push({
+      type: 'placement',
+      player,
+      piece: action.type === 'BUILD_CITY' ? 'city' : 'settlement',
+      location: action.vertex,
     });
   if (action.type === 'ROLL_DICE') {
     const roll = sum(after.dice!);
@@ -98,7 +100,7 @@ export function present(
     if (resource >= 0) {
       events.push({
         type: 'transfer',
-        from: action.victim!,
+        from: action.victim,
         to: player,
         count: 1,
         reason: 'theft',
@@ -106,17 +108,17 @@ export function present(
       const detail: PrivateEvent = {
         type: 'stolen',
         resource,
-        from: action.victim!,
+        from: action.victim,
         to: player,
       };
       recipients[player] = [detail];
-      recipients[action.victim!] = [detail];
+      recipients[action.victim] = [detail];
     }
   }
   if (action.type === 'MONOPOLY')
     after.players.forEach((id, j) => {
       const count =
-        before.hands[j][action.resource!] - after.hands[j][action.resource!];
+        before.hands[j][action.resource] - after.hands[j][action.resource];
       if (j !== i && count > 0)
         events.push({
           type: 'transfer',
@@ -129,7 +131,7 @@ export function present(
     });
   if (action.type === 'ACCEPT' || action.type === 'CONFIRM_TRADE') {
     const offer = before.offers.find((o) => o.id === action.offer);
-    const partner = action.type === 'ACCEPT' ? player : action.partner!;
+    const partner = action.type === 'CONFIRM_TRADE' ? action.partner : player;
     if (
       offer &&
       before.hands.some((hand, j) =>
@@ -173,9 +175,12 @@ export function present(
       { type: 'drawn', kind: after.development[i].at(-1)!.kind },
     ];
   } else if (
-    ['KNIGHT', 'MONOPOLY', 'INVENTION', 'ROAD_BUILDING'].includes(action.type)
+    action.type === 'KNIGHT' ||
+    action.type === 'MONOPOLY' ||
+    action.type === 'INVENTION' ||
+    action.type === 'ROAD_BUILDING'
   ) {
-    events.push({ type: 'card', player, kind: action.type as Development });
+    events.push({ type: 'card', player, kind: action.type });
   }
   if (before.phase.player !== after.phase.player && after.phase.player)
     events.push({ type: 'turn', player: after.phase.player });

@@ -1,4 +1,4 @@
-import { createAudio } from '@board-games/shared/ui';
+import { clamp01, createAudio } from '@board-games/shared/ui';
 /** Gesture-only, disposable synthesis. No network assets, loops or hidden-card cues. */
 export function tableAudio() {
   const audio = createAudio();
@@ -11,7 +11,7 @@ export function tableAudio() {
         from,
         to,
         duration: 0.12,
-        volume: Math.min(0.035, Math.max(0, volume) * 0.045),
+        volume: Math.min(0.035, clamp01(volume) * 0.045),
         attack: 0.002,
       });
     },

@@ -1,16 +1,35 @@
-import type { ActionContext, GameDefinition } from '@board-games/game-core';
+import {
+  shuffled,
+  type ActionContext,
+  type GameDefinition,
+} from '@board-games/game-core';
+import { games, seats } from '@board-games/shared/games';
+import {
+  answerLength,
+  clueLength,
+  powerDeck,
+  powersFrom,
+  winningScore,
+} from './limits.js';
 import type {
   State,
   Options,
   Role,
   Power,
-  Packs,
   View,
   Event,
   EventData,
   Symbol,
 } from './types.js';
-export const distribution: Record<number, [number, number, number]> = {
+/** The rules refuse a random source that returns anything but a number in [0, 1). */
+function checked(random: () => number) {
+  return () => {
+    const n = random();
+    if (!Number.isFinite(n) || n < 0 || n >= 1) fail();
+    return n;
+  };
+}
+const distribution: Record<number, [number, number, number]> = {
   3: [2, 1, 0],
   4: [3, 1, 0],
   5: [3, 1, 1],
@@ -19,24 +38,11 @@ export const distribution: Record<number, [number, number, number]> = {
   8: [5, 2, 1],
   9: [5, 3, 1],
 };
-export const normalize = (word: string) =>
+const normalize = (word: string) =>
   word.normalize('NFC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('es');
 const fail = (): never => {
   throw new Error('ls_error');
 };
-function draw(random: () => number) {
-  const n = random();
-  if (!Number.isFinite(n) || n < 0 || n >= 1) fail();
-  return n;
-}
-function shuffle<T>(items: T[], random: () => number) {
-  const a = [...items];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(draw(random) * (i + 1));
-    [a[i], a[j]] = [a[j]!, a[i]!];
-  }
-  return a;
-}
 function options(input: unknown, count: number): Options {
   if (input != null && (typeof input !== 'object' || Array.isArray(input)))
     fail();
@@ -44,18 +50,65 @@ function options(input: unknown, count: number): Options {
   if (
     (o.wordLanguage !== undefined && !['en', 'es'].includes(o.wordLanguage)) ||
     (o.powers !== undefined && typeof o.powers !== 'boolean') ||
-    (o.powers && count < 6)
+    (o.powers && count < powersFrom)
   )
     fail();
   return { wordLanguage: o.wordLanguage ?? 'en', powers: o.powers ?? false };
 }
-export function create(
+/** The password pairs a table draws from; the browser never imports them. */
+export type Pair = {
+  id: string;
+  words: [string, string];
+  aliases: [string[], string[]];
+};
+export type Packs = Record<'en' | 'es', Pair[]>;
+/** Everything a mission resets: a new table starts from it, and so does every deal. */
+const freshMission = (): Pick<
+  State,
+  | 'cycle'
+  | 'speaker'
+  | 'eliminated'
+  | 'revealed'
+  | 'ballots'
+  | 'rps'
+  | 'candidates'
+  | 'prompt'
+  | 'reactions'
+  | 'result'
+  | 'continued'
+  | 'clues'
+  | 'clueOrder'
+  | 'origin'
+  | 'ballotId'
+  | 'rpsId'
+  | 'history'
+> => ({
+  cycle: 0,
+  speaker: null,
+  eliminated: [],
+  revealed: {},
+  ballots: {},
+  rps: {},
+  candidates: [],
+  prompt: null,
+  reactions: [],
+  result: null,
+  continued: [],
+  clues: {},
+  clueOrder: [],
+  origin: null,
+  ballotId: '',
+  rpsId: '',
+  history: [],
+});
+function create(
   players: string[],
   _random: () => number,
   input?: unknown,
 ): State {
   if (
-    !distribution[players.length] ||
+    players.length < games['little-secret'].minPlayers ||
+    players.length > games['little-secret'].maxPlayers ||
     new Set(players).size !== players.length ||
     players.some(
       (p) =>
@@ -66,6 +119,7 @@ export function create(
   )
     fail();
   return {
+    ...freshMission(),
     players: [...players],
     connectedPlayers: [...players],
     options: options(input, players.length),
@@ -74,39 +128,17 @@ export function create(
     phase: 'setup',
     scores: Object.fromEntries(players.map((p) => [p, 0])),
     mission: 0,
-    cycle: 0,
-    speaker: null,
     powers: {},
-    eliminated: [],
-    revealed: {},
-    prompt: null,
-    ballotId: '',
-    rpsId: '',
-    candidates: [],
-    continued: [],
-    result: null,
     actionSequence: 0,
     events: [],
-    history: [],
-    packVersion: 'original-2026-09-v1',
     used: [],
     password: '',
     alternative: '',
     aliases: [],
     roles: {},
-    ballots: {},
-    rps: {},
-    clues: {},
-    clueOrder: [],
-    origin: null,
-    reactions: [],
   };
 }
-export function presence(
-  s: State,
-  connected: string[],
-  replaced?: string,
-): State {
+function presence(s: State, connected: string[], replaced?: string): State {
   return {
     ...s,
     connectedPlayers: s.players.filter((p) => connected.includes(p)),
@@ -117,6 +149,21 @@ export function presence(
         }
       : {}),
   };
+}
+/** Who the table waits on, or undefined when anyone (or the host) may move. */
+export function nextActor(s: State): string | undefined {
+  if (s.prompt) return s.prompt.actor;
+  if (s.speaker) return s.speaker;
+  switch (s.phase) {
+    case 'setup':
+      return s.players.find((p) => !s.ready.includes(p));
+    case 'vote':
+      return s.players.find((p) => !s.eliminated.includes(p) && !s.ballots[p]);
+    case 'tie':
+      return s.candidates.find((p) => !s.rps[p]);
+    case 'missionResult':
+      return s.players.find((p) => !s.continued.includes(p));
+  }
 }
 export function rules(packs: Packs) {
   function apply(
@@ -143,6 +190,7 @@ export function rules(packs: Packs) {
       const e: Event = { ...event, sequence: n.actionSequence };
       n.events.push(e);
       n.history.push(e);
+      // Tied rock-paper-scissors rounds can repeat without end.
       n.history = n.history.slice(-100);
     };
     const alive = () => n.players.filter((p) => !n.eliminated.includes(p));
@@ -192,7 +240,7 @@ export function rules(packs: Packs) {
       for (const p of n.players) n.scores[p]! += points[p]!;
       const max = Math.max(...Object.values(n.scores));
       const winners =
-        max >= 5 ? n.players.filter((p) => n.scores[p] === max) : [];
+        max >= winningScore ? n.players.filter((p) => n.scores[p] === max) : [];
       n.result = {
         ...solution(),
         points,
@@ -252,62 +300,34 @@ export function rules(packs: Packs) {
       aftermath();
     };
     const deal = () => {
+      const draw = checked(random);
       const pool = packs[n.options.wordLanguage].filter(
         (pair) => !n.used.includes(pair.id),
       );
       if (!pool.length) fail();
-      const pair = pool[Math.floor(draw(random) * pool.length)]!,
-        orientation = draw(random) < 0.5 ? 0 : 1;
+      const pair = pool[Math.floor(draw() * pool.length)]!,
+        orientation = draw() < 0.5 ? 0 : 1;
       n.used.push(pair.id);
       n.password = pair.words[orientation];
       n.alternative = pair.words[1 - orientation]!;
       n.aliases = [n.password, ...pair.aliases[orientation]];
       const [d, i, j] = distribution[n.players.length]!;
-      const roles = shuffle<Role>(
+      const roles = shuffled<Role>(
         [
           ...Array<Role>(d).fill('disciple'),
           ...Array<Role>(i).fill('infiltrator'),
           ...Array<Role>(j).fill('journalist'),
         ],
-        random,
+        draw,
       );
       n.roles = Object.fromEntries(n.players.map((p, i) => [p, roles[i]!]));
       if (n.mission === 0 && n.options.powers) {
-        const deck = shuffle<Power>(
-          [
-            'mime',
-            'novice',
-            'elder',
-            'sage',
-            'revenant',
-            'dictator',
-            'adept',
-            'adept',
-            'adept',
-          ],
-          random,
-        );
+        const deck = shuffled<Power>(powerDeck, draw);
         n.powers = Object.fromEntries(n.players.map((p, i) => [p, deck[i]!]));
       }
+      Object.assign(n, freshMission());
       n.mission++;
-      n.cycle = 0;
       n.phase = 'volunteer';
-      n.speaker = null;
-      n.eliminated = [];
-      n.revealed = {};
-      n.ballots = {};
-      n.rps = {};
-      n.candidates = [];
-      n.prompt = null;
-      n.reactions = [];
-      n.result = null;
-      n.continued = [];
-      n.clues = {};
-      n.clueOrder = [];
-      n.origin = null;
-      n.ballotId = '';
-      n.rpsId = '';
-      n.history = [];
       emit({ type: 'deal' });
     };
     const rpsRound = () => {
@@ -351,7 +371,7 @@ export function rules(packs: Packs) {
         if (
           typeof a.text !== 'string' ||
           !a.text.trim() ||
-          a.text.trim().length > 80
+          a.text.trim().length > clueLength
         )
           fail();
         n.clues[player] = (a.text as string).trim();
@@ -447,7 +467,7 @@ export function rules(packs: Packs) {
       if (
         typeof a.answer !== 'string' ||
         !a.answer.trim() ||
-        a.answer.length > 120 ||
+        a.answer.length > answerLength ||
         /[\p{Cc}\p{Cf}]/u.test(a.answer)
       )
         fail();
@@ -471,17 +491,15 @@ export function rules(packs: Packs) {
     return n;
   }
   return {
-    id: 'little-secret',
-    minPlayers: 3,
-    maxPlayers: 9,
+    ...seats('little-secret'),
     create,
     apply,
     view,
     presence,
     isFinished: (s: State) => s.phase === 'finished',
-  } satisfies GameDefinition<State>;
+  } satisfies GameDefinition<State, View>;
 }
-export function view(s: State, player: string): View {
+function view(s: State, player: string): View {
   if (!s.players.includes(player)) fail();
   const withheld =
     s.prompt?.actor === player || s.reactions.some((r) => r.actor === player);

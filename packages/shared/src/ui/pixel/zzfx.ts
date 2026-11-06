@@ -1,4 +1,4 @@
-import type { Audio } from '../audio.js';
+import { clamp01, type Audio } from '../audio.js';
 import { buildSamples } from './zzfx-core.js';
 
 export { buildSamples };
@@ -22,5 +22,18 @@ export function playChiptune(audio: Audio, cue: Chiptune, volume: number) {
   let samples = cache.get(cue);
   if (!samples)
     cache.set(cue, (samples = buildSamples(rate, ...chiptune[cue])));
-  audio.samples(samples, rate, Math.min(1, Math.max(0, volume)) * 0.35);
+  audio.samples(samples, rate, clamp01(volume) * 0.35);
 }
+
+/** The square/triangle blip every 8-bit sound pack composes its cues from. */
+export const chipNote =
+  (audio: Audio) =>
+  (
+    from: number,
+    delay = 0,
+    duration = 0.08,
+    volume = 0.06,
+    type: OscillatorType = 'square',
+    to?: number,
+  ) =>
+    audio.tone({ from, to, delay, duration, volume, type, attack: 0.002 });

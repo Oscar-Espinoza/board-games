@@ -1,10 +1,6 @@
 <script lang="ts">
   import { meeplePath } from '../art.js';
-  let {
-    color,
-    type = 'meeple',
-    mark = '',
-  }: { color: string; type?: string; mark?: string | number } = $props();
+  let { color, type = 'meeple' }: { color: string; type?: string } = $props();
   const uid = $props.id();
   const shape = $derived(
     type === 'pig'
@@ -49,15 +45,4 @@
     d="M0-4V5M-3-1H3"
     stroke="#fff0ce"
     stroke-width="1.4"
-  />{:else if mark !== ''}<text
-    x="0"
-    y="5"
-    text-anchor="middle"
-    font-size="6.5"
-    font-family="Georgia, serif"
-    fill="#fff4d8"
-    stroke="#271507"
-    stroke-opacity=".4"
-    stroke-width=".3"
-    paint-order="stroke">{mark}</text
-  >{/if}
+  />{/if}

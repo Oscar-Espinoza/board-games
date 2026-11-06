@@ -1,17 +1,12 @@
 <script lang="ts">
-  import { onMount, setContext, tick, untrack, type Snippet } from 'svelte';
-  import {
-    gameSkin,
-    setGameSkin,
-    type Skin,
-  } from '@board-games/shared/ui/pixel';
-  import { skinKey } from './palette.js';
+  import { onMount, setContext, tick, untrack } from 'svelte';
+  import { skinKey } from './skin.js';
   import { m } from '@board-games/shared/messages';
-  import type { Locale } from '@board-games/shared/runtime';
   import {
     colors,
     penalties,
-    rowIssue,
+    FLOOR_SIZE,
+    type Action,
     type View,
     type Source,
     type Destination,
@@ -21,11 +16,36 @@
   import Tile from './Tile.svelte';
   import PlayerBoard from './PlayerBoard.svelte';
   import './tokens.css';
+  import { colorLabels } from './labels.js';
+  import {
+    bag,
+    centerMarker,
+    centerPile,
+    centerTile,
+    discard,
+    factorySlot,
+    summary,
+  } from './locations.js';
   import { ringGeometry, scatter } from './geometry.js';
   import { planPresentation } from './presentation.js';
-  import { RevisionGate, readJson, write } from '@board-games/shared/ui';
+  import {
+    RevisionGate,
+    ViewerSkin,
+    clamp01,
+    message,
+    viewerPreferences,
+    type BoardProps,
+  } from '@board-games/shared/ui';
   import { prefersReducedMotion } from 'svelte/motion';
   import { ceramicAudio, tileFlights, measure } from './effects.js';
+  type ModalKind =
+    | 'help'
+    | 'settings'
+    | 'opponent'
+    | 'factory'
+    | 'draft'
+    | 'details'
+    | 'results';
   let {
     view,
     playerId,
@@ -37,40 +57,15 @@
     pending = false,
     settingsContent,
     rulesContent,
-    canConfigure = false,
     practice = false,
     canRematch = false,
-    rematch = async () => {},
-    errorCode = '',
-  }: {
-    view: View;
-    playerId: string;
-    players: { id: string; name: string; connected?: boolean }[];
-    send: (action: unknown) => unknown;
-    locale?: Locale;
-    round?: number;
-    connected?: boolean;
-    pending?: boolean;
-    settingsContent?: Snippet;
-    rulesContent?: Snippet;
-    canConfigure?: boolean;
-    practice?: boolean;
-    canRematch?: boolean;
-    rematch?: () => Promise<void>;
-    errorCode?: string;
-  } = $props();
+    rematch,
+    errorCode,
+  }: BoardProps<View, Action> = $props();
   let visual = $state(untrack(() => view.public)),
     root = $state<HTMLElement>(),
     dialog = $state<HTMLDialogElement>(),
-    modal = $state<
-      | 'help'
-      | 'settings'
-      | 'opponent'
-      | 'factory'
-      | 'draft'
-      | 'details'
-      | 'results'
-    >('help'),
+    modal = $state<ModalKind>('help'),
     inspected = $state('');
   let selection = $state<{
       source: Source;
@@ -84,10 +79,12 @@
     animating = $state(false),
     recent = $state<Event[]>([]),
     hiddenLocations = $state<string[]>([]);
-  let sound = $state(true),
-    volume = $state(0.25),
-    motion = $state<'system' | 'reduced' | 'full'>('system'),
-    mounted = $state(false),
+  const prefs = viewerPreferences('azul', {
+    sound: true,
+    volume: 0.25,
+    motion: null,
+  });
+  let mounted = $state(false),
     phone = $state(false),
     trayExpanded = $state(false),
     picker = $state<number | null>(null),
@@ -96,35 +93,26 @@
   const ring = $derived(
     ringGeometry(visual.factories.length, phone ? 'compact' : 'tabletop'),
   );
-  // Viewer-only table skin: the 8-bit styles and chiptunes load only when chosen.
-  let skin = $state<Skin>(gameSkin('azul')),
-    pixelReady = $state(false),
-    chiptunes = $state.raw<import('./pixel/sound.js').PixelSounds | null>(null);
-  $effect(() => {
-    if (skin === 'pixel' && !pixelReady)
-      void Promise.all([
-        import('./pixel.css'),
-        import('./pixel/sound.js'),
-      ]).then(([, sounds]) => {
-        chiptunes = sounds.pixelSounds(audio.raw);
-        pixelReady = true;
-      });
-  });
-  const pixel = $derived(skin === 'pixel' && pixelReady);
-  setContext(skinKey, () => pixel);
+  let chiptunes = $state.raw<import('./pixel/sound.js').PixelSounds | null>(
+    null,
+  );
   const gate = new RevisionGate(),
-    audio = ceramicAudio(),
-    flights = tileFlights(() => pixel);
+    audio = ceramicAudio();
+  const skin = new ViewerSkin('azul', async () => {
+    const [, sounds] = await Promise.all([
+      import('./pixel.css'),
+      import('./pixel/sound.js'),
+    ]);
+    chiptunes = sounds.pixelSounds(audio.raw);
+  });
+  const pixel = $derived(skin.pixel);
+  setContext(skinKey, () => pixel);
+  const flights = tileFlights(() => pixel);
   let opener: HTMLElement | null = null,
     epoch = 0,
     flightScrollTop = 0;
-  const labels = {
-    blue: m.azul_blue,
-    yellow: m.azul_yellow,
-    red: m.azul_red,
-    black: m.azul_black,
-    white: m.azul_white,
-  };
+  /** Who and which match the presented state belongs to; a change restarts it. */
+  const identity = $derived(`${round}/${playerId}`);
   const name = (id: string) => players.find((p) => p.id === id)?.name ?? id;
   const ownIndex = $derived(visual.players.indexOf(playerId));
   const ownBoard = $derived(visual.boards[ownIndex]);
@@ -138,8 +126,12 @@
       visual.phase === 'drafting',
   );
   const systemReduced = $derived(prefersReducedMotion.current);
+  const motionChoice = () =>
+    prefs.motion === null ? 'system' : prefs.motion ? 'full' : 'reduced';
+  const chooseMotion = (choice: string) =>
+    (prefs.motion = choice === 'system' ? null : choice === 'full');
   const reduced = $derived(
-    motion === 'reduced' || (motion === 'system' && systemReduced),
+    prefs.motion === false || (prefs.motion === null && systemReduced),
   );
   const sourceTiles = $derived(
     selection
@@ -157,7 +149,7 @@
       visual.markerOwner === null,
   );
   const markerCost = $derived(
-    claimsMarker && ownBoard?.floor.length < 7
+    claimsMarker && ownBoard?.floor.length < FLOOR_SIZE
       ? penalties[ownBoard.floor.length]
       : 0,
   );
@@ -172,14 +164,14 @@
   );
   const floorRoom = $derived(
     ownBoard
-      ? Math.max(0, 7 - ownBoard.floor.length - (claimsMarker ? 1 : 0))
+      ? Math.max(0, FLOOR_SIZE - ownBoard.floor.length - (claimsMarker ? 1 : 0))
       : 0,
   );
-  function clear(message = '') {
+  function clear(text = '') {
     picker = null;
     selection = null;
     destination = null;
-    notice = message;
+    notice = text;
   }
   function settle() {
     epoch++;
@@ -197,24 +189,9 @@
     settle();
     gate.reset();
     if (root)
-      gate.accept(
-        view.public.revision,
-        `${round}/${playerId}`,
-        connected,
-        view.public,
-      );
+      gate.accept(view.public.revision, identity, connected, view.public);
   }
-  function open(
-    kind:
-      | 'help'
-      | 'settings'
-      | 'opponent'
-      | 'factory'
-      | 'draft'
-      | 'details'
-      | 'results',
-    id = '',
-  ) {
+  function open(kind: ModalKind, id = '') {
     baseline();
     if (!dialog?.open) opener = document.activeElement as HTMLElement;
     modal = kind;
@@ -252,7 +229,7 @@
       source,
       color,
       revision: visual.revision,
-      identity: `${round}/${playerId}`,
+      identity,
     };
     destination = null;
     notice = '';
@@ -276,7 +253,7 @@
     }
     if (dialog?.open && modal === 'draft') dialog.close();
     const revision = selection.revision;
-    const action = {
+    const action: Action = {
       type: 'DRAFT',
       source: selection.source,
       color: selection.color,
@@ -288,9 +265,9 @@
     clear();
     try {
       await send(action);
-    } catch {
+    } catch (error) {
       awaitingPresentation = false;
-      notice = m.azul_error();
+      notice = message((error as Error).message, {}, locale) ?? m.azul_error();
     } finally {
       submitting = false;
       if (view.public.revision === revision) awaitingPresentation = false;
@@ -298,16 +275,6 @@
   }
   onMount(() => {
     mounted = true;
-    const saved = readJson('azul-preferences');
-    if (typeof saved.sound === 'boolean') sound = saved.sound;
-    if (
-      typeof saved.volume === 'number' &&
-      saved.volume >= 0 &&
-      saved.volume <= 1
-    )
-      volume = saved.volume;
-    if (saved.motion === 'reduced' || saved.motion === 'full')
-      motion = saved.motion;
     const phoneMedia = matchMedia('(max-width: 900px), (max-height: 800px)');
     phone = phoneMedia.matches;
     const phoneChanged = () => {
@@ -355,21 +322,18 @@
     if (untrack(() => mounted)) untrack(baseline);
   });
   $effect(() => {
-    const prefs = { sound, volume, motion };
-    audio.configure(sound, volume);
-    // System motion changes also restart presentation from a fresh baseline.
+    audio.configure(prefs.sound, clamp01(prefs.volume));
+    // Motion changes, including the system's, restart presentation from a fresh baseline.
+    void prefs.motion;
     void systemReduced;
-    if (mounted) {
-      write('azul-preferences', prefs);
-      untrack(baseline);
-    }
+    if (mounted) untrack(baseline);
   });
   $effect(() => {
     const next = view.public,
-      identity = `${round}/${playerId}`,
+      seat = identity,
       online = connected,
       node = root;
-    const eligible = gate.accept(next.revision, identity, online, next);
+    const eligible = gate.accept(next.revision, seat, online, next);
     untrack(() => {
       const interrupted = animating;
       const previous = visual;
@@ -384,7 +348,7 @@
         selection &&
         (selection.revision !== next.revision ||
           !online ||
-          selection.identity !== identity)
+          selection.identity !== seat)
       )
         clear(m.azul_changed());
       if (!eligible) recent = [];
@@ -446,7 +410,6 @@
   });
   let trayIdentity = '';
   $effect(() => {
-    const identity = `${round}/${playerId}`;
     if (identity !== trayIdentity) {
       trayIdentity = identity;
       trayExpanded = false;
@@ -477,7 +440,6 @@
     settle();
     trayExpanded = !trayExpanded;
   }
-  /** 8-bit cues for scoring steps as they appear on the boards. */
   function cue(p: import('./pixel/sound.js').PixelSounds, fresh: Event[]) {
     const walls = fresh.flatMap((e) => (e.type === 'wall' ? [e] : []));
     if (walls.length) p.score(Math.max(...walls.map((e) => e.scoring.points)));
@@ -491,7 +453,6 @@
     )
       p.bonus();
   }
-  /** The wall tile each accepted scoring event placed, with its points. */
   const gains = (id: string) =>
     recent.flatMap((e) =>
       e.type === 'wall' && e.player === id
@@ -610,7 +571,7 @@
           <article
             class="opponent"
             class:turn={active === id}
-            data-azul-location="{id}/summary"
+            data-azul-location={summary(id)}
           >
             <div class="opponent-heading">
               <span class="opponent-name" title={name(id)}
@@ -685,10 +646,10 @@
                     >{#each Array(4) as _, slot}<span class="factory-slot"
                         >{#if factory[slot]}<Tile
                             color={factory[slot]}
-                            location="factory/{index}/{slot}"
+                            location={factorySlot(index, slot)}
                           />{:else}<span
                             class="factory-empty"
-                            data-azul-location="factory/{index}/{slot}"
+                            data-azul-location={factorySlot(index, slot)}
                           ></span>{/if}</span
                       >{/each}</span
                   >
@@ -703,19 +664,19 @@
                           selection.color === color}
                         aria-label={m.azul_source({
                           count: factory.filter((c) => c === color).length,
-                          color: labels[color](),
+                          color: colorLabels[color](),
                           source: m.azul_factory({ number: index + 1 }),
                         })}
                         onclick={() =>
                           choose({ kind: 'factory', index }, color)}
                         ><Tile
                           {color}
-                          location="factory/{index}/{slot}"
+                          location={factorySlot(index, slot)}
                         /></button
                       >
                     {:else}<span
                         class="factory-empty"
-                        data-azul-location="factory/{index}/{slot}"
+                        data-azul-location={factorySlot(index, slot)}
                       ></span>{/if}
                   {/each}
                 </div>
@@ -735,11 +696,11 @@
                   disabled={!playable || !count}
                   aria-label={m.azul_source({
                     count,
-                    color: labels[color](),
+                    color: colorLabels[color](),
                     source: m.azul_center(),
                   })}
                   onclick={() => choose({ kind: 'center' }, color)}
-                  ><span class="cluster" data-azul-location="center/{color}">
+                  ><span class="cluster" data-azul-location={centerPile(color)}>
                     {#each Array(Math.max(1, count)) as _, slot}{@const offset =
                         scatter(slot)}<span
                         class="center-tile"
@@ -747,9 +708,7 @@
                         ><Tile
                           {color}
                           ghost={!count}
-                          location={count
-                            ? `center/${color}/${slot}`
-                            : undefined}
+                          location={count ? centerTile(color, slot) : undefined}
                         /></span
                       >{/each}
                   </span>{#if count}<b>{count}</b>{/if}</button
@@ -759,7 +718,7 @@
                 class="center-marker"
                 class:marker-away={!!visual.markerOwner}
                 title={m.azul_marker()}
-                ><Tile color="marker" location="center/marker" /></span
+                ><Tile color="marker" location={centerMarker} /></span
               >
             </div>
           </div>
@@ -767,7 +726,7 @@
       </div>
       <div class="table-bottom">
         <div class="reserves">
-          <span data-azul-location="bag"
+          <span data-azul-location={bag}
             ><svg viewBox="0 0 60 64" aria-hidden="true"
               ><path
                 d="m20 6 20 0-4 12c22 23 22 41-6 42C2 59 2 42 24 18Z"
@@ -781,7 +740,7 @@
                 stroke-width="2"
               /></svg
             ><span>{m.azul_bag({ count: visual.bagCount })}</span></span
-          ><span data-azul-location="discard"
+          ><span data-azul-location={discard}
             ><svg viewBox="0 0 72 58" aria-hidden="true"
               ><path
                 d="m4 10 48-5 16 15-5 30-48 4L4 40Z"
@@ -800,7 +759,7 @@
         {#if ownBoard}<div
             class="own-board"
             class:open={phone && trayExpanded}
-            data-azul-location="{playerId}/summary"
+            data-azul-location={summary(playerId)}
           >
             <PlayerBoard
               density={phone && !trayExpanded ? 'compact' : 'full'}
@@ -884,7 +843,7 @@
               })
             : m.azul_choose_destination({
                 count: quantity,
-                color: labels[selection.color](),
+                color: colorLabels[selection.color](),
               })}
         </p>
         {#if claimsMarker}<p class="marker-preview">
@@ -953,10 +912,10 @@
                     choose({ kind: 'factory', index: picker! }, color)}
                   aria-label={m.azul_source({
                     count,
-                    color: labels[color](),
+                    color: colorLabels[color](),
                     source: m.azul_factory({ number: picker + 1 }),
                   })}
-                  ><span><Tile {color} /></span>{labels[color]()} ×{count}</button
+                  ><span><Tile {color} /></span>{colorLabels[color]()} ×{count}</button
                 >{/if}{/each}<button onclick={cancelPicker}
               >{m.azul_cancel()}</button
             >
@@ -967,7 +926,6 @@
         board={ownBoard}
         id={playerId}
         name={name(playerId)}
-        anchors={false}
         fitted={true}
         color={selection?.color ?? null}
         {destination}
@@ -1038,14 +996,17 @@
         class="settings"
       >
         <label class="toggle"
-          ><input type="checkbox" bind:checked={sound} />{m.azul_sound()}</label
+          ><input
+            type="checkbox"
+            bind:checked={prefs.sound}
+          />{m.azul_sound()}</label
         ><label
           >{m.azul_volume()}<input
             type="range"
             min="0"
             max="1"
             step="0.05"
-            bind:value={volume}
+            bind:value={prefs.volume}
           /></label
         >
         <fieldset class="skin-choice">
@@ -1056,31 +1017,27 @@
                 type="radio"
                 name="azul-skin"
                 {value}
-                checked={skin === value}
-                onchange={() => {
-                  skin = value;
-                  setGameSkin('azul', value);
-                }}
+                checked={skin.choice === value}
+                onchange={() => skin.choose(value)}
               />{label}</label
             >{/each}
         </fieldset>
         <label
           >{m.azul_motion()}<select
             aria-label={m.azul_motion()}
-            bind:value={motion}
+            bind:value={motionChoice, chooseMotion}
             ><option value="system">{m.azul_system()}</option><option
               value="reduced">{m.azul_reduced()}</option
             ><option value="full">{m.azul_full_motion()}</option></select
           ></label
         >{#if settingsContent}<div class="room-settings">
             {@render settingsContent()}
-          </div>{/if}{#if canRematch && !settingsContent}<button
-            onclick={rematch}>{m.azul_rematch()}</button
+          </div>{/if}{#if canRematch}<button onclick={rematch}
+            >{m.azul_rematch()}</button
           >{/if}
       </div>
     {:else if visual.players.includes(inspected)}<PlayerBoard
         board={visual.boards[visual.players.indexOf(inspected)]}
-        anchors={false}
         interactive={false}
         id={inspected}
         name={name(inspected)}

@@ -4,8 +4,11 @@ import type {
   Reply,
   RoomView,
   Synchronization,
-} from '@board-games/shared';
+} from '@board-games/game-core';
+import { read, write } from '@board-games/shared/ui';
 import { deliverIntention, SocketReplyError } from './action-retry';
+import { gameClients } from './games';
+import type { GameId } from '@board-games/shared';
 export const session = $state({
   room: null as RoomView | null,
   connected: false,
@@ -16,11 +19,12 @@ export const session = $state({
 });
 let socket: Socket | undefined;
 let current: Credentials | undefined;
+const key = (roomId: string) => `board-games:room:${roomId}`;
+/** The display name the viewer last used, offered again when creating or joining. */
+export const nameKey = 'board-games:name';
 function saved(roomId: string): Credentials | undefined {
   try {
-    const value = JSON.parse(
-      localStorage.getItem(`board-games:room:${roomId}`) ?? 'null',
-    );
+    const value = JSON.parse(read(key(roomId)) ?? 'null');
     return value?.roomId === roomId && typeof value.token === 'string'
       ? value
       : undefined;
@@ -30,14 +34,8 @@ function saved(roomId: string): Credentials | undefined {
 }
 function remember(credentials: Credentials) {
   current = credentials;
-  try {
-    localStorage.setItem(
-      `board-games:room:${credentials.roomId}`,
-      JSON.stringify(credentials),
-    );
-  } catch {
+  if (!write(key(credentials.roomId), credentials))
     session.storageWarning = true;
-  }
 }
 export function request<T>(event: string, data: unknown): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -125,24 +123,30 @@ export async function send(action: unknown) {
   const initial = session.room;
   const id = crypto.randomUUID();
   try {
-    await deliverIntention(initial, action, id, {
-      current: () => session.room,
-      submit: (payload) => request('action', payload),
-      synchronize: async (payload) => {
-        const synchronized = await request<Synchronization>('sync', payload);
-        // Never overwrite a different room, match, or a newer pushed snapshot.
-        const live = session.room;
-        if (
-          live?.id === synchronized.room.id &&
-          live.playerId === synchronized.room.playerId &&
-          live.round === synchronized.room.round &&
-          live.revision <= synchronized.room.revision
-        ) {
-          session.room = synchronized.room;
-        }
-        return synchronized;
+    await deliverIntention(
+      initial,
+      action,
+      id,
+      gameClients[initial.gameId as GameId]?.retryable,
+      {
+        current: () => session.room,
+        submit: (payload) => request('action', payload),
+        synchronize: async (payload) => {
+          const synchronized = await request<Synchronization>('sync', payload);
+          // Never overwrite a different room, match, or a newer pushed snapshot.
+          const live = session.room;
+          if (
+            live?.id === synchronized.room.id &&
+            live.playerId === synchronized.room.playerId &&
+            live.round === synchronized.room.round &&
+            live.revision <= synchronized.room.revision
+          ) {
+            session.room = synchronized.room;
+          }
+          return synchronized;
+        },
       },
-    });
+    );
   } catch (error) {
     session.error = (error as Error).message;
     session.errorCode =
