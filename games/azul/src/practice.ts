@@ -119,6 +119,7 @@ export function practice(scenario: Scenario = 'start2'): PracticeTable<View> {
     get actor() {
       return state.players[state.turn];
     },
+    followsActor: false,
     get finished() {
       return state.phase === 'finished';
     },

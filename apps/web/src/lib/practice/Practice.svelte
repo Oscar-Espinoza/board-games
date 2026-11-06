@@ -73,14 +73,18 @@
       .catch((e: Error) => (loadingError = e.message));
   });
   let shown = table;
-  /** Show the seat that must act next; call it after changing the table yourself. */
+  /**
+   * Show the seat that must act next (a new table, or any table that `followsActor`);
+   * call it after changing the table yourself.
+   */
   export function refresh() {
     // A new table restarts revisions, so presentation starts over with a new round.
-    if (table !== shown) {
+    const fresh = table !== shown;
+    if (fresh) {
       shown = table;
       round++;
     }
-    seat = table!.actor;
+    if (fresh || table!.followsActor !== false) seat = table!.actor;
     version++;
   }
   function reset() {

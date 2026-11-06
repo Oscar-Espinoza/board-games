@@ -86,8 +86,13 @@ export function readinessUnchanged(
  */
 export interface PracticeTable<View = GameView> {
   readonly players: Player[];
-  /** The seat that must act next; the route shows it after every move. */
+  /** The seat that must act next; the route starts there and, unless told otherwise, follows it. */
   readonly actor: string;
+  /**
+   * False when the viewer's seat stays where they put it after a move (Azul's tile
+   * flights play only for an unchanged viewer). Absent: the route follows `actor`.
+   */
+  readonly followsActor?: boolean;
   readonly finished: boolean;
   view(seat: string): View;
   /** Throws the rules' rejection (a message key) and leaves the table unchanged. */
