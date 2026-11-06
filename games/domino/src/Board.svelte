@@ -45,9 +45,12 @@
     const skin = game.skin.choice;
     let alive = true;
     Table = null;
+    failed = false;
     tables[skin]()
       .then((v) => alive && (Table = v.default))
-      .catch(() => (failed = true));
+      .catch(() => {
+        if (alive) failed = true;
+      });
     return () => (alive = false);
   });
 </script>
