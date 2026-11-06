@@ -90,8 +90,9 @@
     sound: true,
     motion: true,
   });
-  // Reduced motion always wins (ADR 025); the setting only turns ambient motion off.
-  const motion = $derived(prefs.motion && !prefersReducedMotion.current);
+  // The system's reduced-motion request picks the starting state; the toggle can still
+  // turn ambient motion on (ADR 025).
+  let motion = $state(prefs.motion && !prefersReducedMotion.current);
   let cx = $state(50),
     cy = $state(50),
     scale = $state(1.5),
@@ -2034,8 +2035,7 @@
       <button onclick={toggleSound} aria-pressed={prefs.sound}
         >{t('sound')} · {prefs.sound ? t('on') : t('off')}</button
       ><button
-        disabled={prefersReducedMotion.current}
-        onclick={() => (prefs.motion = !prefs.motion)}
+        onclick={() => (prefs.motion = motion = !motion)}
         aria-pressed={motion}
         >{t('motion')} · {motion ? t('on') : t('off')}</button
       ><button
