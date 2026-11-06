@@ -21,6 +21,14 @@ import type {
   EventData,
   Symbol,
 } from './types.js';
+/** The rules refuse a random source that returns anything but a number in [0, 1). */
+function checked(random: () => number) {
+  return () => {
+    const n = random();
+    if (!Number.isFinite(n) || n < 0 || n >= 1) fail();
+    return n;
+  };
+}
 const distribution: Record<number, [number, number, number]> = {
   3: [2, 1, 0],
   4: [3, 1, 0],
@@ -292,12 +300,13 @@ export function rules(packs: Packs) {
       aftermath();
     };
     const deal = () => {
+      const draw = checked(random);
       const pool = packs[n.options.wordLanguage].filter(
         (pair) => !n.used.includes(pair.id),
       );
       if (!pool.length) fail();
-      const pair = pool[Math.floor(random() * pool.length)]!,
-        orientation = random() < 0.5 ? 0 : 1;
+      const pair = pool[Math.floor(draw() * pool.length)]!,
+        orientation = draw() < 0.5 ? 0 : 1;
       n.used.push(pair.id);
       n.password = pair.words[orientation];
       n.alternative = pair.words[1 - orientation]!;
@@ -309,11 +318,11 @@ export function rules(packs: Packs) {
           ...Array<Role>(i).fill('infiltrator'),
           ...Array<Role>(j).fill('journalist'),
         ],
-        random,
+        draw,
       );
       n.roles = Object.fromEntries(n.players.map((p, i) => [p, roles[i]!]));
       if (n.mission === 0 && n.options.powers) {
-        const deck = shuffled<Power>(powerDeck, random);
+        const deck = shuffled<Power>(powerDeck, draw);
         n.powers = Object.fromEntries(n.players.map((p, i) => [p, deck[i]!]));
       }
       Object.assign(n, freshMission());

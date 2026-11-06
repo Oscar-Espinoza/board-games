@@ -25,6 +25,14 @@ const other = (team: Team): Team => (team === 'red' ? 'blue' : 'red');
 const fail = (): never => {
   throw new Error('cn_error');
 };
+/** The rules refuse a random source that returns anything but a number in [0, 1). */
+function checked(random: () => number) {
+  return () => {
+    const n = random();
+    if (!Number.isFinite(n) || n < 0 || n >= 1) fail();
+    return n;
+  };
+}
 export function create(
   players: string[],
   _random: () => number,
@@ -185,7 +193,8 @@ export function apply(
     if (n.ready.includes(player)) fail();
     n.ready.push(player);
     if (n.ready.length === n.players.length) {
-      const pool = shuffled(words[n.options.boardLanguage], random);
+      const draw = checked(random);
+      const pool = shuffled(words[n.options.boardLanguage], draw);
       n.startingTeam = random() < 0.5 ? 'red' : 'blue';
       const identities: Identity[] = [
         ...Array<Identity>(deal.first).fill(n.startingTeam),
@@ -193,7 +202,7 @@ export function apply(
         ...Array<Identity>(deal.civilians).fill('civilian'),
         'assassin',
       ];
-      n.board = shuffled(identities, random).map((identity, i): Cell => ({
+      n.board = shuffled(identities, draw).map((identity, i): Cell => ({
         word: pool[i]!,
         identity,
         revealed: false,
