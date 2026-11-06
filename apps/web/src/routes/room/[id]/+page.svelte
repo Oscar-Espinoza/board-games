@@ -163,9 +163,6 @@
             canRematch={room.status === 'finished' &&
               room.hostId === room.playerId}
             rematch={start}
-            onLeave={leave}
-            onInvite={invite}
-            {copied}
             >{#snippet rulesContent()}<Rulebook
                 game={room.gameId as GameId}
               />{/snippet}{#snippet settingsContent()}<a

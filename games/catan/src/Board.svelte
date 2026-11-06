@@ -52,8 +52,6 @@
   import { resourceArtwork, shade } from './table/artwork.js';
   import { provideSkin } from './table/skin.js';
   import { m } from '@board-games/shared/messages';
-  import { locales, setLocale } from '@board-games/shared/runtime';
-  import type { Locale } from '@board-games/shared/runtime';
   type PlayerView = ReturnType<typeof playerView>;
   let {
     view,
@@ -68,9 +66,6 @@
     settingsContent,
     rulesContent,
     chooseSeat,
-    onLeave,
-    onInvite,
-    copied = false,
     practice = false,
   }: BoardProps<PlayerView, Action> = $props();
 
@@ -763,31 +758,15 @@
   style:--px-table={pixel ? `url("${sheets.table}")` : undefined}
 >
   <nav class="table-navigation" aria-label={m.catalog({}, { locale })}>
-    <a href="/" onclick={() => onLeave?.()}
-      ><span aria-hidden="true">←</span> {m.back({}, { locale })}</a
-    >
     <button onclick={() => (rulesOpen = true)}
       ><span aria-hidden="true">▤</span>
       {m.library_rules({}, { locale })}</button
     >
   </nav>
   <div class="table-utilities">
-    {#if onInvite && !practice}<button onclick={() => onInvite()}
-        ><span aria-hidden="true">♟♟</span>
-        {copied ? m.copied({}, { locale }) : m.invite({}, { locale })}</button
-      >{:else if practice}<span class="practice-label"
+    {#if practice}<span class="practice-label"
         >{m.catan_practice({}, { locale })}</span
       >{/if}
-    <label class="table-language"
-      ><span aria-hidden="true">◎</span><select
-        aria-label={m.language({}, { locale })}
-        value={locale}
-        onchange={(e) => setLocale(e.currentTarget.value as Locale)}
-        >{#each locales as code}<option value={code}
-            >{code.toUpperCase()}</option
-          >{/each}</select
-      ></label
-    >
     <button
       class="settings-trigger"
       aria-label={m.catan_settings({}, { locale })}
@@ -1850,8 +1829,6 @@
     z-index: 1;
   }
   button,
-  .table-navigation a,
-  .table-language,
   .table-connection {
     background: var(--wood);
     color: #fff1d6;
@@ -1870,13 +1847,10 @@
     padding: 10px 13px;
     cursor: pointer;
   }
-  button:hover:not(:disabled):not([aria-disabled='true']),
-  .table-navigation a:hover {
+  button:hover:not(:disabled):not([aria-disabled='true']) {
     filter: brightness(1.16);
   }
-  button:focus-visible,
-  a:focus-visible,
-  select:focus-visible {
+  button:focus-visible {
     outline: 3px solid #ffe29b;
     outline-offset: 3px;
   }
@@ -1899,12 +1873,6 @@
     gap: 10px;
     z-index: 7;
   }
-  .table-navigation a {
-    text-decoration: none;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
   .table-navigation button {
     display: flex;
     align-items: center;
@@ -1924,7 +1892,6 @@
     z-index: 7;
   }
   .table-utilities button,
-  .table-language,
   .table-connection {
     font-size: clamp(11px, 0.95vw, 16px);
     padding: 9px 10px;
@@ -1933,24 +1900,6 @@
     font-size: 21px;
     vertical-align: middle;
     color: #f1d594;
-  }
-  .table-language {
-    display: flex;
-    align-items: center;
-    padding: 0 7px;
-    gap: 4px;
-  }
-  .table-language select {
-    appearance: none;
-    width: auto;
-    border: 0;
-    background: transparent;
-    color: #fff1d6;
-    font: inherit;
-    padding: 5px 0;
-  }
-  .table-language option {
-    color: #302111;
   }
   .table-connection {
     display: flex;
@@ -2574,8 +2523,7 @@
     text-align: center;
     margin: 3px 0 8px;
   }
-  input,
-  select {
+  input {
     color: #322411;
     padding: 5px;
   }
@@ -2826,7 +2774,6 @@
     .table-utilities {
       gap: 5px;
     }
-    .table-navigation a,
     .table-navigation button {
       font-size: 12px;
       padding: 9px;
@@ -2905,7 +2852,6 @@
       left: 8px;
       gap: 5px;
     }
-    .table-navigation a,
     .table-navigation button {
       font-size: 10px;
       padding: 8px;
@@ -2923,14 +2869,6 @@
       font-size: 10px;
       padding: 6px;
     }
-    .table-utilities > button:first-child > span {
-      display: none;
-    }
-    .table-language {
-      font-size: 11px;
-      padding: 0 4px;
-    }
-    .table-language > span,
     .settings-label,
     .table-connection,
     .practice-label {
@@ -3167,7 +3105,6 @@
     .seat-stats {
       font-size: 9px;
     }
-    .table-navigation a,
     .table-navigation button {
       font-size: 10px;
       padding: 7px;
@@ -3176,12 +3113,6 @@
       font-size: 18px;
     }
     .table-utilities .settings-label {
-      display: none;
-    }
-    .table-utilities > button:first-child {
-      font-size: 10px;
-    }
-    .table-utilities > button:first-child > span {
       display: none;
     }
     .table-connection {

@@ -26,10 +26,6 @@ export type BoardProps<View = GameView, Action = unknown> = {
   settingsContent?: Snippet;
   /** A practice host lets the viewer switch seats from the table itself. */
   chooseSeat?: (seat: string) => void;
-  /** Room actions for a Board that draws its own room chrome. */
-  onLeave?: () => void;
-  onInvite?: () => unknown;
-  copied?: boolean;
 };
 
 export type Intention = Record<string, any>;
