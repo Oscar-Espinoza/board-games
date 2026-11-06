@@ -1,10 +1,18 @@
 import { createAudio } from '@board-games/shared/ui';
-import type { Event } from './index.js';
+import type { Event, EventKind } from './index.js';
+/** An event's cue, or one the table plays for the viewer's own gestures. */
+export type SoundCue = EventKind | 'rotate' | 'build' | 'preview';
 export function tableAudio() {
   const audio = createAudio();
   let muted = false;
+  const score = [
+    [0, 0.08, 0.1, 800],
+    [0.1, 0.07, 0.09, 1200],
+    [0.2, 0.09, 0.07, 1700],
+  ];
   // Broad filtered textures, never pitched oscillators: paper, wood and metal.
-  const cues: Record<string, number[][]> = {
+  // Events missing here stay silent.
+  const cues: Partial<Record<SoundCue, number[][]>> = {
     rotate: [[0, 0.12, 0.09, 2100]],
     build: [
       [0, 0.09, 0.14, 240],
@@ -24,16 +32,8 @@ export function tableAudio() {
       [0, 0.15, 0.07, 2600],
       [0.13, 0.06, 0.1, 600],
     ],
-    score: [
-      [0, 0.08, 0.1, 800],
-      [0.1, 0.07, 0.09, 1200],
-      [0.2, 0.09, 0.07, 1700],
-    ],
-    final: [
-      [0, 0.08, 0.1, 800],
-      [0.1, 0.07, 0.09, 1200],
-      [0.2, 0.09, 0.07, 1700],
-    ],
+    score,
+    final: score,
     gold: [
       [0, 0.035, 0.12, 4300],
       [0.06, 0.05, 0.09, 6100],
@@ -79,7 +79,7 @@ export function tableAudio() {
       [0.4, 0.2, 0.06, 3400],
     ],
   };
-  function play(kind: string, delay = 0) {
+  function play(kind: SoundCue, delay = 0) {
     if (muted) return;
     for (const [offset, duration, volume, frequency] of cues[kind] ?? [])
       audio.noise({

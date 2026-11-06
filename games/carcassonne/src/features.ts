@@ -45,6 +45,29 @@ export const directions = [
   [-1, 0],
 ] as const;
 export const key = (x: number, y: number) => `${x},${y}`;
+/** Whether two tiles are the same or touch, diagonals included (a monastery's reach). */
+export const adjacent = (
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+) => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1;
+/** Meeples come in sevens; every other figure is one per player. */
+export const figureSupply = (type: Figure['type']) =>
+  type === 'meeple' ? 7 : 1;
+/** The figures a table offers, with the large meeple and abbot as their modules allow. */
+export const figureTypes = (
+  modules: readonly string[],
+  fly = false,
+): Figure['type'][] => [
+  'meeple',
+  ...(modules.includes('inns') ? (['large'] as const) : []),
+  ...(!fly && modules.includes('abbot') ? (['abbot'] as const) : []),
+];
+export function supply(s: Landscape, who: string, type: Figure['type']) {
+  return (
+    figureSupply(type) -
+    s.figures.filter((f) => f.owner === who && f.type === type).length
+  );
+}
 export const node = (tile: string, region: string) => `${tile}/${region}`;
 export function split(ref: string) {
   const [tile, region] = ref.split('/');
@@ -107,10 +130,8 @@ export function graph(s: Landscape): Feature[] {
     let open = nodes.reduce((n, v) => n + openings.get(v)!, 0);
     const sanctuary = r.kind === 'monastery' || r.kind === 'garden';
     if (sanctuary) {
-      open = 0;
-      for (let dx = -1; dx <= 1; dx++)
-        for (let dy = -1; dy <= 1; dy++)
-          if (!s.board[key(p.x + dx, p.y + dy)]) open++;
+      open = 9;
+      for (const q of Object.values(s.board)) if (adjacent(p, q)) open--;
     }
     const figures = s.figures.filter((f) =>
       nodes.includes(node(f.tile, f.region)),
@@ -173,10 +194,7 @@ export function points(f: Feature, final = false) {
 export function goldTiles(s: Landscape, f: Feature) {
   if (f.kind !== 'monastery' && f.kind !== 'garden') return f.tiles;
   const p = s.board[f.tiles[0]];
-  return Object.keys(s.board).filter(
-    (k) =>
-      Math.abs(s.board[k].x - p.x) <= 1 && Math.abs(s.board[k].y - p.y) <= 1,
-  );
+  return Object.keys(s.board).filter((k) => adjacent(s.board[k], p));
 }
 export function frontier(board: Landscape['board']) {
   const out = new Set<string>();

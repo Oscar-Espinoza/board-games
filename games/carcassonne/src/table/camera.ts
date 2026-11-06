@@ -6,7 +6,7 @@ export const ground = { a: 1, b: 0.05, c: -0.13, d: 0.74 };
 export const groundMatrix = `matrix(${ground.a} ${ground.b} ${ground.c} ${ground.d} 0 0)`;
 const determinant = ground.a * ground.d - ground.b * ground.c;
 export const uprightMatrix = `matrix(${ground.d / determinant} ${-ground.b / determinant} ${-ground.c / determinant} ${ground.a / determinant} 0 0)`;
-export function project({ x, y }: Point): Point {
+function project({ x, y }: Point): Point {
   return { x: ground.a * x + ground.c * y, y: ground.b * x + ground.d * y };
 }
 export function unproject({ x, y }: Point): Point {

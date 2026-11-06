@@ -1,13 +1,25 @@
-import { seeded } from '@board-games/game-core';
+import { seeded, type Player } from '@board-games/game-core';
+import type { PracticeTable } from '@board-games/shared/ui';
 /** Local practice only; never imported by multiplayer initialization. No bots. */
-import { placements } from './features.js';
+import { placements, regionAt } from './features.js';
 import { modules } from './tiles.js';
-import { createGame, applyAction, playerView, type State } from './index.js';
-export const seats = ['Rose', 'Azure', 'Amber'].map((name, i) => ({
-  id: 'practice-' + i,
-  name,
-  connected: true,
-}));
+import {
+  createGame,
+  applyAction,
+  playerView,
+  type State,
+  type View,
+} from './index.js';
+const practiceSeats = (names: string[]): Player[] =>
+  names.map((name, i) => ({
+    id: 'practice-' + i,
+    name,
+    connected: true,
+    reservedUntil: null,
+  }));
+const seats = practiceSeats(['Rose', 'Azure', 'Amber']);
+/** The `short` scenario plays only this many tiles. */
+const SHORT_DECK = 17;
 export const scenarios = [
   'short',
   'match',
@@ -92,16 +104,17 @@ function scenarioState(scenario: Scenario): State {
   }
   return s;
 }
-// A reproducible developed landscape built exclusively through accepted actions.
-// This is a local review fixture, never a multiplayer initializer or bot policy.
-export const tableSeats = [
+const tableSeats = practiceSeats([
   'Eleanor',
   'Magnus',
   'Clara',
   'Rurik',
   'Isolde',
   'Hugo',
-].map((name, i) => ({ id: 'practice-' + i, name, connected: true }));
+]);
+// A reproducible developed landscape built exclusively through accepted actions:
+// tiles go nearest the middle, meeples on the first road, city or monastery offered.
+// A local review fixture, never a multiplayer initializer.
 function paintedTable(): State {
   let s = createGame(tableSeats.map((p) => p.id));
   s.config = { farmers: true, modules: ['abbot', 'inns', 'traders'], first: 0 };
@@ -137,7 +150,7 @@ function paintedTable(): State {
           (o) =>
             o.kind === 'deploy' &&
             o.figure === 'meeple' &&
-            !o.target?.includes('/f'),
+            regionAt(s, o.target!).kind !== 'field',
         ) ??
         prompt.options.find((o) => o.kind === 'skip') ??
         prompt.options[0];
@@ -151,7 +164,7 @@ function paintedTable(): State {
   }
   return s;
 }
-export function practice(scenario: Scenario = 'short') {
+export function practice(scenario: Scenario = 'short'): PracticeTable<View> {
   const short = scenario === 'short';
   let state =
     scenario === 'table'
@@ -160,23 +173,34 @@ export function practice(scenario: Scenario = 'short') {
         ? createGame(seats.map((p) => p.id))
         : scenarioState(scenario);
   if (short) state.config = { farmers: false, modules: [], first: 0 };
+  const players = scenario === 'table' ? tableSeats : seats;
   const random = seeded(3109);
   return {
-    get state() {
-      return state;
-    },
+    players,
     get actor() {
       return state.phase === 'setup'
         ? (state.players.find((p) => !state.ready.includes(p)) ??
             state.players[0])
         : (state.pending?.actor ?? state.players[state.active]);
     },
-    view: (id: string) => playerView(state, id),
-    send(id: string, action: unknown) {
-      const setup = state.phase === 'setup';
-      state = applyAction(state, id, action, random);
-      if (setup && state.phase !== 'setup' && short)
-        state.deck = state.deck.slice(0, 17);
+    view: (id) => playerView(state, id),
+    send(id, action) {
+      if (
+        state.phase === 'setup' &&
+        (action as { type?: unknown })?.type === 'ready'
+      ) {
+        // One Start button confirms every local seat.
+        let next = state;
+        for (const player of players)
+          next = applyAction(
+            next,
+            player.id,
+            { type: 'ready', version: state.setupVersion },
+            random,
+          );
+        if (short) next.deck = next.deck.slice(0, SHORT_DECK);
+        state = next;
+      } else state = applyAction(state, id, action, random);
     },
   };
 }

@@ -11,7 +11,12 @@
   import { tiles, rotatePoint } from '../tiles.js';
   import { cityPath } from '../art.js';
   import { lift, uprightMatrix } from './camera.js';
-  import { cityLayout, meadowLayout, seeded, type Slot } from './scenery.js';
+  import {
+    cityLayout,
+    meadowLayout,
+    hashStream,
+    type Slot,
+  } from './scenery.js';
   import { sprites, spriteRoot, small } from './sprites.js';
   import { spriteImage, wallImage } from '../pixel/atlas.svelte.js';
 
@@ -88,7 +93,7 @@
       })
       .sort((a, b) => a.y - b.y || a.x - b.x);
   });
-  const smoke = $derived(seeded(`${tileKey}/smoke`)() < 0.5);
+  const smoke = $derived(hashStream(`${tileKey}/smoke`)() < 0.5);
 </script>
 
 <g class="elevation" data-elevation-tile={tileKey}>

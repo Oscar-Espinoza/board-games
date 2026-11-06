@@ -1,7 +1,8 @@
-import { points, type Feature } from './features.js';
+import { figureSupply, points, type Feature } from './features.js';
 import type { View } from './index.js';
 
 type PublicState = View['public'];
+const WATCHED_LIMIT = 12;
 
 export const scoreSources = [
   'city',
@@ -93,12 +94,12 @@ export function playerOverviews(
       placedTiles: state.events.filter(
         (event) => event.kind === 'place' && event.player === id,
       ).length,
-      standardAvailable: 7 - standard.length,
+      standardAvailable: figureSupply('meeple') - standard.length,
       standardDeployed: standard.length,
       farmers,
-      largeAvailable: 1 - large.length,
+      largeAvailable: figureSupply('large') - large.length,
       largeDeployed: large.length,
-      abbotAvailable: 1 - abbots.length,
+      abbotAvailable: figureSupply('abbot') - abbots.length,
       abbotDeployed: abbots.length,
       builderActive: figures.some((figure) => figure.attachment === 'builder'),
       pigActive: figures.some((figure) => figure.attachment === 'pig'),
@@ -129,7 +130,6 @@ export function watchedFeatures(
   features: Feature[],
   playerId: string,
   scope: FeatureScope,
-  limit = 12,
 ) {
   return features
     .filter((feature) => {
@@ -150,5 +150,5 @@ export function watchedFeatures(
         return b.tiles.length - a.tiles.length;
       return a.id.localeCompare(b.id);
     })
-    .slice(0, limit);
+    .slice(0, WATCHED_LIMIT);
 }

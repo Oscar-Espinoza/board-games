@@ -1,5 +1,6 @@
 import { shuffled as shuffle } from '@board-games/game-core';
 import type { ActionContext, GameDefinition } from '@board-games/game-core';
+import { seats } from '@board-games/shared/games';
 import {
   tiles,
   modules,
@@ -11,6 +12,8 @@ import {
 import {
   graph,
   points,
+  adjacent,
+  directions,
   goldTiles,
   placements,
   legalPlacement,
@@ -18,29 +21,113 @@ import {
   node,
   split,
   regionAt,
+  figureTypes,
+  supply,
   type Landscape,
   type Figure,
   type Feature,
 } from './features.js';
+export type OptionKind =
+  | 'deploy'
+  | 'retrieve'
+  | 'fly'
+  | 'skip'
+  | 'robber'
+  | 'gold'
+  | 'mage'
+  | 'witch'
+  | 'ferry'
+  | 'score'
+  | 'keep'
+  | 'return'
+  | 'marker'
+  | 'reward'
+  | 'two'
+  | 'message'
+  | 'add'
+  | 'remove';
+/** What a pending decision asks for; its options use `OptionKind`s. */
+export type PromptKind =
+  | 'robber'
+  | 'gold'
+  | 'magic'
+  | 'deploy'
+  | 'landing'
+  | 'ferry'
+  | 'score'
+  | 'pig'
+  | 'marker'
+  | 'rewardMarker'
+  | 'reward'
+  | 'message'
+  | 'cropMode'
+  | 'crop';
+export type EventKind =
+  | 'place'
+  | 'draw'
+  | 'discard'
+  | 'meeple'
+  | 'return'
+  | 'score'
+  | 'final'
+  | 'robber'
+  | 'goods'
+  | 'pig'
+  | 'gold'
+  | 'magic'
+  | 'flight'
+  | 'ferry'
+  | 'win'
+  | 'extra'
+  | 'message';
+/** Where the resolution of a turn stands; `advance` walks them in this order. */
+export type Stage =
+  | 'setup'
+  | 'robbers'
+  | 'place'
+  | 'effects'
+  | 'magic'
+  | 'deploy'
+  | 'ferries'
+  | 'score'
+  | 'pigs'
+  | 'markers'
+  | 'rewards'
+  | 'messageRewards'
+  | 'message'
+  | 'crop'
+  | 'cropPlayers'
+  | 'end'
+  | 'finished';
+/** What a seat may send; the host's setup is `config`, everything else follows the prompt. */
+export type Action =
+  | {
+      type: 'config';
+      version: number;
+      config: { farmers: boolean; modules: Module[]; first: number };
+    }
+  | { type: 'ready'; version: number }
+  | { type: 'place'; turn: number; x: number; y: number; rotation: number }
+  | { type: 'choose'; prompt: number; choice: string };
 export type Option = {
   id: string;
-  kind: string;
+  kind: OptionKind;
   target?: string;
   figure?: Figure['type'];
   attachment?: Figure['attachment'];
   value?: string | number;
   points?: number;
 };
-export type Pending = {
+type Pending = {
   id: number;
-  kind: string;
+  kind: PromptKind;
   actor: string;
   options: Option[];
 };
 export type Event = {
   id: number;
   turn: number;
-  kind: string;
+  kind: EventKind;
   player?: string;
   target?: string;
   points?: number;
@@ -55,7 +142,7 @@ export type State = Landscape & {
   setupVersion: number;
   ready: string[];
   phase: 'setup' | 'place' | 'decision' | 'finished';
-  stage: string;
+  stage: Stage;
   turn: number;
   active: number;
   deck: string[];
@@ -84,26 +171,27 @@ export type State = Landscape & {
   extra: number;
   builderTriggered: boolean;
   flight: { roll: number; tile: string; figure: Figure['type'] } | null;
-  cropMode: string;
+  cropMode: '' | 'add' | 'remove';
   winners: string[];
 };
 const clone = <T>(v: T): T => structuredClone(v);
+/** Every rejection carries the message key the table translates. */
 function fail(): never {
-  throw new Error('Invalid Carcassonne action');
+  throw new Error('carc_error');
 }
 const actor = (s: State) => s.players[s.active];
 const ordered = (s: State, first = s.active) =>
   s.players.map((_, i) => s.players[(first + i) % s.players.length]);
 function event(
   s: State,
-  kind: string,
+  kind: EventKind,
   data: Omit<Partial<Event>, 'id' | 'turn' | 'kind'> = {},
 ) {
   s.events.push({ id: ++s.eventSerial, turn: s.turn, kind, ...data });
 }
 function prompt(
   s: State,
-  kind: string,
+  kind: PromptKind,
   who: string,
   options: Omit<Option, 'id'>[],
 ) {
@@ -117,10 +205,18 @@ function prompt(
   };
   return true;
 }
-export function supply(s: Landscape, who: string, type: Figure['type']) {
-  return (
-    (type === 'meeple' ? 7 : 1) -
-    s.figures.filter((f) => f.owner === who && f.type === type).length
+/** Which of the two scoring markers (0, or 1 with the courier) takes these points. */
+function markerPrompt(
+  s: State,
+  kind: 'marker' | 'rewardMarker',
+  who: string,
+  points: number | undefined,
+) {
+  return prompt(
+    s,
+    kind,
+    who,
+    [0, 1].map((value) => ({ kind: 'marker', value, points })),
   );
 }
 function attached(s: State, who: string, kind: Figure['attachment']) {
@@ -135,13 +231,7 @@ function types(
   who: string,
   fly = false,
 ): Figure['type'][] {
-  return (
-    [
-      'meeple',
-      ...(s.config.modules.includes('inns') ? ['large'] : []),
-      ...(!fly && s.config.modules.includes('abbot') ? ['abbot'] : []),
-    ] as Figure['type'][]
-  ).filter(
+  return figureTypes(s.config.modules, fly).filter(
     (t) =>
       supply(s, who, t) > 0 &&
       (kind === 'garden'
@@ -217,7 +307,7 @@ function award(
   who: string,
   n: number,
   f?: Feature,
-  reason = 'score',
+  reason: EventKind = 'score',
 ) {
   if (n <= 0) return;
   s.turnPoints[who] = (s.turnPoints[who] ?? 0) + n;
@@ -287,9 +377,10 @@ function moveScore(
     if (owner === who || s.robbers[owner] !== old) continue;
     if (robbery) s.robbers[owner] = s.scores[who][marker] % 50;
     else {
-      const options = (s.robberRewards[owner] ??= []);
-      options.push({ player: who, points: Math.ceil(total / 2) });
-      s.robberRewards[owner] = options;
+      (s.robberRewards[owner] ??= []).push({
+        player: who,
+        points: Math.ceil(total / 2),
+      });
     }
   }
 }
@@ -397,13 +488,8 @@ function firstFerries(s: State) {
     }
     for (const port of r.ports) {
       const side = (port + p.rotation) % 4;
-      const d = [
-        [0, -1],
-        [1, 0],
-        [0, 1],
-        [-1, 0],
-      ][side];
-      const k = key(p.x + d[0], p.y + d[1]);
+      const [dx, dy] = directions[side];
+      const k = key(p.x + dx, p.y + dy);
       const next = s.board[k];
       if (!next) continue;
       const local = (side + 2 - next.rotation + 4) % 4;
@@ -498,12 +584,7 @@ function advance(s: State) {
             'gold',
             who,
             Object.keys(s.board)
-              .filter(
-                (k) =>
-                  k !== s.last &&
-                  Math.abs(s.board[k].x - p.x) <= 1 &&
-                  Math.abs(s.board[k].y - p.y) <= 1,
-              )
+              .filter((k) => k !== s.last && adjacent(s.board[k], p))
               .map((k) => ({ kind: 'gold', target: k })),
           )
         )
@@ -601,10 +682,7 @@ function advance(s: State) {
           s.config.modules.includes('messages') &&
           s.markers[p] === undefined
         ) {
-          prompt(s, 'marker', p, [
-            { kind: 'marker', value: 0, points: s.turnPoints[p] },
-            { kind: 'marker', value: 1, points: s.turnPoints[p] },
-          ]);
+          markerPrompt(s, 'marker', p, s.turnPoints[p]);
           return;
         }
         moveScore(s, p, s.turnPoints[p]);
@@ -616,7 +694,7 @@ function advance(s: State) {
       const p = s.queue.shift();
       if (p) {
         const options = s.robberRewards[p].map((v) => ({
-          kind: 'reward',
+          kind: 'reward' as const,
           target: v.player,
           points: v.points,
         }));
@@ -681,8 +759,8 @@ function advance(s: State) {
 }
 export function createGame(players: string[]): State {
   if (
-    players.length < 2 ||
-    players.length > 6 ||
+    players.length < carcassonne.minPlayers ||
+    players.length > carcassonne.maxPlayers ||
     new Set(players).size !== players.length
   )
     fail();
@@ -924,10 +1002,7 @@ export function applyAction(
         s.config.modules.includes('messages') &&
         s.markers[player] === undefined
       ) {
-        prompt(s, 'rewardMarker', player, [
-          { kind: 'marker', value: 0, points: o.points },
-          { kind: 'marker', value: 1, points: o.points },
-        ]);
+        markerPrompt(s, 'rewardMarker', player, o.points);
         return s;
       }
       moveScore(s, player, o.points!, true);
@@ -957,7 +1032,7 @@ export function applyAction(
       break;
     }
     case 'cropMode':
-      s.cropMode = o.kind;
+      s.cropMode = o.kind === 'remove' ? 'remove' : 'add';
       s.queue = ordered(s, (s.active + 1) % s.players.length);
       break;
     case 'crop':
@@ -1009,11 +1084,9 @@ export function playerView(s: State, player: string) {
   };
 }
 export type View = ReturnType<typeof playerView>;
-export const carcassonne: GameDefinition<State> = {
-  id: 'carcassonne',
-  minPlayers: 2,
-  maxPlayers: 6,
-  create: (players) => createGame(players),
+export const carcassonne: GameDefinition<State, View> = {
+  ...seats('carcassonne'),
+  create: createGame,
   apply: applyAction,
   view: playerView,
   isFinished: (s) => s.phase === 'finished',

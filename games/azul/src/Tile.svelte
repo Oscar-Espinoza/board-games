@@ -1,22 +1,15 @@
 <script lang="ts">
   import { getContext } from 'svelte';
-  import { palette, richTileArtwork, skinKey } from './palette.js';
+  import { palette, richTileArtwork } from './palette.js';
+  import { skinKey } from './skin.js';
   import type { Color } from './index.js';
-  import { m } from '@board-games/shared/messages';
+  import { colorLabels } from './labels.js';
   let {
     color,
     ghost = false,
     location,
   }: { color: Color | 'marker'; ghost?: boolean; location?: string } = $props();
   const pixel = getContext<(() => boolean) | undefined>(skinKey);
-  const labels = {
-    blue: m.azul_blue,
-    yellow: m.azul_yellow,
-    red: m.azul_red,
-    black: m.azul_black,
-    white: m.azul_white,
-    marker: m.azul_marker,
-  };
 </script>
 
 {#if pixel?.()}<span
@@ -24,7 +17,7 @@
     class:px-ghost={ghost}
     data-azul-location={location}
     role="img"
-    aria-label={labels[color]()}
+    aria-label={colorLabels[color]()}
     >{#if color === 'marker'}<b aria-hidden="true">1</b>{/if}</span
   >{:else}<span
     class="tile {color}"
@@ -32,7 +25,7 @@
     style="--glaze:{palette[color].glaze};--motif:{palette[color].motif}"
     data-azul-location={location}
     role="img"
-    aria-label={labels[color]()}
+    aria-label={colorLabels[color]()}
   >
     {#if color === 'marker'}<svg viewBox="0 0 40 40" aria-hidden="true"
         ><text

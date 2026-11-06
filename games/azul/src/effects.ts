@@ -1,7 +1,14 @@
 import { createAudio } from '@board-games/shared/ui';
 import { mount, unmount, flushSync } from 'svelte';
 import Tile from './Tile.svelte';
-import { skinKey } from './palette.js';
+import { skinKey } from './skin.js';
+import {
+  bag,
+  centerPile,
+  discard,
+  parseLocation,
+  summary,
+} from './locations.js';
 import type { Flight, Presentation, PresentationStep } from './presentation.js';
 import type { PixelSounds } from './pixel/sound.js';
 export type Bounds = Map<string, DOMRect>;
@@ -25,7 +32,6 @@ export function ceramicAudio() {
     audio.stop();
   };
   return {
-    /** The shared Web Audio instance, for building the 8-bit pack. */
     raw: audio,
     unlock: () => void audio.unlock(),
     configure(sound: boolean, level: number) {
@@ -44,7 +50,7 @@ export function ceramicAudio() {
     chip(run: (pack: PixelSounds) => void) {
       if (enabled && !document.hidden && chip) run(chip);
     },
-    /** 8-bit cues for a whole presentation; false leaves it to `play`. */
+    /** Returns false when the classic skin should play its own cues instead. */
     flights(list: Flight[]) {
       if (!chip) return false;
       if (!enabled || document.hidden) return true;
@@ -56,13 +62,14 @@ export function ceramicAudio() {
         floor = list.find(
           (f) =>
             f.color !== 'marker' &&
-            f.to.includes('/floor/') &&
-            !/\/(pattern|floor)\//.test(f.from),
+            parseLocation(f.to).kind === 'floor' &&
+            !f.cleanup,
         ),
-        deal = list.find((f) => f.from === 'bag' || f.from === 'discard');
+        deal = list.find((f) => f.from === bag || f.from === discard);
       if (draft) {
         pack.pick(at(draft));
-        if (!draft.to.includes('/floor/')) pack.place(at(draft, true));
+        if (parseLocation(draft.to).kind !== 'floor')
+          pack.place(at(draft, true));
       }
       if (marker) pack.marker(at(marker, true));
       if (floor) pack.floor(at(floor, true));
@@ -87,7 +94,6 @@ export function ceramicAudio() {
     },
   };
 }
-/** `pixel` reports the viewer's skin when a flight starts. */
 export function tileFlights(pixel: () => boolean = () => false) {
   const active = new Set<{
     node: HTMLElement;
@@ -123,12 +129,16 @@ export function tileFlights(pixel: () => boolean = () => false) {
     cancel();
     const chiptune = sound.flights(plan.flights),
       eightBit = pixel();
-    const locate = (map: Bounds, id: string) =>
-      map.get(id) ??
-      (id.startsWith('center/')
-        ? map.get(id.split('/').slice(0, 2).join('/'))
-        : undefined) ??
-      map.get(`${id.split('/')[0]}/summary`);
+    const locate = (map: Bounds, id: string) => {
+      const place = parseLocation(id);
+      return (
+        map.get(id) ??
+        (place.kind === 'center' && place.color !== 'marker'
+          ? map.get(centerPile(place.color))
+          : undefined) ??
+        ('player' in place ? map.get(summary(place.player)) : undefined)
+      );
+    };
     for (const flight of plan.flights) {
       const start = locate(before, flight.from) ?? locate(after, flight.from),
         end = locate(after, flight.to) ?? locate(before, flight.to);

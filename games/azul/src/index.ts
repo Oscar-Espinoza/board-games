@@ -1,5 +1,17 @@
 import { shuffle } from '@board-games/game-core';
 import type { GameDefinition } from '@board-games/game-core';
+import { seats } from '@board-games/shared/games';
+import {
+  bag,
+  centerMarker,
+  centerPile,
+  discard,
+  factorySlot,
+  floorSlot,
+  markerSpot,
+  patternSlot,
+  wallCell,
+} from './locations.js';
 
 export const colors = ['blue', 'yellow', 'red', 'black', 'white'] as const;
 export type Color = (typeof colors)[number];
@@ -11,6 +23,10 @@ export const wallColors: readonly (readonly Color[])[] = Object.freeze([
   Object.freeze(['yellow', 'red', 'black', 'white', 'blue'] as Color[]),
 ]);
 export const penalties = [1, 1, 2, 2, 2, 3, 3] as const;
+export const FLOOR_SIZE = penalties.length;
+export const WALL_SIZE = wallColors.length;
+export const TILES_PER_COLOR = 20;
+const FACTORY_SLOTS = 4;
 export type Source = { kind: 'factory'; index: number } | { kind: 'center' };
 export type Destination = { kind: 'pattern'; row: number } | { kind: 'floor' };
 export type Action = {
@@ -77,9 +93,14 @@ export type State = Omit<PublicState, 'bagCount' | 'discardCount'> & {
   discard: Color[];
 };
 export type View = { public: PublicState; private: Record<string, never> };
+/** The message key every rejection carries. */
+const rejected = 'azul_error';
 const emptyBoard = (): Board => ({
-  patterns: Array.from({ length: 5 }, () => ({ color: null, count: 0 })),
-  wall: Array.from({ length: 5 }, () => Array(5).fill(false)),
+  patterns: Array.from({ length: WALL_SIZE }, () => ({
+    color: null,
+    count: 0,
+  })),
+  wall: Array.from({ length: WALL_SIZE }, () => Array(WALL_SIZE).fill(false)),
   floor: [],
   score: 0,
   wallPoints: 0,
@@ -87,10 +108,10 @@ const emptyBoard = (): Board => ({
   floorLoss: 0,
   bonus: { rows: 0, columns: 0, colors: 0 },
 });
-export function refill(s: State, random: () => number) {
+function refill(s: State, random: () => number) {
   s.factories = Array.from({ length: s.players.length * 2 + 1 }, () => []);
   for (let f = 0; f < s.factories.length; f++)
-    for (let slot = 0; slot < 4; slot++) {
+    for (let slot = 0; slot < FACTORY_SLOTS; slot++) {
       if (!s.bag.length && s.discard.length) {
         s.bag = s.discard;
         s.discard = [];
@@ -103,25 +124,27 @@ export function refill(s: State, random: () => number) {
         type: 'travel',
         reason: 'deal',
         color,
-        from: 'bag',
-        to: `factory/${f}/${slot}`,
+        from: bag,
+        to: factorySlot(f, slot),
       });
     }
 }
 export function create(players: string[], random: () => number): State {
   if (
-    players.length < 2 ||
-    players.length > 4 ||
+    players.length < azul.minPlayers ||
+    players.length > azul.maxPlayers ||
     new Set(players).size !== players.length
   )
-    throw new Error('AZUL_PLAYERS');
-  const bag = colors.flatMap((color) => Array<Color>(20).fill(color));
-  shuffle(bag, random);
+    throw new Error(rejected);
+  const tiles = colors.flatMap((color) =>
+    Array<Color>(TILES_PER_COLOR).fill(color),
+  );
+  shuffle(tiles, random);
   const starter = Math.floor(random() * players.length);
   const s: State = {
     players: [...players],
     boards: players.map(emptyBoard),
-    bag,
+    bag: tiles,
     discard: [],
     factories: [],
     center: [],
@@ -162,8 +185,8 @@ function integer(n: unknown, max: number): n is number {
   return Number.isInteger(n) && (n as number) >= 0 && (n as number) < max;
 }
 export function validate(s: State, actor: string, input: unknown): Action {
-  if (s.phase !== 'drafting') throw new Error('AZUL_FINISHED');
-  if (s.players[s.turn] !== actor) throw new Error('AZUL_TURN');
+  if (s.phase !== 'drafting') throw new Error(rejected);
+  if (s.players[s.turn] !== actor) throw new Error(rejected);
   if (
     !object(input) ||
     !exact(input, ['type', 'source', 'color', 'destination']) ||
@@ -172,7 +195,7 @@ export function validate(s: State, actor: string, input: unknown): Action {
     !object(input.source) ||
     !object(input.destination)
   )
-    throw new Error('AZUL_ACTION');
+    throw new Error(rejected);
   const { source, destination } = input;
   if (
     !(source.kind === 'center' && exact(source, ['kind'])) &&
@@ -182,30 +205,30 @@ export function validate(s: State, actor: string, input: unknown): Action {
       integer(source.index, s.factories.length)
     )
   )
-    throw new Error('AZUL_SOURCE');
+    throw new Error(rejected);
   if (
     !(destination.kind === 'floor' && exact(destination, ['kind'])) &&
     !(
       destination.kind === 'pattern' &&
       exact(destination, ['kind', 'row']) &&
-      integer(destination.row, 5)
+      integer(destination.row, WALL_SIZE)
     )
   )
-    throw new Error('AZUL_DESTINATION');
+    throw new Error(rejected);
   const action = input as unknown as Action;
   const supply =
     action.source.kind === 'center'
       ? s.center
       : s.factories[action.source.index];
-  if (!supply.includes(action.color)) throw new Error('AZUL_EMPTY');
+  if (!supply.includes(action.color)) throw new Error(rejected);
   if (
     action.destination.kind === 'pattern' &&
     rowIssue(s.boards[s.turn], action.color, action.destination.row)
   )
-    throw new Error('AZUL_ROW');
+    throw new Error(rejected);
   return action;
 }
-export function scorePlacement(
+function scorePlacement(
   wall: boolean[][],
   row: number,
   column: number,
@@ -215,13 +238,13 @@ export function scorePlacement(
   for (const direction of [-1, 1]) {
     for (
       let c = column + direction;
-      c >= 0 && c < 5 && wall[row][c];
+      c >= 0 && c < WALL_SIZE && wall[row][c];
       c += direction
     )
       horizontal.push([row, c]);
     for (
       let r = row + direction;
-      r >= 0 && r < 5 && wall[r][column];
+      r >= 0 && r < WALL_SIZE && wall[r][column];
       r += direction
     )
       vertical.push([r, column]);
@@ -237,20 +260,20 @@ export function scorePlacement(
     cells: [...horizontal, ...vertical.slice(1)],
   };
 }
-export function bonuses(wall: boolean[][]): Bonus {
+function bonuses(wall: boolean[][]): Bonus {
   return {
     rows: wall.filter((row) => row.every(Boolean)).length * 2,
     columns:
-      Array.from({ length: 5 }, (_, c) => wall.every((row) => row[c])).filter(
-        Boolean,
-      ).length * 7,
+      Array.from({ length: WALL_SIZE }, (_, c) =>
+        wall.every((row) => row[c]),
+      ).filter(Boolean).length * 7,
     colors:
       colors.filter((color) =>
         wall.every((row, r) => row[wallColors[r].indexOf(color)]),
       ).length * 10,
   };
 }
-export function resolveRound(s: State, random: () => number) {
+function resolveRound(s: State, random: () => number) {
   s.boards.forEach((board, p) => {
     const player = s.players[p];
     board.patterns.forEach((pattern, row) => {
@@ -267,8 +290,8 @@ export function resolveRound(s: State, random: () => number) {
         color,
         row,
         column,
-        from: `${player}/pattern/${row}/0`,
-        to: `${player}/wall/${row}/${column}`,
+        from: patternSlot(player, row, 0),
+        to: wallCell(player, row, column),
         scoring,
       });
       s.discard.push(...Array<Color>(row).fill(color));
@@ -331,26 +354,26 @@ export function apply(
     reason: 'draft' | 'marker' | 'overflow',
   ) => {
     const to =
-      board.floor.length < 7
-        ? `${actor}/floor/${board.floor.length}`
+      board.floor.length < FLOOR_SIZE
+        ? floorSlot(actor, board.floor.length)
         : color === 'marker'
-          ? `${actor}/marker`
-          : 'discard';
-    if (board.floor.length < 7) board.floor.push(color);
+          ? markerSpot(actor)
+          : discard;
+    if (board.floor.length < FLOOR_SIZE) board.floor.push(color);
     else if (color !== 'marker') s.discard.push(color);
     s.events.push({ type: 'travel', reason, color, from, to });
   };
   if (a.source.kind === 'center' && s.markerOwner === null) {
     s.markerOwner = actor;
-    floor('marker', 'center/marker', 'marker');
+    floor('marker', centerMarker, 'marker');
   }
   const supply =
     a.source.kind === 'center' ? s.center : s.factories[a.source.index];
   supply.forEach((color, slot) => {
     const from =
       a.source.kind === 'center'
-        ? `center/${color}`
-        : `factory/${a.source.index}/${slot}`;
+        ? centerPile(color)
+        : factorySlot(a.source.index, slot);
     if (color !== a.color) {
       if (a.source.kind === 'factory') {
         s.center.push(color);
@@ -359,7 +382,7 @@ export function apply(
           reason: 'spill',
           color,
           from,
-          to: `center/${color}`,
+          to: centerPile(color),
         });
       }
       return;
@@ -375,7 +398,7 @@ export function apply(
         reason: 'draft',
         color,
         from,
-        to: `${actor}/pattern/${a.destination.row}/${pattern.count++}`,
+        to: patternSlot(actor, a.destination.row, pattern.count++),
       });
     } else
       floor(color, from, a.destination.kind === 'floor' ? 'draft' : 'overflow');
@@ -388,7 +411,7 @@ export function apply(
   else s.turn = (s.turn + 1) % s.players.length;
   return s;
 }
-export function view(s: State, _player?: string): View {
+export function view(s: State): View {
   // Whitelist at the only network projection boundary; never include bag order.
   return {
     public: structuredClone({
@@ -423,10 +446,8 @@ export function view(s: State, _player?: string): View {
     private: {},
   };
 }
-export const azul: GameDefinition<State> = {
-  id: 'azul',
-  minPlayers: 2,
-  maxPlayers: 4,
+export const azul: GameDefinition<State, View> = {
+  ...seats('azul'),
   create,
   apply,
   view,

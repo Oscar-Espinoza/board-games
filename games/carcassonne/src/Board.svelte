@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { onMount, untrack, type Snippet } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { prefersReducedMotion } from 'svelte/motion';
-  import { modal, read, write } from '@board-games/shared/ui';
   import {
-    gameSkin,
-    setGameSkin,
-    type Skin,
-  } from '@board-games/shared/ui/pixel';
+    ViewerSkin,
+    modal,
+    viewerPreferences,
+    type BoardProps,
+  } from '@board-games/shared/ui';
   import { m } from '@board-games/shared/messages';
   import { loadPixelArt } from './pixel/atlas.svelte.js';
   import PixelIcon from './pixel/PixelIcon.svelte';
@@ -24,7 +24,6 @@
     tableSpace,
     fitCamera,
   } from './table/camera.js';
-  import type { Locale } from '@board-games/shared/runtime';
   import {
     tiles,
     modules,
@@ -32,14 +31,22 @@
     rotatePoint,
     type Module,
   } from './tiles.js';
-  import { node, split, points, type Feature } from './features.js';
-  import type { View, Option } from './index.js';
+  import {
+    figureSupply,
+    figureTypes,
+    node,
+    split,
+    points,
+    type Feature,
+    type Figure,
+  } from './features.js';
+  import type { Action, View, Option } from './index.js';
   import TileArt from './TileArt.svelte';
   import Elevation, { type CityState } from './table/Elevation.svelte';
   import { risingFeatures } from './table/scenery.js';
   import { colors, cityPath, roadPath, fieldPath, ferryPath } from './art.js';
   import { label } from './labels.js';
-  import { tableAudio, EventGate } from './effects.js';
+  import { tableAudio, EventGate, type SoundCue } from './effects.js';
   import {
     featureOwners,
     playerOverviews,
@@ -56,21 +63,13 @@
     locale = 'en',
     round = 0,
     connected = true,
+    errorCode,
     settingsContent,
     canConfigure = true,
+    canRematch = false,
+    rematch,
     practice = false,
-  }: {
-    view: View;
-    playerId: string;
-    players: { id: string; name: string; connected?: boolean }[];
-    send: (a: unknown) => void;
-    locale?: Locale;
-    round?: number;
-    connected?: boolean;
-    settingsContent?: Snippet;
-    canConfigure?: boolean;
-    practice?: boolean;
-  } = $props();
+  }: BoardProps<View, Action> = $props();
   const p = $derived(view.public);
   const t = (k: string) => label(k, locale);
   const name = (id: string) => players.find((p) => p.id === id)?.name ?? id;
@@ -87,8 +86,12 @@
     journal = $state(false),
     guide = $state(false),
     overview = $state(false),
-    overviewScope = $state<FeatureScope>('mine'),
-    sound = $state(read('carcassonne:sound') !== 'off');
+    overviewScope = $state<FeatureScope>('mine');
+  const prefs = viewerPreferences('carcassonne', {
+    sound: true as boolean,
+    motion: null as boolean | null,
+  });
+  const motion = $derived(prefs.motion ?? !prefersReducedMotion.current);
   let cx = $state(50),
     cy = $state(50),
     scale = $state(1.5),
@@ -110,24 +113,19 @@
   let settings = $state(false);
   const classicAudio = tableAudio(),
     gate = new EventGate();
-  // Viewer-only table style. The 8-bit stylesheet, art and chiptune pack load only
-  // when chosen, so classic players never download them.
-  let skin = $state<Skin>(gameSkin('carcassonne')),
-    pixelReady = $state(false),
-    chiptune: ReturnType<typeof pixelAudio> | undefined;
-  $effect(() => {
-    if (skin !== 'pixel' || pixelReady) return;
-    void Promise.all([
+  let chiptune: ReturnType<typeof pixelAudio> | undefined;
+  // The 8-bit stylesheet, art and chiptune pack load only when chosen, so classic
+  // players never download them.
+  const skin = new ViewerSkin('carcassonne', async () => {
+    const [, pack] = await Promise.all([
       import('./pixel.css'),
       import('./pixel/sound.js'),
       loadPixelArt(),
-    ]).then(([, pack]) => {
-      chiptune ??= pack.pixelAudio();
-      chiptune.mute(!sound);
-      pixelReady = true;
-    });
+    ]);
+    chiptune ??= pack.pixelAudio();
+    chiptune.mute(!prefs.sound);
   });
-  const pixel = $derived(skin === 'pixel' && pixelReady);
+  const pixel = $derived(skin.pixel);
   // One facade over both sound packs; the chosen skin decides which one plays.
   const audio = {
     get pack() {
@@ -136,7 +134,7 @@
     unlock() {
       this.pack.unlock();
     },
-    play(kind: string, delay = 0) {
+    play(kind: SoundCue, delay = 0) {
       this.pack.play(kind, delay);
     },
     events(events: Parameters<typeof classicAudio.events>[0]) {
@@ -151,10 +149,6 @@
       chiptune?.close();
     },
   };
-  function chooseSkin(value: Skin) {
-    skin = value;
-    setGameSkin('carcassonne', value);
-  }
   let ferryPreview = $state<{ tile: string; pair: [string, string] } | null>(
     null,
   );
@@ -167,9 +161,6 @@
   ].map(({ k, fill }) => ({ ...lift(-k), fill }));
   let rising = $state<string[]>([]);
   let risingTimer: ReturnType<typeof setTimeout>;
-  let motion = $state(
-    read('carcassonne:motion') !== 'off' && !prefersReducedMotion.current,
-  );
   // Clickable regions per tile design never change, so filter them once.
   const regionCache = new Map<string, (typeof tiles)[string]['regions']>();
   const hitRegions = (id: string) => {
@@ -181,11 +172,9 @@
       );
     return list;
   };
-  // Ground tiles in row order; computed once per board change, not per render.
   const rowOrder = $derived(
     Object.entries(p.board).sort((a, b) => a[1].y - b[1].y || a[1].x - b[1].x),
   );
-  // Draw standing scenery back to front in screen depth.
   const depthOrder = $derived(
     Object.entries(p.board).sort(
       (a, b) =>
@@ -197,7 +186,6 @@
   const byNode = $derived(
     new Map(p.features.flatMap((f) => f.nodes.map((n) => [n, f] as const))),
   );
-  // A completed city's keep stands on its broadest region.
   const keeps = $derived(
     new Set(
       p.features
@@ -295,13 +283,13 @@
     ) || [],
   );
   function unlock() {
-    if (sound) audio.unlock();
+    if (prefs.sound) audio.unlock();
   }
   function rotate(n: number) {
     unlock();
     rotation = (rotation + n + 4) % 4;
     visualRotation += n;
-    if (sound) audio.play('rotate');
+    if (prefs.sound) audio.play('rotate');
   }
   function selectLocation(x: number, y: number) {
     unlock();
@@ -325,7 +313,13 @@
   }
   function place() {
     if (valid && mine)
-      send({ type: 'place', turn: p.turn, ...preview, rotation });
+      send({
+        type: 'place',
+        turn: p.turn,
+        x: preview!.x,
+        y: preview!.y,
+        rotation,
+      });
   }
   function choose(o: Option) {
     unlock();
@@ -525,7 +519,7 @@
           : source,
     );
   }
-  // Draws are private bookkeeping noise; the journal lists public outcomes.
+  // The journal lists public outcomes; draws are private bookkeeping.
   const journalEntries = $derived(
     [...p.events].reverse().filter((e) => e.kind !== 'draw'),
   );
@@ -542,7 +536,6 @@
     requestAnimationFrame(() => map?.focus({ preventScroll: true }));
   }
   function toggleModule(id: (typeof setupOptions)[number]) {
-    if (!canConfigure) return;
     if (id === 'farmers') config({ ...p.config, farmers: !p.config.farmers });
     else
       config({
@@ -582,8 +575,7 @@
   const choiceIdentity = $derived(
     `${round}:${p.turn}:${p.phase}:${p.pending?.id ?? ''}`,
   );
-  $effect(() => {
-    choiceIdentity;
+  function resetChoice() {
     preview = null;
     rotation = 0;
     visualRotation = 0;
@@ -593,10 +585,20 @@
     attachment = undefined;
     drag = null;
     clearTimeout(returnTimer);
+  }
+  const outdated = $derived(
+    errorCode === 'STALE_REVISION' || errorCode === 'MATCH_CHANGED',
+  );
+  $effect(() => {
+    void choiceIdentity;
+    untrack(resetChoice);
+  });
+  $effect(() => {
+    if (outdated) untrack(resetChoice);
   });
   $effect(() => {
     const events = gate.take(round, p.events, connected);
-    audio.mute(!sound);
+    audio.mute(!prefs.sound);
     if (events.length) {
       audio.events(events);
       receipts = events
@@ -625,7 +627,7 @@
     }
   });
   $effect(() => {
-    round;
+    void round;
     overview = false;
     overviewScope = 'mine';
     spacePan = false;
@@ -646,22 +648,18 @@
     return () => {
       observer.disconnect();
       audio.close();
+      clearTimeout(risingTimer);
       clearTimeout(recentTimer);
       clearTimeout(returnTimer);
     };
   });
-  function toggleMotion() {
-    motion = !motion;
-    write('carcassonne:motion', motion ? 'on' : 'off');
-  }
   function toggleSound() {
-    sound = !sound;
-    audio.mute(!sound);
-    if (sound) audio.unlock();
-    write('carcassonne:sound', sound ? 'on' : 'off');
+    prefs.sound = !prefs.sound;
+    audio.mute(!prefs.sound);
+    if (prefs.sound) audio.unlock();
   }
 
-  type Piece = 'meeple' | 'large' | 'abbot';
+  type Piece = Figure['type'];
   let tool = $state<'tile' | Piece | null>(null);
   let attachment = $state<'builder' | 'pig' | undefined>(undefined);
   let drag = $state<{
@@ -698,14 +696,10 @@
   );
   const ownIndex = $derived(Math.max(0, p.players.indexOf(playerId)));
   const ownColor = $derived(colors[ownIndex]);
-  const figureTypes = $derived([
-    'meeple',
-    ...(p.config.modules.includes('inns') ? ['large'] : []),
-    ...(p.config.modules.includes('abbot') ? ['abbot'] : []),
-  ] as Piece[]);
+  const ownedTypes = $derived(figureTypes(p.config.modules));
   function available(type: Piece) {
     return (
-      (type === 'meeple' ? 7 : 1) -
+      figureSupply(type) -
       p.figures.filter((f) => f.owner === playerId && f.type === type).length
     );
   }
@@ -716,31 +710,28 @@
       !!p.pending?.options.some((o) => o.kind === 'deploy' && o.figure === type)
     );
   }
+  const canUse = (kind: 'tile' | Piece) =>
+    kind === 'tile' ? p.phase === 'place' && mine : usable(kind);
+  function takeTool(kind: 'tile' | Piece) {
+    unlock();
+    tool = kind;
+    selected = '';
+    if (kind === 'tile') attachment = undefined;
+  }
   function pick(kind: 'tile' | Piece) {
     if (suppressClick) {
       suppressClick = false;
       return;
     }
-    if (kind === 'tile' ? p.phase !== 'place' || !mine : !usable(kind)) return;
-    unlock();
-    tool = kind;
-    selected = '';
-    if (kind === 'tile') attachment = undefined;
+    if (!canUse(kind)) return;
+    takeTool(kind);
     map?.focus({ preventScroll: true });
   }
   function beginDrag(kind: 'tile' | Piece, e: PointerEvent) {
-    if (
-      e.button !== 0 ||
-      drag ||
-      (kind === 'tile' ? p.phase !== 'place' || !mine : !usable(kind))
-    )
-      return;
+    if (e.button !== 0 || drag || !canUse(kind)) return;
     e.preventDefault();
     e.stopPropagation();
-    unlock();
-    tool = kind;
-    selected = '';
-    if (kind === 'tile') attachment = undefined;
+    takeTool(kind);
     const source =
       (e.currentTarget as Element).closest('button') ??
       document.querySelector(
@@ -1346,6 +1337,11 @@
     </details>
   </nav>
   <p class="camera-hint">{t('camera_hint')}</p>
+  {#if outdated}<p class="notice" role="status">
+      {errorCode === 'MATCH_CHANGED'
+        ? m.action_match_changed({}, { locale })
+        : m.action_stale({}, { locale })}
+    </p>{/if}
   <button
     class="guide-toggle corner-control"
     onclick={() => (guide = true)}
@@ -1542,7 +1538,9 @@
           >
         </p>{/each}<button onclick={() => (journal = true)}
         >{t('history')}</button
-      >
+      >{#if canRematch}<button class="primary" onclick={rematch}
+          >{m.rematch({}, { locale })}</button
+        >{/if}
     </section>
   {:else}
     <div class="turn-hint" aria-live="polite">
@@ -1638,8 +1636,8 @@
         >{t('your_pieces')} {supplyOpen ? '⌄' : '⌃'}</button
       >
       <div class="meeple-supply">
-        {#each figureTypes as type}<div class="piece-group">
-            {#each Array(type === 'meeple' ? 7 : 1) as _, i}
+        {#each ownedTypes as type}<div class="piece-group">
+            {#each Array(figureSupply(type)) as _, i}
               {@const unavailable = i >= available(type) || !usable(type)}
               <span
                 class="piece-wrap"
@@ -2044,9 +2042,9 @@
     <p class="eyebrow">CARCASSONNE · 3.1</p>
     <h2>{t('settings')}</h2>
     <div class="settings-grid">
-      <button onclick={toggleSound} aria-pressed={sound}
-        >{t('sound')} · {sound ? t('on') : t('off')}</button
-      ><button onclick={toggleMotion} aria-pressed={motion}
+      <button onclick={toggleSound} aria-pressed={prefs.sound}
+        >{t('sound')} · {prefs.sound ? t('on') : t('off')}</button
+      ><button onclick={() => (prefs.motion = !motion)} aria-pressed={motion}
         >{t('motion')} · {motion ? t('on') : t('off')}</button
       ><button
         onclick={() => {
@@ -2076,8 +2074,8 @@
             type="radio"
             name="carc-skin"
             {value}
-            checked={skin === value}
-            onchange={() => chooseSkin(value as Skin)}
+            checked={skin.choice === value}
+            onchange={() => skin.choose(value as 'classic' | 'pixel')}
           /><span>{text}</span></label
         >{/each}
     </fieldset>
@@ -2091,10 +2089,6 @@
     font-family: 'Carcassonne Display';
     src: url('/fonts/carcassonne/marcellus.woff2') format('woff2');
     font-display: swap;
-  }
-  :global(body:has(.carc-table) .site-header),
-  :global(body:has(.carc-table) .room-toolbar) {
-    display: none;
   }
   .carc-table {
     position: fixed;
@@ -2413,6 +2407,20 @@
   .pan-buttons button {
     width: 44px;
     height: 44px;
+  }
+  .notice {
+    position: absolute;
+    z-index: 5;
+    top: 72px;
+    left: 50%;
+    max-width: min(480px, calc(100% - 32px));
+    transform: translateX(-50%);
+    padding: 8px 14px;
+    border-radius: 4px;
+    background: #f2d7ba;
+    color: #723f33;
+    font-size: 13px;
+    pointer-events: none;
   }
   .camera-hint {
     position: absolute;
@@ -3009,6 +3017,9 @@
   }
   .finished h2 {
     margin: 12px 0 20px;
+  }
+  .finished .primary {
+    margin-top: 12px;
   }
   .settings-dialog,
   .guide-dialog,

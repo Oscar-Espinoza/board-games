@@ -11,18 +11,13 @@ import { terrainRects, spriteRects } from './sheet.js';
 import { stamp, bitmapSize } from './bitmaps.js';
 
 export const pixelRoot = '/games/carcassonne/pixel/';
-/** Ground grid and sprite grid, in pixels per tile. */
+/** Ground grid (G) and sprite grid (S), in pixels per tile. */
 const G = 64,
   S = 128;
 /** Tile units per sprite pixel (a tile is 100 units). */
 export const spriteUnit = 100 / S;
 
 const art = $state({ ready: false });
-export const pixelArt = {
-  get ready() {
-    return art.ready;
-  },
-};
 
 let terrain: { data: Uint8ClampedArray; width: number } | undefined;
 let sheet: HTMLCanvasElement | undefined;
@@ -48,7 +43,7 @@ function context(c: HTMLCanvasElement) {
   return ctx;
 }
 
-/** Loads the two sheets once; components re-render when `pixelArt.ready` flips. */
+/** Loads the two sheets once; components re-render when `art.ready` flips. */
 export function loadPixelArt() {
   loading ??= Promise.all([
     image(`${pixelRoot}terrain.webp`),
@@ -128,7 +123,6 @@ const fill = (d: string) => (ctx: CanvasRenderingContext2D) =>
 const ellipse = (cx: number, cy: number, rx: number, ry: number) =>
   `M${cx - rx},${cy}a${rx},${ry} 0 1,0 ${rx * 2},0a${rx},${ry} 0 1,0 ${-rx * 2},0Z`;
 
-/** Paints the 64px ground of one tile in world orientation. */
 function ground(id: string, rotation: number, tx: number, ty: number) {
   const tile = tiles[id];
   const px = new Float32Array(G * G * 3);
@@ -165,7 +159,6 @@ function ground(id: string, rotation: number, tx: number, ty: number) {
     paint(mask(rotation, fill(lake)), water);
   }
 
-  // Towns: roofs everywhere inside, then stone walls on every inner edge.
   const cities = tile.regions.filter((r) => r.kind === 'city');
   const city = new Uint8Array(G * G);
   cities.forEach((r, n) => {
@@ -221,7 +214,6 @@ function ground(id: string, rotation: number, tx: number, ty: number) {
     paint(mask(rotation, stroke(d, 9.5)), (j) => texel('road', wx(j), wy(j)));
   });
 
-  // Bridges where roads cross rivers.
   for (const b of bridges(id)) {
     const [bx, by] = rotatePoint([b.x, b.y], rotation);
     const across =
@@ -291,7 +283,6 @@ function ground(id: string, rotation: number, tx: number, ty: number) {
 }
 
 type Sprite = keyof typeof spriteRects;
-/** Draws a sheet sprite 1:1 with its bottom centre at a point in tile units. */
 function sprite(
   ctx: CanvasRenderingContext2D,
   name: Sprite,
@@ -500,7 +491,6 @@ export function wallImage(
 }
 
 const sprites = new Map<string, string>();
-/** One sheet sprite as its own data URL, with its size in tile units. */
 export function spriteImage(name: string) {
   const rect = spriteRects[name as Sprite];
   if (!art.ready || !rect) return null;
