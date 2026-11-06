@@ -8,6 +8,9 @@ const key = (game: string) => `board-games:skin:${game}`;
 export function gameSkin(game: string): Skin {
   const saved = read(key(game));
   if (saved === 'classic' || saved === 'pixel') return saved;
+  // Dominó saved its look as `domino:look` (`3d` is the classic table) before the shared key.
+  const old = game === 'domino' ? read('domino:look') : null;
+  if (old === '3d' || old === 'pixel') return old === '3d' ? 'classic' : old;
   return document.documentElement.dataset.theme === 'pixel'
     ? 'pixel'
     : 'classic';

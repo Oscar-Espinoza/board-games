@@ -1,5 +1,5 @@
 import { gameSkin, setGameSkin, type Skin } from './pixel/skin.js';
-import { readJson, write } from './storage.js';
+import { read, readJson, write } from './storage.js';
 
 type Preference = boolean | number | string | null;
 /** `true` saves as any boolean, `null` as "follow the system" or a boolean. */
@@ -13,6 +13,60 @@ type Saved<T> = {
         : T[K];
 };
 
+const onOff = (key: string, off: string) => {
+  const value = read(key);
+  return value === null ? undefined : value !== off;
+};
+
+/**
+ * Settings saved under the keys each game used before `viewerPreferences`, read once
+ * (until the first save under the new key) so nobody's choices are lost.
+ */
+const legacy: Record<string, () => Record<string, unknown>> = {
+  azul: () => {
+    const saved = readJson('azul-preferences');
+    return {
+      sound: saved.sound,
+      volume: saved.volume,
+      motion:
+        saved.motion === 'full'
+          ? true
+          : saved.motion === 'reduced'
+            ? false
+            : undefined,
+    };
+  },
+  'little-secret': () => {
+    const saved = readJson('little-secret:preferences');
+    return { sound: saved.sound, motion: saved.reduced !== true };
+  },
+  'sushi-go-party': () => readJson('sushi-go-party:preferences'),
+  codenames: () => {
+    const saved = readJson('codenames:preferences');
+    return { ...saved, motion: saved.reduced !== true };
+  },
+  catan: () => ({
+    sound: onOff('catan:sound', 'false'),
+    motion: onOff('catan:motion', 'false'),
+  }),
+  carcassonne: () => ({
+    sound: onOff('carcassonne:sound', 'off'),
+    motion: onOff('carcassonne:motion', 'off'),
+  }),
+  uno: () => ({
+    sound: onOff('uno:sound', 'off'),
+    motion: onOff('uno:motion', 'off'),
+  }),
+  domino: () => {
+    const camera = read('domino:camera');
+    return {
+      sound: onOff('domino:sound', 'off'),
+      motion: onOff('domino:motion', 'off'),
+      camera: camera === null ? undefined : Number(camera),
+    };
+  },
+};
+
 /**
  * Per-viewer settings (sound, volume, motion…) persisted under one key per game.
  * A `null` default means "follow the system" until the viewer chooses a boolean.
@@ -23,10 +77,19 @@ export function viewerPreferences<T extends Record<string, Preference>>(
   defaults: T,
 ): Saved<T> {
   const key = `board-games:preferences:${game}`;
-  const saved = readJson(key);
+  const stored = readJson(key);
+  const saved = Object.keys(stored).length
+    ? stored
+    : (legacy[game]?.() ?? stored);
   const initial = { ...defaults } as Saved<T>;
   for (const name in defaults) {
-    const value = saved[name];
+    let value = saved[name];
+    if (
+      name === 'volume' &&
+      typeof value === 'number' &&
+      Number.isFinite(value)
+    )
+      value = Math.min(1, Math.max(0, value));
     if (
       defaults[name] === null
         ? value === null || typeof value === 'boolean'
