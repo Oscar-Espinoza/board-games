@@ -14,7 +14,7 @@ type Seat = {
   bot?: boolean;
   socketId: string | null;
   reservedUntil: number | null;
-  accepted: Map<string, number>;
+  accepted: Set<string>;
 };
 type Room = {
   id: string;
@@ -90,7 +90,7 @@ export class Rooms {
       token: randomBytes(32).toString('hex'),
       socketId,
       reservedUntil: null,
-      accepted: new Map(),
+      accepted: new Set(),
     };
   }
   private credentials(room: Room, seat: Seat): Credentials {
@@ -140,7 +140,7 @@ export class Rooms {
           token: '',
           socketId: null,
           reservedUntil: null,
-          accepted: new Map(),
+          accepted: new Set(),
           bot: true,
         });
       }
@@ -194,7 +194,7 @@ export class Rooms {
         token: incoming.token,
         socketId,
         reservedUntil: null,
-        accepted: new Map(),
+        accepted: new Set(),
       });
     else room.seats.push(seat);
     this.syncPresence(room, vacant?.id);
@@ -229,7 +229,7 @@ export class Rooms {
     const id = text(request.id, 64);
     if (request.round !== room.round)
       fail('Round changed; try again', 'MATCH_CHANGED');
-    if (seat.accepted.has(id)) return;
+    if (seat.accepted.has(id)) return false;
     if (request.revision !== room.revision)
       fail('Table updated; try again', 'STALE_REVISION');
     if (room.state === null) fail('Game has not started');
@@ -243,9 +243,10 @@ export class Rooms {
     room.revision++;
     room.botAt = this.now() + BOT_DELAY;
     room.touched = this.now();
-    seat.accepted.set(id, room.revision);
+    seat.accepted.add(id);
     if (seat.accepted.size > 256)
       seat.accepted.delete(seat.accepted.keys().next().value!);
+    return true;
   }
   synchronize(
     roomId: string,
