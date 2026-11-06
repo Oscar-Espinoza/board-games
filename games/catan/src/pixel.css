@@ -23,10 +23,7 @@
   }
 
   /* Chrome: flat wood, ink border, hard bevel and a one-pixel drop. */
-  & button,
-  & .table-navigation a,
-  & .table-language,
-  & .table-connection {
+  & button {
     font-family: var(--px-font);
     font-size-adjust: ex-height 0.56;
     background: var(--px-wood);
@@ -41,8 +38,7 @@
     filter: none;
     transition: none;
   }
-  & button:hover:not(:disabled):not([aria-disabled='true']),
-  & .table-navigation a:hover {
+  & button:hover:not(:disabled):not([aria-disabled='true']) {
     filter: none;
     background-color: #74492b;
   }
@@ -74,28 +70,6 @@
   & .table-utilities button > span[aria-hidden],
   & .table-navigation span {
     color: var(--px-gold);
-  }
-  & .table-language select {
-    font-family: var(--px-font);
-    font-size: inherit;
-    color: var(--px-cream);
-    background: transparent;
-    border: 0;
-  }
-  & .table-language option {
-    color: var(--px-ink);
-    background: var(--px-cream);
-  }
-  & .table-connection i {
-    border-radius: 0;
-    box-shadow: 2px 2px 0 var(--px-ink);
-  }
-  & .practice-label {
-    border-radius: 0;
-    background: var(--px-ink);
-    color: var(--px-gold);
-    border: 2px solid var(--px-wood-edge);
-    font-size: 14px;
   }
 
   /* Civilization plaques. */
@@ -605,7 +579,7 @@
     background: var(--px-ink);
   }
   & input:not([type='checkbox'], [type='radio']),
-  & select:not(.table-language select) {
+  & select {
     border-radius: 0;
     border: var(--px) solid var(--px-ink);
     font-family: var(--px-font);
@@ -760,10 +734,8 @@
     & .seat-stats {
       font-size: 13px;
     }
-    & .table-navigation a,
     & .table-navigation button,
-    & .table-utilities button,
-    & .table-connection {
+    & .table-utilities button {
       font-size: 15px;
     }
   }
@@ -799,10 +771,8 @@
     & .card-title {
       font-size: 14px;
     }
-    & .table-navigation a,
     & .table-navigation button,
-    & .table-utilities button,
-    & .table-connection {
+    & .table-utilities button {
       font-size: 13px;
     }
   }

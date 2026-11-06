@@ -1,24 +1,29 @@
 import { present, type Presentation } from './presentation.js';
+import { shuffle } from '@board-games/game-core';
 import type { GameDefinition } from '@board-games/game-core';
-import { makeBoard, incident, edgeId, shuffle, type Board } from './board.js';
+import { games, seats } from '@board-games/shared/games';
+import { makeBoard, incident, edgeId, type Board } from './board.js';
+import { bankSize, isExtended, quantities, validOffer } from './limits.js';
 export const resources = ['wood', 'wool', 'wheat', 'brick', 'ore'] as const;
+const setups = ['variable', 'beginner'] as const;
+type Setup = (typeof setups)[number];
 export type Development =
   'KNIGHT' | 'MONOPOLY' | 'ROAD_BUILDING' | 'INVENTION' | 'VICTORY_POINT';
-export interface Action {
-  type: string;
-  strength?: number;
-  vertex?: number;
-  edge?: number;
-  hex?: number;
-  victim?: string;
-  resource?: number;
-  resources?: number[];
-  give?: number[] | number;
-  take?: number[] | number;
-  to?: string | null;
-  offer?: number;
-  partner?: string;
-}
+export type Action =
+  | { type: 'ROLL_DICE'; strength?: number }
+  | { type: 'END_TURN' | 'BUY_DEVELOPMENT' | 'FINISH_ROADS' | 'WITHDRAW' }
+  | { type: 'KNIGHT' | 'ROAD_BUILDING' }
+  | { type: 'BUILD_SETTLEMENT' | 'BUILD_CITY'; vertex: number }
+  | { type: 'BUILD_ROAD'; edge: number }
+  | { type: 'MOVE_ROBBER'; hex: number }
+  | { type: 'STEAL'; victim: string }
+  | { type: 'MONOPOLY'; resource: number }
+  | { type: 'INVENTION'; resources: number[] }
+  | { type: 'BANK_TRADE'; give: number; take: number }
+  | { type: 'OFFER'; give: number[]; take: number[]; to?: string | null }
+  | { type: 'DISCARD'; resources: number[] }
+  | { type: 'ACCEPT' | 'DECLINE'; offer: number }
+  | { type: 'CONFIRM_TRADE'; offer: number; partner: string };
 type Phase = {
   type:
     | 'setup'
@@ -110,15 +115,16 @@ function starting(s: State, p: string, v: number) {
 export function createGame(
   players: string[],
   random: () => number,
-  setup: 'variable' | 'beginner' = 'variable',
+  setup: Setup = 'variable',
 ): State {
+  const { minPlayers, maxPlayers } = games.catan;
   assert(
-    players.length >= 3 &&
-      players.length <= 6 &&
+    players.length >= minPlayers &&
+      players.length <= maxPlayers &&
       new Set(players).size === players.length,
-    'CATAN requires 3–6 different players.',
+    `CATAN requires ${minPlayers}–${maxPlayers} different players.`,
   );
-  const extended = players.length > 4,
+  const extended = isExtended(players.length),
     board = makeBoard(extended, random, setup === 'variable');
   const deck = shuffle(
     (
@@ -150,7 +156,7 @@ export function createGame(
     development: players.map(() => []),
     played: players.map(() => []),
     deck,
-    bank: Array(5).fill(extended ? 24 : 19),
+    bank: Array(5).fill(bankSize(extended)),
     robber:
       deserts[setup === 'beginner' ? 0 : Math.floor(random() * deserts.length)],
     phase: { type: 'setup', player: players[first], step: 0, settlement: null },
@@ -255,7 +261,7 @@ function roadLegal(s: State, p: string, e: number) {
     )
   );
 }
-export function longestRoute(s: State, p: string): number {
+function longestRoute(s: State, p: string): number {
   function trail(v: number, used: Set<number>): number {
     if (used.size && s.buildings[v] && s.buildings[v]!.owner !== p) return 0;
     let best = 0;
@@ -323,7 +329,7 @@ function ratio(s: State, p: string, r: number) {
       ),
   );
 }
-export function legalActions(s: State, p: string): Action[] {
+function legalActions(s: State, p: string): Action[] {
   const i = s.players.indexOf(p);
   if (i < 0) return [];
   const a: Action[] = [],
@@ -426,23 +432,13 @@ export function legalActions(s: State, p: string): Action[] {
     }
   return a;
 }
-function quantities(value: unknown): value is number[] {
-  return (
-    Array.isArray(value) &&
-    value.length === 5 &&
-    value.every((n) => Number.isInteger(n) && n >= 0 && n <= 24)
-  );
-}
 function sameAction(a: Action, b: Action) {
-  const ak = Object.keys(a).sort(),
-    bk = Object.keys(b).sort();
+  const x: Record<string, unknown> = a,
+    y: Record<string, unknown> = b,
+    keys = Object.keys(x).sort();
   return (
-    JSON.stringify(ak) === JSON.stringify(bk) &&
-    ak.every(
-      (k) =>
-        JSON.stringify(a[k as keyof Action]) ===
-        JSON.stringify(b[k as keyof Action]),
-    )
+    JSON.stringify(keys) === JSON.stringify(Object.keys(y).sort()) &&
+    keys.every((k) => JSON.stringify(x[k]) === JSON.stringify(y[k]))
   );
 }
 export function applyAction(
@@ -455,6 +451,7 @@ export function applyAction(
   const action = input as Action,
     i = state.players.indexOf(p);
   assert(i >= 0);
+  // The dice throw strength is cosmetic, so it is checked but never part of the choice.
   let intention = action;
   if (action.type === 'ROLL_DICE' && action.strength !== undefined) {
     assert(
@@ -463,10 +460,10 @@ export function applyAction(
         action.strength >= 0 &&
         action.strength <= 1,
     );
-    const { strength, ...rest } = action;
-    intention = rest;
+    intention = { type: 'ROLL_DICE' };
   }
   // Check every ordinary action against server-derived choices before consuming randomness.
+  // Offers and discards carry open-ended quantities, so their cases validate them.
   if (action.type !== 'OFFER' && action.type !== 'DISCARD')
     assert(legalActions(state, p).some((a) => sameAction(a, intention)));
   const s = structuredClone(state),
@@ -501,12 +498,7 @@ export function applyAction(
     case 'OFFER': {
       assert(phase.type === 'turn' && phase.stage === 'actions' && !s.paired);
       assert(
-        quantities(a.give) &&
-          quantities(a.take) &&
-          total(a.give) > 0 &&
-          total(a.take) > 0 &&
-          a.give.every((n, r) => !n || !(a.take as number[])[r]) &&
-          enough(s.hands[i], a.give),
+        validOffer(s.hands[i], a.give, a.take),
         'Offer distinct resources you own.',
       );
       const to = a.to ?? null;
@@ -529,7 +521,7 @@ export function applyAction(
       break;
     }
     case 'BUILD_SETTLEMENT': {
-      const v = a.vertex!;
+      const v = a.vertex;
       s.buildings[v] = { owner: p, color: s.colors[i], city: false };
       if (phase.type === 'setup') {
         if (phase.step! >= s.players.length) starting(s, p, v);
@@ -539,10 +531,10 @@ export function applyAction(
     }
     case 'BUILD_CITY':
       pay(s, i, costs.BUILD_CITY);
-      s.buildings[a.vertex!]!.city = true;
+      s.buildings[a.vertex]!.city = true;
       break;
     case 'BUILD_ROAD': {
-      s.roads[a.edge!] = p;
+      s.roads[a.edge] = p;
       if (phase.type === 'setup') {
         const step = phase.step! + 1,
           n = s.players.length;
@@ -584,7 +576,7 @@ export function applyAction(
       break;
     }
     case 'END_TURN':
-      if (s.players.length > 4 && !s.paired) s.paired = true;
+      if (isExtended(s.players.length) && !s.paired) s.paired = true;
       else {
         s.paired = false;
         s.primary = (s.primary + 1) % s.players.length;
@@ -603,7 +595,7 @@ export function applyAction(
       s.development[i].push({ kind: s.deck.pop()!, bought: s.opportunity });
       break;
     case 'MOVE_ROBBER': {
-      s.robber = a.hex!;
+      s.robber = a.hex;
       const targets = [
         ...new Set(
           s.board.hexes[s.robber].vertices.flatMap((v) =>
@@ -619,7 +611,7 @@ export function applyAction(
       break;
     }
     case 'STEAL': {
-      const j = s.players.indexOf(a.victim!),
+      const j = s.players.indexOf(a.victim),
         count = total(s.hands[j]);
       if (count) {
         let pick = Math.floor(random() * count);
@@ -643,14 +635,14 @@ export function applyAction(
       play('MONOPOLY');
       s.hands.forEach((hand, j) => {
         if (j !== i) {
-          s.hands[i][a.resource!] += hand[a.resource!];
-          hand[a.resource!] = 0;
+          s.hands[i][a.resource] += hand[a.resource];
+          hand[a.resource] = 0;
         }
       });
       break;
     case 'INVENTION':
       play('INVENTION');
-      a.resources!.forEach((n, r) => {
+      a.resources.forEach((n, r) => {
         s.bank[r] -= n;
         s.hands[i][r] += n;
       });
@@ -665,8 +657,7 @@ export function applyAction(
       };
       break;
     case 'BANK_TRADE': {
-      const give = a.give as number,
-        take = a.take as number,
+      const { give, take } = a,
         n = ratio(s, p, give);
       s.hands[i][give] -= n;
       s.bank[give] += n;
@@ -690,7 +681,7 @@ export function applyAction(
         if (!o.accepted.includes(p)) o.accepted.push(p);
         break;
       }
-      const partner = a.type === 'ACCEPT' ? p : a.partner!,
+      const partner = a.type === 'CONFIRM_TRADE' ? a.partner : p,
         x = s.players.indexOf(o.from),
         y = s.players.indexOf(partner);
       assert(
@@ -722,7 +713,7 @@ export function applyAction(
   s.presentation = present(state, s, p, action);
   return s;
 }
-export function produce(s: State, roll: number) {
+function produce(s: State, roll: number) {
   const requests = s.players.map(zero);
   s.board.hexes.forEach((h, hex) => {
     if (hex === s.robber || h.number !== roll || h.resource === null) return;
@@ -757,13 +748,7 @@ export function playerView(s: State, p: string) {
       bank: s.bank,
       phase: s.phase,
       dice: s.dice,
-      primary: s.players[s.primary],
-      secondary:
-        s.players.length > 4
-          ? s.players[(s.primary + 3) % s.players.length]
-          : null,
       paired: s.paired,
-      opportunity: s.opportunity,
       longest: s.longest,
       army: s.army,
       offers: s.offers,
@@ -773,8 +758,6 @@ export function playerView(s: State, p: string) {
         resources: total(s.hands[j]),
         development: s.development[j].length,
         points: points(s, id, s.phase.winner === id),
-        knights: s.played[j].filter((c) => c === 'KNIGHT').length,
-        played: s.played[j],
         inventory: inventory(s, id),
       })),
     },
@@ -789,23 +772,19 @@ export function playerView(s: State, p: string) {
   });
 }
 export const catan: GameDefinition<State> = {
-  id: 'catan',
-  minPlayers: 3,
-  maxPlayers: 6,
+  ...seats('catan'),
   create: (players, random, options?: unknown) => {
     assert(
       options === undefined ||
         (typeof options === 'object' &&
           options !== null &&
-          ['variable', 'beginner'].includes(
-            (options as { setup: string }).setup,
-          )),
+          setups.includes((options as { setup: Setup }).setup)),
       'Invalid CATAN setup.',
     );
     return createGame(
       players,
       random,
-      (options as { setup?: 'variable' | 'beginner' } | undefined)?.setup,
+      (options as { setup?: Setup } | undefined)?.setup,
     );
   },
   apply: applyAction,

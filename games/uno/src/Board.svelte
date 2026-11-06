@@ -1,24 +1,28 @@
 <script lang="ts">
-  import { onMount, tick, untrack, type Snippet } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { prefersReducedMotion } from 'svelte/motion';
-  import { modal, read, write } from '@board-games/shared/ui';
   import {
-    gameSkin,
-    setGameSkin,
-    type Skin,
-  } from '@board-games/shared/ui/pixel';
+    modal,
+    ViewerSkin,
+    viewerPreferences,
+    type BoardProps,
+  } from '@board-games/shared/ui';
+  import type { Skin } from '@board-games/shared/ui/pixel';
+  import { games } from '@board-games/shared/games';
   import { m } from '@board-games/shared/messages';
-  import type { Locale } from '@board-games/shared/runtime';
-  import type { Player } from '@board-games/game-core';
-  import type { Action, Card, Color } from './index.js';
+  import type { Action } from './index.js';
+  import { cardSymbols, colors, type Card } from './cards.js';
   import {
     bigDraws,
-    seatPosition,
+    consecutive,
+    gained,
     unoCalls,
     type UnoView,
   } from './presentation.js';
-  import { cardMotion, cardAudio } from './motion.js';
+  import { cardMotion } from './motion.js';
+  import { cardAudio } from './sound.js';
   import type { Cue } from './pixel/sound.js';
+
   let {
     view,
     playerId,
@@ -31,58 +35,48 @@
     canRematch = false,
     rematch,
     settingsContent,
-  }: {
-    view: UnoView;
-    playerId: string;
-    players: Player[];
-    send: (action: unknown) => void;
-    locale: Locale;
-    round?: number;
-    connected?: boolean;
-    pending?: boolean;
-    canRematch?: boolean;
-    rematch?: () => void;
-    settingsContent?: Snippet;
-  } = $props();
+  }: BoardProps<UnoView, Action> = $props();
+
+  /** Opponent cards drawn as a fan beside each seat. */
+  const MINI_FAN = 7;
+  /** Takes the card cue and table effect when a card lands on the discard pile. */
+  const landing: Partial<Record<string, { cue: Cue; kind: string }>> = {
+    skip: { cue: 'skip', kind: 'skip' },
+    reverse: { cue: 'reverse', kind: 'reverse' },
+    '+2': { cue: 'hit2', kind: 'hit' },
+    '+4': { cue: 'hit4', kind: 'hit' },
+  };
   let root: HTMLElement;
+  const preferences = viewerPreferences('uno', {
+    sound: true as boolean,
+    motion: null as boolean | null,
+  });
   let declared = $state(false),
-    soundEnabled = $state(read('uno:sound') !== 'off'),
-    // An explicit choice wins; otherwise follow the system motion preference.
-    motionSetting = $state(read('uno:motion')),
     settingsOpen = $state(false),
-    // Players currently holding a declared last card.
     called = $state<Record<string, boolean>>({}),
     pops = $state<{ key: number; id: string; count: number }[]>([]),
-    burst = $state<{ key: number; id: string } | null>(null);
-  // The 8-bit skin is per viewer; its CSS and chiptune pack load only when chosen.
-  let skin = $state<Skin>(gameSkin('uno')),
-    pixelReady = $state(false),
+    burst = $state<{ key: number; id: string } | null>(null),
     chiptune = $state<(cue: Cue) => void>(),
     fx = $state<{ key: number; kind: string } | null>(null),
     dismissed = $state(-1);
-  $effect(() => {
-    if (skin === 'pixel' && !pixelReady)
-      void Promise.all([
-        import('./pixel.css'),
-        import('./pixel/sound.js'),
-      ]).then(([, sound]) => {
-        chiptune = sound.chiptune(audio.audio);
-        pixelReady = true;
-      });
-  });
-  const pixel = $derived(skin === 'pixel' && pixelReady);
+  const audio = cardAudio(() => preferences.sound);
+  // The 8-bit skin is per viewer; its CSS and chiptune pack load only when chosen.
+  const skin = new ViewerSkin('uno', () =>
+    Promise.all([import('./pixel.css'), import('./pixel/sound.js')]).then(
+      ([, sound]) => (chiptune = sound.chiptune(audio.audio)),
+    ),
+  );
+  const pixel = $derived(skin.pixel);
   const motionEnabled = $derived(
-    motionSetting ? motionSetting !== 'off' : !prefersReducedMotion.current,
+    preferences.motion ?? !prefersReducedMotion.current,
   );
   let motion = $state<ReturnType<typeof cardMotion>>();
-  const audio = cardAudio();
   const palette = {
     red: '#e2332d',
     yellow: '#f5bd1d',
     green: '#2fa04c',
     blue: '#1f6fcf',
   };
-  const colors: Color[] = ['red', 'yellow', 'green', 'blue'];
   let pub = $derived(view.public),
     hand = $derived(view.private.hand),
     legal = $derived(view.private.legalActions);
@@ -92,7 +86,6 @@
     ...pub.players.slice(0, ownIndex),
   ]);
   let myTurn = $derived(pub.turn === playerId && pub.phase === 'turn');
-  // Arc the hand: small rotation steps that tighten as it grows.
   let step = $derived(
     hand.length > 1 ? Math.min(5, 36 / (hand.length - 1)) : 0,
   );
@@ -106,54 +99,40 @@
     wild: m.uno_wild({}, { locale }),
   });
   const name = (id: string) => players.find((p) => p.id === id)?.name ?? id;
-  /** 8-bit portrait: one of eight characters, stable per roster seat. */
+  /** Opponent seat centre in % of the table: an arc across the top rim, wrapping down the sides on big tables. */
+  function seatPosition(index: number, count: number): [number, number] {
+    if (count < 3) return [50, 11];
+    const spread = count >= 5 ? Math.PI * 0.14 : 0;
+    const angle =
+      Math.PI - spread + ((index - 1) / (count - 2)) * (Math.PI + spread * 2);
+    return [50 + 41 * Math.cos(angle), 52 + 41 * Math.sin(angle)];
+  }
+  /** The 8-bit sheet has one portrait per possible seat. */
   const avatar = (id: string) =>
     Math.max(
       0,
       pub.players.findIndex((p) => p.id === id),
-    ) % 8;
-  /** Column of a card's numeral or icon in the 8-bit glyph sheet. */
-  const glyph = (card: Card) =>
-    /^\d$/.test(card.symbol)
-      ? Number(card.symbol)
-      : ['skip', 'reverse', '+2', '+4', 'wild'].indexOf(card.symbol) + 10;
-  const tint = (card: Card) => (card.color ? colors.indexOf(card.color) : 4);
+    ) % games.uno.maxPlayers;
+  const glyph = (card: Card) => cardSymbols.indexOf(card.symbol);
+  const tint = (card: Card) =>
+    card.color ? colors.indexOf(card.color) : colors.length;
   function cue(sound: Cue) {
-    if (pixel && soundEnabled && !document.hidden) chiptune?.(sound);
+    if (pixel && preferences.sound && !document.hidden) chiptune?.(sound);
   }
   /** 8-bit juice for one accepted revision: a chiptune cue and a table effect. */
   function react(before: UnoView, next: UnoView) {
     const b = before.public,
       n = next.public;
-    if (n.revision !== b.revision + 1) return;
+    if (!consecutive(before, next)) return;
     let kind = '';
     if (n.top.id !== b.top.id) {
-      const symbol = n.top.symbol;
-      kind =
-        symbol === 'skip' || symbol === 'reverse'
-          ? symbol
-          : symbol === '+2' || symbol === '+4'
-            ? 'hit'
-            : '';
-      cue(
-        symbol === 'skip' || symbol === 'reverse'
-          ? symbol
-          : symbol === '+2'
-            ? 'hit2'
-            : symbol === '+4'
-              ? 'hit4'
-              : 'play',
-      );
+      const hit = landing[n.top.symbol];
+      kind = hit?.kind ?? '';
+      cue(hit?.cue ?? 'play');
     } else if (b.phase === 'color' && n.phase !== 'color') {
       kind = 'wild';
       cue('wild');
-    } else if (
-      n.players.some(
-        (seat) =>
-          seat.count > (b.players.find((p) => p.id === seat.id)?.count ?? 99),
-      )
-    )
-      cue('draw');
+    } else if (n.players.some((seat) => gained(before, seat) > 0)) cue('draw');
     if (n.phase === 'finished' && b.phase !== 'finished')
       later(() => cue(n.winner === playerId ? 'win' : 'lose'), 350);
     else if (n.turn === playerId && n.phase === 'turn' && b.turn !== playerId)
@@ -194,46 +173,39 @@
     act({ type: 'PLAY_CARD', cardId, uno: declared && hand.length === 2 });
     declared = false;
   }
-  function preference(kind: 'sound' | 'motion', value: boolean) {
-    write(`uno:${kind}`, value ? 'on' : 'off');
-    if (kind === 'sound') {
-      soundEnabled = value;
-      audio.setEnabled(value);
-      audio.unlock();
-    } else {
-      motionSetting = value ? 'on' : 'off';
-      if (!value) motion?.clear();
-    }
+  function toggleSound() {
+    preferences.sound = !preferences.sound;
+    if (preferences.sound) audio.unlock();
+    else audio.audio.stop();
   }
-  let previousRound = -1;
+  function toggleMotion() {
+    preferences.motion = !motionEnabled;
+    if (!preferences.motion) motion?.clear();
+  }
+  let previousRound = -1,
+    lastView: UnoView | undefined;
   $effect.pre(() => {
     const next = view,
       enabled = motionEnabled,
       online = connected,
       controller = motion,
       currentRound = round;
-    if (!controller) return;
     if (currentRound !== previousRound) {
-      controller.reset();
       previousRound = currentRound;
+      called = {};
+      lastView = undefined;
+      controller?.reset();
     }
+    if (!controller) return;
     const animate = untrack(() => controller.prepare(next, enabled, online));
     void tick().then(animate);
   });
   // UNO calls and penalty draws, read from consecutive public revisions only.
-  let lastView: UnoView | undefined,
-    lastRound = -1;
   $effect(() => {
-    const next = view,
-      currentRound = round;
+    const next = view;
     untrack(() => {
       const before = lastView;
       lastView = next;
-      if (currentRound !== lastRound) {
-        lastRound = currentRound;
-        called = {};
-        return;
-      }
       for (const seat of next.public.players)
         if (seat.count !== 1 && called[seat.id]) delete called[seat.id];
       if (!before) return;
@@ -264,33 +236,28 @@
     if (hand.length !== 2 || !myTurn) declared = false;
   });
   onMount(() => {
-    audio.setEnabled(soundEnabled);
     motion = cardMotion(
       root,
       playerId,
       () => {
-        if (!document.hidden && !pixel) audio.play();
+        if (!pixel) audio.play();
       },
       () => pixel,
     );
-    const unlock = () => audio.unlock();
-    const reset = () => motion?.reset();
-    const resize = () => motion?.clear();
-    document.addEventListener('pointerdown', unlock, true);
-    document.addEventListener('keydown', unlock, true);
-    document.addEventListener('visibilitychange', reset);
-    window.addEventListener('resize', resize);
     return () => {
       motion?.reset();
       audio.dispose();
       for (const id of timers) clearTimeout(id);
-      document.removeEventListener('pointerdown', unlock, true);
-      document.removeEventListener('keydown', unlock, true);
-      document.removeEventListener('visibilitychange', reset);
-      window.removeEventListener('resize', resize);
     };
   });
 </script>
+
+<svelte:window
+  onpointerdowncapture={() => audio.unlock()}
+  onkeydowncapture={() => audio.unlock()}
+  onresize={() => motion?.clear()}
+/>
+<svelte:document onvisibilitychange={() => motion?.reset()} />
 
 {#snippet cardFace(card: Card)}
   {#if pixel}{@render pixelFace(card)}{:else}{@render classicFace(card)}{/if}
@@ -332,6 +299,12 @@
   <span class="corner bottom">{symbol(card)}</span>
 {/snippet}
 
+{#snippet rematchButton()}
+  {#if canRematch}<button class="rematch" onclick={() => rematch?.()}
+      >{m.rematch({}, { locale })}</button
+    >{/if}
+{/snippet}
+
 {#snippet bubbles(id: string)}
   {#if called[id]}<span class="bubble uno">UNO!</span>{/if}
   {#each pops.filter((p) => p.id === id) as pop (pop.key)}<span
@@ -347,17 +320,20 @@
   aria-label="UNO"
   data-round={round}
   data-revision={pub.revision}
-  data-sound={soundEnabled}
+  data-sound={preferences.sound}
   data-motion={motionEnabled}
 >
   <nav class="tools" aria-label={m.uno_settings({}, { locale })}>
     <button
-      aria-pressed={soundEnabled}
+      aria-pressed={preferences.sound}
       aria-label={m.uno_sound({}, { locale })}
       title={m.uno_sound({}, { locale })}
-      onclick={() => preference('sound', !soundEnabled)}
+      onclick={toggleSound}
       ><svg viewBox="0 0 24 24" aria-hidden="true"
-        ><path d="M4 9h4l5-4v14l-5-4H4z" class="fill" />{#if soundEnabled}<path
+        ><path
+          d="M4 9h4l5-4v14l-5-4H4z"
+          class="fill"
+        />{#if preferences.sound}<path
             d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"
           />{:else}<path d="M16.5 9.5l5 5M21.5 9.5l-5 5" />{/if}</svg
       ></button
@@ -365,7 +341,7 @@
       aria-pressed={motionEnabled}
       aria-label={m.uno_motion({}, { locale })}
       title={m.uno_motion({}, { locale })}
-      onclick={() => preference('motion', !motionEnabled)}
+      onclick={toggleMotion}
       ><svg viewBox="0 0 24 24" aria-hidden="true"
         ><rect
           x="10"
@@ -413,9 +389,9 @@
             >{/if}
         </div>
         <div class="seat-cards" aria-hidden="true">
-          {#each Array(Math.min(seat.count, 7)) as _, i}<span
+          {#each Array(Math.min(seat.count, MINI_FAN)) as _, i}<span
               class="mini-back"
-              style={`--fan:${i - (Math.min(seat.count, 7) - 1) / 2}`}
+              style={`--fan:${i - (Math.min(seat.count, MINI_FAN) - 1) / 2}`}
             ></span>{/each}
           {#if pixel}<span class="px-count">{seat.count}</span>{/if}
         </div>
@@ -504,14 +480,12 @@
             >{/each}
         </div>
       </div>{/if}
-    {#each legal.filter((a) => a.type === 'CATCH_UNO') as action}<button
-        class="catch"
-        disabled={pending || !connected}
-        onclick={() => act(action)}
-        >{m.uno_catch({}, { locale })}: {name(
-          (action as Extract<Action, { type: 'CATCH_UNO' }>).player,
-        )}</button
-      >{/each}
+    {#each legal as action}{#if action.type === 'CATCH_UNO'}<button
+          class="catch"
+          disabled={pending || !connected}
+          onclick={() => act(action)}
+          >{m.uno_catch({}, { locale })}: {name(action.player)}</button
+        >{/if}{/each}
     {#if fx}{#key fx.key}<div
           class="px-fx {fx.kind}"
           style:--gx={glyph(pub.top)}
@@ -559,9 +533,7 @@
             {m.uno_won({}, { locale })}
           </p>{/if}
         <div class="px-result-actions">
-          {#if canRematch}<button class="rematch" onclick={() => rematch?.()}
-              >{m.rematch({}, { locale })}</button
-            >{/if}<button onclick={() => (dismissed = round)}
+          {@render rematchButton()}<button onclick={() => (dismissed = round)}
             >{m.uno_view_table({}, { locale })}</button
           >
         </div>
@@ -575,9 +547,7 @@
             ? `${name(pub.winner)} ${m.uno_won({}, { locale })}`
             : m.uno_tie({}, { locale })}
         </p>
-        {#if canRematch}<button class="rematch" onclick={() => rematch?.()}
-            >{m.rematch({}, { locale })}</button
-          >{/if}
+        {@render rematchButton()}
       {:else}<p class="turn-pill" class:mine={pub.turn === playerId}>
           {pub.turn === playerId
             ? m.uno_turn({}, { locale })
@@ -646,10 +616,9 @@
               type="radio"
               name="uno-skin"
               {value}
-              checked={skin === value}
+              checked={skin.choice === value}
               onchange={() => {
-                skin = value as Skin;
-                setGameSkin('uno', skin);
+                skin.choose(value as Skin);
                 motion?.clear();
               }}
             />{text}</label

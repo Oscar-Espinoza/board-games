@@ -1,26 +1,18 @@
 # CATAN
 
-See the [Catan rules and controls](../../docs/games/catan.md) for retained game behavior.
-Rules remain independent of transport, the DOM and browser effects. Historical
-ChaCha replay files are not compatible with the TypeScript port.
+Behaviour, rules coverage and controls are in [docs/games/catan.md](../../docs/games/catan.md);
+artwork provenance in [docs/games/catan-assets.md](../../docs/games/catan-assets.md).
 
-`src/index.ts` implements the shared game contract. `create` accepts optional
-`{ setup: 'variable' | 'beginner' }`; variable is the default. The ordinary legal
-intention list is calculated from authoritative state. Every accepted operation
-returns a cloned state. Special trade/discard quantities are independently
-validated. `view` constructs a public projection and only the requesting seat's
-private hand, development cards and legal choices; no canonical state or deck is
-serialized to players.
+Source map (`src/`):
 
-`src/Board.svelte` renders a responsive SVG island and semantic action controls.
-The generated physical-table materials are local, compressed WebP assets. The
-textured ocean, zoomable and pannable island, civilization seats, resource cards, placement previews, short SVG/Web Animations
-and gesture-unlocked audio live in this game package. Typed accepted-action events
-carry revisions and explicitly projected public/recipient details. Resynchronization
-settles immediately rather than replaying effects.
-No commercial rulebook images or third-party artwork are bundled. CATAN is not
-an official CATAN product.
-
-The lazy `/practice/catan` route runs `src/practice.ts` fixtures with seeded local
-rules and four switchable seats. It never creates a room or changes multiplayer
-setup.
+- `index.ts` the rules and the recipient `playerView`. `create` accepts optional
+  `{ setup: 'variable' | 'beginner' }`. Ordinary actions are checked against
+  `legalActions`; offers and discards carry open-ended quantities and validate them
+  in their own cases. Rule rejections are English sentences, shown as is.
+- `limits.ts` the rule numbers (bank size, offer limit, offer check) the table also reads.
+- `board.ts` topology and published layouts. `presentation.ts` the typed events of an
+  accepted action; `timing.ts` the pacing that effects and sound share.
+- `Board.svelte` the table: SVG island, seats, hand, trade panels. `effects.ts`
+  (motion and classic audio), `dice-throw.ts`, `pixel/` and `pixel.css` (the 8-bit
+  skin, loaded the first time it is chosen), `table/` (pieces, costs, artwork).
+- `practice.ts` the seeded fixtures behind `/practice/catan`; it never creates a room.

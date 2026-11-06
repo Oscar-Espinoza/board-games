@@ -2,18 +2,29 @@ import { createAudio } from '@board-games/shared/ui';
 import { diceThrow, pixelThrowDuration } from './dice-throw.js';
 import type { PresentationEvent } from './presentation.js';
 import { chiptune } from './pixel/sound.js';
+import { gold, ink, settlementPath } from './table/shapes.js';
+import { deliveryDelay, GLOW_DELAY, rollStrength } from './timing.js';
 
 /** 8-bit motion: every tween moves in hard frames (about 12 per second). */
 const stepped = (duration: number) =>
   `steps(${Math.max(2, Math.round(duration / 80))}, end)`;
 
 /** Browser-only, Catan-only decoration. Canonical pieces always exist underneath. */
+/** Where the dice may land: the table box and the ellipse over the island. */
+type Throw = {
+  table: DOMRect;
+  cx: number;
+  cy: number;
+  rx: number;
+  ry: number;
+};
+
 export function playEffects(
   root: HTMLElement,
   events: PresentationEvent[],
-  onSettled: () => void = () => {},
-  onRollSettled: () => void = () => {},
-  pixel = false,
+  pixel: boolean,
+  onSettled: () => void,
+  onRollSettled: () => void,
 ) {
   const animations: Animation[] = [],
     decorations: Element[] = [];
@@ -49,7 +60,7 @@ export function playEffects(
       const dot = document.createElement('i');
       dot.className = 'catan-dust';
       dot.style.cssText = `position:fixed;pointer-events:none;z-index:9;left:${r.x + r.width / 2}px;top:${r.y + r.height * 0.75}px;width:7px;height:7px;background:#f1dca4;border-radius:${pixel ? 0 : '50%'}`;
-      if (pixel) dot.style.boxShadow = '3px 3px 0 #1a0f08';
+      if (pixel) dot.style.boxShadow = `3px 3px 0 ${ink}`;
       root.append(dot);
       decorations.push(dot);
       animate(
@@ -75,7 +86,7 @@ export function playEffects(
     badge.setAttribute('aria-hidden', 'true');
     badge.style.cssText =
       (pixel
-        ? 'font-family:var(--px-font);text-shadow:3px 3px 0 #1a0f08;font-size:40px;'
+        ? `font-family:var(--px-font);text-shadow:3px 3px 0 ${ink};font-size:40px;`
         : '') +
       'position:fixed;pointer-events:none;z-index:9;color:#ffe6a2;font-size:30px;left:' +
       (target.x + target.width / 2) +
@@ -106,20 +117,17 @@ export function playEffects(
     );
   };
   const roll = events.find((e) => e.type === 'roll');
-  const throwPlan = diceThrow(
-    roll?.type === 'roll' ? (roll.strength ?? 0) : 0,
-    Math.random,
-  );
+  const strength = rollStrength(events);
+  const throwPlan = diceThrow(strength, Math.random);
   const rollDuration = pixel
-    ? pixelThrowDuration(roll?.type === 'roll' ? (roll.strength ?? 0) : 0)
+    ? pixelThrowDuration(strength)
     : throwPlan.duration;
-  // Hard gold outline blinks instead of a soft glow.
   const glowFrames: Keyframe[] = [
-    { outline: '0 solid #f2c14e00' },
-    { outline: '4px solid #f2c14e', offset: 0.2 },
-    { outline: '0 solid #f2c14e00', offset: 0.4 },
-    { outline: '4px solid #f2c14e', offset: 0.6 },
-    { outline: '0 solid #f2c14e00' },
+    { outline: `0 solid ${gold}00` },
+    { outline: `4px solid ${gold}`, offset: 0.2 },
+    { outline: `0 solid ${gold}00`, offset: 0.4 },
+    { outline: `4px solid ${gold}`, offset: 0.6 },
+    { outline: `0 solid ${gold}00` },
   ];
   /** The 8-bit tumble: the physics path sampled at ~12 fps, quarter turns only, random
    * faces flicking by until the die settles on its real face. */
@@ -127,11 +135,7 @@ export function playEffects(
     die: HTMLElement,
     points: ReturnType<typeof diceThrow>['paths'][number],
     i: number,
-    table: DOMRect,
-    cx: number,
-    cy: number,
-    rx: number,
-    ry: number,
+    { table, cx, cy, rx, ry }: Throw,
   ) => {
     const origin = die.getBoundingClientRect();
     const centerX = origin.x + origin.width / 2 - table.x;
@@ -184,7 +188,7 @@ export function playEffects(
       if (piece && wrapper) {
         if (event.piece === 'city' && !pixel) {
           const old = piece.cloneNode() as SVGPathElement;
-          old.setAttribute('d', 'M -8 8 V -2 L 0 -10 L 8 -2 V 8 Z');
+          old.setAttribute('d', settlementPath);
           old.classList.remove('built');
           old.classList.add('previous-settlement');
           wrapper.prepend(old);
@@ -200,26 +204,23 @@ export function playEffects(
             500,
           );
         }
+        const drop: Keyframe[] = [
+          {
+            transform:
+              event.piece === 'road'
+                ? 'translateY(-40px)'
+                : 'translateY(-90px)',
+            opacity: 0.1,
+            easing: 'cubic-bezier(.6,0,1,.8)',
+          },
+          { transform: 'translateY(0)', opacity: 1, offset: 0.55 },
+          { transform: 'translateY(-5px)', offset: 0.72 },
+          { transform: 'translateY(0)' },
+        ];
         for (const detail of wrapper.querySelectorAll(
           '.piece-finish, .piece-detail',
         ))
-          animate(
-            detail,
-            [
-              {
-                transform:
-                  event.piece === 'road'
-                    ? 'translateY(-40px)'
-                    : 'translateY(-90px)',
-                opacity: 0.1,
-                easing: 'cubic-bezier(.6,0,1,.8)',
-              },
-              { transform: 'translateY(0)', opacity: 1, offset: 0.55 },
-              { transform: 'translateY(-5px)', offset: 0.72 },
-              { transform: 'translateY(0)' },
-            ],
-            500,
-          );
+          animate(detail, drop, 500);
         animate(
           piece,
           pixel
@@ -233,19 +234,7 @@ export function playEffects(
                 { transform: 'translateY(-6px)', offset: 0.75 },
                 { transform: 'translateY(0)' },
               ]
-            : [
-                {
-                  transform:
-                    event.piece === 'road'
-                      ? 'translateY(-40px)'
-                      : 'translateY(-90px)',
-                  opacity: 0.1,
-                  easing: 'cubic-bezier(.6,0,1,.8)',
-                },
-                { transform: 'translateY(0)', opacity: 1, offset: 0.55 },
-                { transform: 'translateY(-5px)', offset: 0.72 },
-                { transform: 'translateY(0)' },
-              ],
+            : drop,
           event.piece === 'road' ? 350 : 500,
         );
         puff(wrapper);
@@ -271,9 +260,12 @@ export function playEffects(
       }
     }
     if (event.type === 'roll') {
-      const table = root.querySelector('.table')!.getBoundingClientRect();
-      const island = root.querySelector('.shore')!.getBoundingClientRect();
-      const tray = root.querySelector<HTMLElement>('.board-dice')!;
+      const tableBox = root.querySelector('.table'),
+        shore = root.querySelector('.shore'),
+        tray = root.querySelector<HTMLElement>('.board-dice');
+      if (!tableBox || !shore || !tray) continue;
+      const table = tableBox.getBoundingClientRect();
+      const island = shore.getBoundingClientRect();
       const rx = Math.max(30, Math.min(island.width, table.width) / 2 - 26);
       const ry = Math.max(30, Math.min(island.height, table.height) / 2 - 26);
       const cx = table.width / 2,
@@ -281,13 +273,10 @@ export function playEffects(
       const landing = throwPlan.landing;
       tray.style.left = ((cx + landing.x * rx) / table.width) * 100 + '%';
       tray.style.top = ((cy + landing.y * ry) / table.height) * 100 + '%';
-      tray.dataset.strength = String(
-        roll?.type === 'roll' ? (roll.strength ?? 0) : 0,
-      );
       root.querySelectorAll('.die').forEach((die, i) => {
         const points = throwPlan.paths[i];
         if (pixel) {
-          pixelDie(die as HTMLElement, points, i, table, cx, cy, rx, ry);
+          pixelDie(die as HTMLElement, points, i, { table, cx, cy, rx, ry });
           return;
         }
         const origin = die.getBoundingClientRect();
@@ -368,8 +357,7 @@ export function playEffects(
         token.setAttribute('aria-hidden', 'true');
         token.style.cssText = `position:fixed;pointer-events:none;z-index:9;left:${from.x + from.width / 2}px;top:${from.y + from.height / 2}px;background:#f8e6af;color:#254a44;border-radius:6px;padding:4px 8px;font-size:20px`;
         if (pixel)
-          token.style.cssText +=
-            ';border-radius:0;font-family:var(--px-font);color:#1a0f08;border:3px solid #1a0f08;box-shadow:3px 3px 0 #1a0f08';
+          token.style.cssText += `;border-radius:0;font-family:var(--px-font);color:${ink};border:3px solid ${ink};box-shadow:3px 3px 0 ${ink}`;
         if (production) {
           const card = root.querySelectorAll('.hand > .resource-card')[
             event.resource ?? 0
@@ -396,7 +384,7 @@ export function playEffects(
         decorations.push(token);
         const dx = to.x + to.width / 2 - from.x - from.width / 2;
         const dy = to.y + to.height / 2 - from.y - from.height / 2;
-        const delay = production ? rollDuration + 300 + delivery++ * 700 : 0;
+        const delay = production ? deliveryDelay(rollDuration, delivery++) : 0;
         animate(
           token,
           production
@@ -451,7 +439,7 @@ export function playEffects(
                   { boxShadow: '0 0 0 0 #ffe6a200' },
                 ],
             700,
-            delay + 1400,
+            delay + GLOW_DELAY,
           );
       }
     }
@@ -533,7 +521,7 @@ export function softAudio() {
     cancel() {
       generation++;
     },
-    reject(pixel = false) {
+    reject(pixel: boolean) {
       if (pixel) return later(() => chip.reject());
       later(() =>
         audio.tone({
@@ -546,12 +534,9 @@ export function softAudio() {
       );
     },
     /** `pixel` swaps in the chiptune pack; `player` hears their own deliveries. */
-    play(events: PresentationEvent[], pixel = false, player = '') {
+    play(events: PresentationEvent[], pixel: boolean, player: string) {
       if (pixel) {
-        const roll = events.find((e) => e.type === 'roll');
-        const duration = pixelThrowDuration(
-          roll?.type === 'roll' ? (roll.strength ?? 0) : 0,
-        );
+        const duration = pixelThrowDuration(rollStrength(events));
         return later(() => chip.play(events, player, duration));
       }
       later(() => {
@@ -586,9 +571,7 @@ export function softAudio() {
           noise(impact, 0.35 * weight, 0.35, 1300);
           noise(impact + 0.1, 0.12 * weight, 0.45, 420);
         } else if (events.some((e) => e.type === 'roll')) {
-          const roll = events.find((e) => e.type === 'roll');
-          const scale =
-            0.3 + ((roll?.type === 'roll' ? roll.strength : 0) ?? 0) * 0.3;
+          const scale = 0.3 + rollStrength(events) * 0.3;
           for (let i = 0; i < 5; i++) {
             const at = [0.05, 0.91, 1.12, 1.38, 1.52][i] * scale;
             noise(at, 0.1 * (1 - i * 0.16), 0.055, 2800);

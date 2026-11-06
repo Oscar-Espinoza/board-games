@@ -1,17 +1,11 @@
 import type { Audio } from '@board-games/shared/ui';
-import { playChiptune } from '@board-games/shared/ui/pixel';
+import { chipNote, playChiptune } from '@board-games/shared/ui/pixel';
+import { deliveryDelay, GLOW_DELAY, rollStrength } from '../timing.js';
 import type { PresentationEvent } from '../presentation.js';
 
 /** Chiptune cues for the 8-bit skin: square/triangle tones and noise, no files. */
 export function chiptune(audio: Audio) {
-  const note = (
-    from: number,
-    delay = 0,
-    duration = 0.08,
-    volume = 0.06,
-    type: OscillatorType = 'square',
-    to?: number,
-  ) => audio.tone({ from, to, delay, duration, volume, type, attack: 0.002 });
+  const note = chipNote(audio);
   const crunch = (delay: number, volume: number, frequency: number) =>
     audio.noise({
       delay,
@@ -32,7 +26,6 @@ export function chiptune(audio: Audio) {
       note(f / 2, delay + i * step, step, volume * 0.7, 'triangle');
     });
   const cues = {
-    /** Dice rattle in the cup, then two clacks as they land. */
     roll(strength: number, landing: number) {
       const shakes = 5 + Math.round(strength * 4);
       for (let i = 0; i < shakes; i++) {
@@ -44,14 +37,12 @@ export function chiptune(audio: Audio) {
         note(330 - i * 60, at, 0.05, 0.05, 'triangle');
       }
     },
-    /** A coin pick-up per delivery, rising with each resource. */
     gain(delay: number, index: number) {
       note(988 + index * 60, delay, 0.05, 0.045);
       note(1319 + index * 80, delay + 0.06, 0.12, 0.045);
     },
     build(piece: 'road' | 'settlement' | 'city') {
       const weight = piece === 'road' ? 0 : piece === 'settlement' ? 1 : 2;
-      // Falling whistle, crunchy landing, then a short "built" chime.
       note(1200 - weight * 200, 0, 0.14, 0.03, 'square', 300);
       crunch(0.14, 0.2 + weight * 0.08, 900 - weight * 200);
       note(110 - weight * 20, 0.14, 0.16, 0.08, 'triangle', 45);
@@ -73,7 +64,6 @@ export function chiptune(audio: Audio) {
       note(988, 0.21, 0.14, 0.045);
     },
     robber() {
-      // Sneaky descending minor steps and a thud.
       [392, 370, 311, 233].forEach((f, i) =>
         note(f, i * 0.11, 0.1, 0.05, 'square'),
       );
@@ -86,7 +76,6 @@ export function chiptune(audio: Audio) {
     },
     card(kind: string) {
       if (kind === 'purchase') {
-        // A card flip: quick noise swish and two blips.
         audio.noise({
           duration: 0.09,
           volume: 0.06,
@@ -123,12 +112,12 @@ export function chiptune(audio: Audio) {
       const placement = events.find((e) => e.type === 'placement');
       const card = events.find((e) => e.type === 'card');
       const win = events.some((e) => e.type === 'win');
-      if (roll?.type === 'roll')
-        cues.roll(roll.strength ?? 0, rollDuration / 1000);
+      if (roll) cues.roll(rollStrength(events), rollDuration / 1000);
       let delivery = 0;
       for (const event of events)
         if (event.type === 'transfer' && event.reason === 'production') {
-          const at = rollDuration / 1000 + 0.3 + delivery++ * 0.7 + 1.4;
+          const at =
+            (deliveryDelay(rollDuration, delivery++) + GLOW_DELAY) / 1000;
           if (event.to === player) cues.gain(at, delivery);
         }
       if (placement?.type === 'placement') cues.build(placement.piece);

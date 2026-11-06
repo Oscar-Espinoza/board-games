@@ -59,10 +59,6 @@ export function polygonPixels(corners: number[][], grow = 0) {
   return runs(rows);
 }
 
-/** Several shapes' pixels unioned into one path (overlaps stay filled). */
-export const union = (...paths: string[]) => paths.join('');
-
-/** A filled pixel disc of radius `r` art pixels centred on (x, y). */
 export function discPixels(x: number, y: number, r: number) {
   const gx = Math.round(x / P),
     gy = Math.round(y / P);
@@ -95,10 +91,8 @@ export function linePixels(
   return runs(rows);
 }
 
-/** Snap a board coordinate to the art-pixel grid. */
 export const snap = (v: number) => Math.round(v / P) * P;
 
-/** Inline style that shows cell (col, row) of a sprite sheet with `cols` × `rows` cells. */
 export function cell(
   url: string,
   col: number,

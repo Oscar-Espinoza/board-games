@@ -1,23 +1,25 @@
+import { clamp01 } from '@board-games/shared/ui';
+
 /** The 8-bit skin's throw length: the same path, replayed at a fixed stepped pace. */
 export const pixelThrowDuration = (strength: number) =>
-  1100 + Math.max(0, Math.min(1, strength)) * 1300;
+  1100 + clamp01(strength) * 1300;
 
 /** Small cosmetic simulation, independent of the rules and their randomness. */
 export function diceThrow(strength: number, random: () => number) {
-  const power = Math.max(0, Math.min(1, strength));
+  const power = clamp01(strength);
   let duration = 1600 + power * 2200;
   const steps = Math.ceil(duration / (1000 / 60));
   const dt = duration / 1000 / steps;
   const dice = [0, 1].map((i) => {
-    let x = (i ? 0.22 : -0.22) + (random() - 0.5) * 0.12,
+    const x = (i ? 0.22 : -0.22) + (random() - 0.5) * 0.12,
       y = 0.5 + random() * 0.12;
     const heading = -Math.PI / 2 + (random() - 0.5) * 1.8;
     const speed = (1.3 + power * 5) * (0.85 + random() * 0.3);
     let vx = Math.cos(heading) * speed,
       vy = Math.sin(heading) * speed;
-    let height = 0.06,
+    const height = 0.06,
       vertical = 0.8 + power * 0.6 + random() * 0.3;
-    let spinX = 0,
+    const spinX = 0,
       spinY = 0,
       yaw = random() * 40 - 20;
     const axisX = 150 + random() * 140,

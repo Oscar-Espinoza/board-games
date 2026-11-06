@@ -2,7 +2,7 @@
   import ResourceArt from '../ResourceArt.svelte';
   import { m } from '@board-games/shared/messages';
   import type { Locale } from '@board-games/shared/runtime';
-  let { locale }: { locale: Locale } = $props();
+  let { locale }: { locale?: Locale } = $props();
   const rows = [
     {
       label: m.catan_road,

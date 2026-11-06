@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { getContext } from 'svelte';
+  import { useSkin } from './table/skin.js';
   import { resourceArtwork } from './table/artwork.js';
   import { cell, sheets } from './pixel/geometry.js';
   let { resource }: { resource: number } = $props();
-  const pixel = getContext<(() => boolean) | undefined>('catan:pixel');
+  const pixel = useSkin();
 </script>
 
-{#if pixel?.()}
+{#if pixel()}
   <span
     class="resource-art px-sprite px-resource"
     style={cell(sheets.resources.url, resource, sheets.resources.cols)}
