@@ -20,11 +20,7 @@ const stride = 18;
 const walk = (from: number, to: number) =>
   Math.max(cycle / 2, (Math.abs(to - from) / stride) * cycle);
 
-export function errand(
-  from: number,
-  shelf: Shelf,
-  random = Math.random,
-): Beat[] {
+export function errand(from: number, shelf: Shelf): Beat[] {
   const beats: Beat[] = [{ x: from, pose: 'idle', say: 'go', ms: 700 }];
   let at = from;
   const go = (x: number, extra: Partial<Beat> = {}) => {
@@ -32,19 +28,19 @@ export function errand(
     at = x;
   };
   // Sometimes he checks the wrong shelf first. He always gets there eventually.
-  if (random() < 0.35) {
-    const off = 18 + random() * 16;
+  if (Math.random() < 0.35) {
+    const off = 18 + Math.random() * 16;
     const wrong = shelf.x + off < 64 ? shelf.x + off : shelf.x - off;
     go(Math.max(8, wrong));
     beats.push({
       x: at,
       pose: 'confused',
       say: 'lost',
-      ms: 1400 + random() * 800,
+      ms: 1400 + Math.random() * 800,
     });
   }
   go(shelf.x, shelf.high ? { ladder: shelf.x } : {});
-  const search = 900 + random() * 1400;
+  const search = 900 + Math.random() * 1400;
   if (shelf.high) {
     beats.push({ x: at, pose: 'reach', climb: true, ms: 650 });
     beats.push({

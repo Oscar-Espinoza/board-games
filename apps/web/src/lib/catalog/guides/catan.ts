@@ -48,6 +48,29 @@ export default {
     {
       id: 'building',
       title: m.learn_catan_building_chapter_title,
+      reference: {
+        title: m.library_costs,
+        entries: [
+          [
+            () => `⌁ ${m.library_road()}`,
+            () => `1 ${m.library_wood()} + 1 ${m.library_brick()}`,
+          ],
+          [
+            () => `⌂ ${m.library_settlement()}`,
+            () =>
+              `1 ${m.library_wood()} + 1 ${m.library_brick()} + 1 ${m.library_wool()} + 1 ${m.library_grain()}`,
+          ],
+          [
+            () => `♜ ${m.library_city()}`,
+            () => `2 ${m.library_grain()} + 3 ${m.library_ore()}`,
+          ],
+          [
+            () => `▣ ${m.library_development()}`,
+            () =>
+              `1 ${m.library_wool()} + 1 ${m.library_grain()} + 1 ${m.library_ore()}`,
+          ],
+        ],
+      },
       lessons: [
         {
           id: 'road-cost',

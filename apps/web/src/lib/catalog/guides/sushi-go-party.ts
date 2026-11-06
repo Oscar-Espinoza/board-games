@@ -1,4 +1,5 @@
 import { m } from '@board-games/shared/messages';
+import { message } from '@board-games/shared/ui';
 import type { Guide } from '../types';
 const names = [
   'nigiri',
@@ -25,8 +26,7 @@ const names = [
   'ice_cream',
   'fruit',
 ];
-const text = (key: string) => () =>
-  (m as unknown as Record<string, () => string>)[`sgp_${key}`]();
+const text = (key: string) => () => message(`sgp_${key}`) ?? key;
 export default {
   title: m.sgp_guide,
   chapters: [

@@ -5,6 +5,7 @@
   import { catalog } from '@board-games/shared';
   import { m } from '@board-games/shared/messages';
   import type { GameId } from '$lib/catalog/types';
+  import type { Panel } from './state.svelte';
   import {
     cells,
     counter,
@@ -15,7 +16,6 @@
     type Shelf,
   } from './shopkeeper';
 
-  type Panel = 'start' | 'summary' | 'rules';
   let {
     selected,
     onselect,
@@ -23,7 +23,7 @@
   }: {
     selected: GameId;
     onselect: (id: GameId) => void;
-    onopen: (panel: Panel) => void;
+    onopen: (panel: Exclude<Panel, 'join'>) => void;
   } = $props();
 
   const art = '/games/pixel-store';
@@ -265,7 +265,9 @@
     >
     <div class="more">
       <button onclick={() => onopen('summary')}>{m.library_summary()}</button
-      ><button onclick={() => onopen('rules')}>{m.library_rules()}</button>
+      ><button data-rules onclick={() => onopen('rules')}
+        >{m.library_rules()}</button
+      >
     </div>
   </section>
 
@@ -285,8 +287,8 @@
   >{/snippet}
 
 <style>
-  :global(html:has(.pixel-store)),
-  :global(body:has(.pixel-store)) {
+  :global(html[data-home='pixel']),
+  :global(html[data-home='pixel'] body) {
     background: #2a1a10;
     color: #f6e7c8;
     font-family: 'Pixelify Sans', system-ui, sans-serif;

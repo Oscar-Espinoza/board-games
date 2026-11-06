@@ -3,6 +3,7 @@
   import { onDestroy, tick } from 'svelte';
   import { m } from '@board-games/shared/messages';
   import { guideLoaders } from './guides/load';
+  import { reloadRulebook } from './recovery';
   import type { GameId, Guide, Lesson } from './types';
   let { game }: { game: GameId } = $props();
   let guide = $state<Guide | null>(null),
@@ -20,14 +21,18 @@
   });
   const sceneLoaders = {
     azul: () => import('./guides/AzulScene.svelte'),
-    codenames: () => import('./guides/CodenamesScene.svelte'),
-    'little-secret': () => import('./guides/LittleSecretScene.svelte'),
+    codenames: () => import('@board-games/codenames/GuideScene.svelte'),
+    'little-secret': () =>
+      import('@board-games/little-secret/GuideScene.svelte'),
     'sushi-go-party': () => import('./guides/SushiScene.svelte'),
     uno: () => import('./guides/UnoScene.svelte'),
     catan: () => import('./guides/CatanScene.svelte'),
     carcassonne: () => import('./guides/CarcassonneScene.svelte'),
     domino: () => import('./guides/DominoScene.svelte'),
-  };
+  } satisfies Record<
+    GameId,
+    () => Promise<{ default: Component<{ lesson: Lesson; step: number }> }>
+  >;
   $effect(() => {
     const id = game;
     let cancelled = false;
@@ -56,6 +61,9 @@
       cancelled = true;
     };
   });
+  const reference = $derived(
+    guide?.chapters.find((c) => c.id === chapter)?.reference,
+  );
   const visible = $derived(
     guide?.chapters
       .map((c) => ({
@@ -81,35 +89,9 @@
     heading?.focus({ preventScroll: true });
     heading?.scrollIntoView({ block: 'start', behavior: 'instant' });
   }
-  async function retry() {
-    // Failed ES module imports are cached by the browser. A fresh document
-    // clears that cache; the fragment restores only this open rulebook.
-    // WebKit also retains failed script resources across document reloads.
-    // Refresh only this app's already-requested JS assets before reopening.
+  function retry() {
     loading = true;
-    const assets = new Set(
-      performance
-        .getEntriesByType('resource')
-        .map((entry) => entry.name)
-        .filter((name) => {
-          const url = new URL(name);
-          return (
-            url.origin === location.origin &&
-            url.pathname.startsWith('/_app/') &&
-            url.pathname.endsWith('.js')
-          );
-        }),
-    );
-    await Promise.allSettled(
-      [...assets].map((url) =>
-        fetch(url, { cache: 'reload', signal: AbortSignal.timeout(5000) }),
-      ),
-    );
-    if (disposed) return;
-    const url = new URL(window.location.href);
-    url.searchParams.set('_guideRetry', String(Date.now()));
-    url.hash = `rules-${game}`;
-    window.location.replace(url);
+    void reloadRulebook(game, () => disposed);
   }
 </script>
 
@@ -143,43 +125,17 @@
       </nav>
     </aside>
     <div class="chapter-content">
-      {#if game === 'uno' && !search && chapter === 'actions'}
+      {#if reference && !search}
         <section class="reference">
-          <h3>{m.library_dictionary()}</h3>
-          <dl class="symbols">
-            <dt>⊘</dt>
-            <dd>{m.library_skip()}</dd>
-            <dt>↺</dt>
-            <dd>{m.library_reverse()}</dd>
-            <dt>+2</dt>
-            <dd>{m.library_draw_two()}</dd>
-            <dt>✦</dt>
-            <dd>{m.library_wild()}</dd>
-            <dt>+4</dt>
-            <dd>{m.library_wild_four()}</dd>
+          <h3>{reference.title()}</h3>
+          <dl class:symbols={reference.layout === 'symbols'}>
+            {#each reference.entries as [term, description]}
+              <dt>{term()}</dt>
+              <dd>{description()}</dd>
+            {/each}
           </dl>
         </section>
       {/if}
-      {#if game === 'catan' && !search && chapter === 'building'}<section
-          class="reference"
-        >
-          <h3>{m.library_costs()}</h3>
-          <dl>
-            <dt>⌁ {m.library_road()}</dt>
-            <dd>1 {m.library_wood()} + 1 {m.library_brick()}</dd>
-            <dt>⌂ {m.library_settlement()}</dt>
-            <dd>
-              1 {m.library_wood()} + 1 {m.library_brick()} + 1 {m.library_wool()}
-              + 1 {m.library_grain()}
-            </dd>
-            <dt>♜ {m.library_city()}</dt>
-            <dd>2 {m.library_grain()} + 3 {m.library_ore()}</dd>
-            <dt>▣ {m.library_development()}</dt>
-            <dd>
-              1 {m.library_wool()} + 1 {m.library_grain()} + 1 {m.library_ore()}
-            </dd>
-          </dl>
-        </section>{/if}
       {#if !visible.length}<p role="status">{m.library_empty()}</p>
         <button onclick={() => (search = '')}>{m.library_clear()}</button>{/if}
       {#each visible as c}<section aria-labelledby={`chapter-${c.id}`}>
