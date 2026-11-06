@@ -24,8 +24,8 @@
     return game.view(seat);
   }
   onMount(() => {
-    gameClients
-      .domino()
+    gameClients.domino
+      .load()
       .then((v) => (Board = v.default))
       .catch(() => (error = m.domino_error()));
   });

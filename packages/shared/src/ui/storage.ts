@@ -14,11 +14,15 @@ export function readJson(key: string): Record<string, unknown> {
     return {};
   }
 }
-export function write(key: string, value: unknown) {
+/** False when the browser refused to store the value. */
+export function write(key: string, value: unknown): boolean {
   try {
     localStorage.setItem(
       key,
       typeof value === 'string' ? value : JSON.stringify(value),
     );
-  } catch {}
+    return true;
+  } catch {
+    return false;
+  }
 }

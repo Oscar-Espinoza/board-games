@@ -87,7 +87,9 @@ export class DominoGame {
         this.chosenEnd = null;
       }
     });
-    $effect(() => write('domino:camera', String(this.camera)));
+    $effect(() => {
+      write('domino:camera', String(this.camera));
+    });
     // Sounds and table events only across consecutive revisions.
     $effect(() => {
       const revision = this.pub.revision,

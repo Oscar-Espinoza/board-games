@@ -36,8 +36,8 @@
     finish: m.azul_finish,
   };
   onMount(() => {
-    gameClients
-      .azul()
+    gameClients.azul
+      .load()
       .then((v) => (Board = v.default))
       .catch(() => (error = m.azul_error()));
   });

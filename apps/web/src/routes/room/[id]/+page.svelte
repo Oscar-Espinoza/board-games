@@ -3,10 +3,10 @@
   import type { Component } from 'svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
-  import { catalog } from '@board-games/shared';
+  import { games, type GameId } from '@board-games/shared';
+  import { errorText, read } from '@board-games/shared/ui';
   import { gameClients } from '$lib/games';
   import Rulebook from '$lib/catalog/Rulebook.svelte';
-  import type { GameId } from '$lib/catalog/types';
   import {
     session,
     resume,
@@ -30,35 +30,22 @@
     session.room?.id === page.params.id ? session.room : null,
   );
   const immersive = $derived(room?.game != null);
-  const cornerControls = $derived(
-    immersive &&
-      [
-        'azul',
-        'codenames',
-        'sushi-go-party',
-        'little-secret',
-        'catan',
-        'uno',
-        'domino',
-      ].includes(room?.gameId ?? ''),
-  );
-  const metadata = $derived(catalog.find((game) => game.id === room?.gameId));
+  const gameId = $derived(room?.gameId as GameId | undefined);
+  const metadata = $derived(gameId && games[gameId]);
   onMount(() => {
-    try {
-      name = localStorage.getItem('board-games:name') ?? '';
-    } catch {}
+    name = read('board-games:name') ?? '';
   });
   // Runs again when navigating straight from one room link to another.
   $effect(() => {
     const id = page.params.id;
     if (id && untrack(() => session.room?.id) !== id) resume(id);
   });
-  const gameId = $derived(room?.gameId);
   $effect(() => {
-    const id = gameId;
-    if (!id || !(id in gameClients)) return;
+    const client = gameId && gameClients[gameId];
+    if (!client) return;
     let current = true;
-    gameClients[id as keyof typeof gameClients]()
+    client
+      .load()
       .then((module) => {
         if (current) Board = module.default;
       })
@@ -67,20 +54,11 @@
       });
     return () => (current = false);
   });
-  function errorText() {
+  function errorMessage() {
     if (session.errorCode === 'STALE_REVISION') return m.action_stale();
     if (session.errorCode === 'MATCH_CHANGED') return m.action_match_changed();
     if (session.errorCode === 'TIMEOUT') return m.action_timeout();
-    const key = session.error.startsWith('AZUL_')
-      ? 'azul_error'
-      : session.error;
-    if (/^(azul_|cn_|sgp_|ls_)/.test(key)) {
-      const translated = (
-        m as unknown as Record<string, (() => string) | undefined>
-      )[key];
-      if (translated) return translated();
-    }
-    return session.error;
+    return errorText(session.error);
   }
   async function joinRoom(useToken = true) {
     session.error = '';
@@ -112,37 +90,24 @@
 <svelte:head
   ><title>{metadata?.name ?? m.join()} · {m.catalog()}</title></svelte:head
 >
-<main class="room" class:immersive class:corner-controls={cornerControls}>
-  {#if !cornerControls}<div class="room-toolbar">
+<main class="room" class:immersive>
+  {#if immersive}{#if !session.connected}<p
+        class="connection-failure"
+        role="status"
+      >
+        {m.disconnected()}
+      </p>{/if}{:else}<div class="room-toolbar">
       <a href="/" onclick={() => leave()}>{m.back()}</a><span
         class:online={session.connected}
         class="connection"
         role="status"
         >{session.connected ? m.connected() : m.disconnected()}</span
-      >{#if room?.status === 'finished' && room.hostId === room.playerId && immersive}<button
-          onclick={start}>{m.rematch()}</button
-        >{/if}{#if !room?.practice}<button class="secondary" onclick={invite}
+      >{#if !room?.practice}<button class="secondary" onclick={invite}
           >{copied ? m.copied() : m.invite()}</button
-        >{:else}<span class="practice-label">{m.uno_practice_table()}</span
-        >{/if}
-      {#if immersive && room?.gameId !== 'catan'}<select
-          class="room-language"
-          aria-label={m.language()}
-          value={getLocale()}
-          onchange={(event) => setLocale(event.currentTarget.value as Locale)}
-          >{#each locales as locale}<option value={locale}
-              >{locale.toUpperCase()}</option
-            >{/each}</select
         >{/if}
     </div>{/if}
-  {#if cornerControls && !session.connected}<p
-      class="connection-failure"
-      role="status"
-    >
-      {m.disconnected()}
-    </p>{/if}
   {#if session.error}<p class="error" role="alert">
-      {errorText()}<button
+      {errorMessage()}<button
         type="button"
         aria-label={m.catan_dismiss_error()}
         onclick={() => (session.error = '')}>×</button
@@ -184,11 +149,6 @@
           aria-busy={session.pending}
         >
           <Board
-            roomId={room.id}
-            maxPlayers={metadata?.maxPlayers ?? 8}
-            onInvite={invite}
-            onLeave={leave}
-            {copied}
             view={room.game}
             playerId={room.playerId}
             players={room.players}
@@ -203,29 +163,26 @@
             canRematch={room.status === 'finished' &&
               room.hostId === room.playerId}
             rematch={start}
+            onLeave={leave}
+            onInvite={invite}
+            {copied}
             >{#snippet rulesContent()}<Rulebook
                 game={room.gameId as GameId}
-              />{/snippet}{#snippet settingsContent()}{#if room.gameId === 'catan'}
-                <p>{room.id}</p>
-                {#if room.status === 'finished' && room.hostId === room.playerId}<button
-                    onclick={start}>{m.rematch()}</button
-                  >{/if}
-              {:else if room.gameId === 'carcassonne' || cornerControls}<a
-                  href="/"
-                  onclick={() => leave()}>{m.back()}</a
-                ><button onclick={invite}
+              />{/snippet}{#snippet settingsContent()}<a
+                href="/"
+                onclick={() => leave()}>{m.back()}</a
+              >{#if !room.practice}<button onclick={invite}
                   >{copied ? m.copied() : m.invite()}</button
-                ><select
-                  aria-label={m.language()}
-                  value={getLocale()}
-                  onchange={(e) => setLocale(e.currentTarget.value as Locale)}
-                  ><option value="en">EN</option><option value="es">ES</option
-                  ></select
-                >{#if room.status === 'finished' && room.hostId === room.playerId}<button
-                    onclick={start}>{m.rematch()}</button
-                  >{/if}<span role="status"
-                  >{session.connected ? m.connected() : m.disconnected()} · {room.id}</span
-                >{/if}{/snippet}</Board
+                >{/if}<select
+                aria-label={m.language()}
+                value={getLocale()}
+                onchange={(e) => setLocale(e.currentTarget.value as Locale)}
+                >{#each locales as locale}<option value={locale}
+                    >{locale.toUpperCase()}</option
+                  >{/each}</select
+              ><span role="status"
+                >{session.connected ? m.connected() : m.disconnected()} · {room.id}</span
+              >{/snippet}</Board
           >
         </div>{:else if loadingError}<p class="error">{loadingError}</p>
         <button onclick={() => location.reload()}>{m.retry()}</button>{:else}<p
@@ -274,30 +231,13 @@
     color: #fff;
     text-align: center;
   }
-  .corner-controls :global(.board-container) {
+  .immersive :global(.board-container) {
     width: 100%;
     height: 100%;
   }
 
   :global(body:has(.room.immersive) .site-header) {
     visibility: hidden;
-  }
-  .room-language {
-    padding: 6px;
-    font-size: 11px;
-    background: #20332e;
-    color: #f1e8d0;
-    border-color: #ffffff30;
-    max-width: 58px;
-  }
-  .practice-label {
-    font-size: 11px;
-    color: #abbba7;
-  }
-  @media (max-width: 600px) {
-    .practice-label {
-      display: none;
-    }
   }
 
   .room.immersive {
@@ -307,29 +247,6 @@
     padding: 0;
     background: #191e1b;
     overflow: hidden;
-  }
-  .immersive .room-toolbar {
-    position: absolute;
-    z-index: 5;
-    left: 24px;
-    right: 24px;
-    top: 12px;
-    color: #d7d9c9;
-    justify-content: flex-start;
-    height: 40px;
-    font-size: 12px;
-    gap: 18px;
-  }
-  .immersive .room-toolbar .connection {
-    margin-left: auto;
-    font-size: 11px;
-  }
-  .immersive .room-toolbar button {
-    font-size: 12px;
-    padding: 8px 12px;
-    color: #f6eed8;
-    border-color: #ffffff30;
-    background: #20332e;
   }
   .immersive .error {
     position: absolute;
@@ -341,22 +258,6 @@
     padding: 8px 12px;
   }
   @media (max-width: 600px) {
-    .immersive .room-toolbar {
-      left: 12px;
-      right: 12px;
-      gap: 8px;
-      top: 6px;
-    }
-    .immersive .room-toolbar .connection {
-      order: 0;
-      width: auto;
-      max-width: 100px;
-      line-height: 1.2;
-    }
-    .immersive .room-toolbar button {
-      font-size: 10px;
-      padding: 7px;
-    }
     .immersive .error {
       left: 8px;
       right: 8px;

@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./games": "./src/games.ts",
     "./messages": "./src/paraglide/messages.js",
     "./runtime": "./src/paraglide/runtime.js",
     "./ui": "./src/ui/index.ts",

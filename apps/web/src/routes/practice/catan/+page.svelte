@@ -5,8 +5,8 @@
   let Board = $state<Component<any> | null>(null);
   let loadingError = $state('');
   onMount(() => {
-    gameClients
-      .catan()
+    gameClients.catan
+      .load()
       .then((module) => {
         Board = module.default;
       })

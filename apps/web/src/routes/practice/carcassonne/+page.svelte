@@ -28,8 +28,8 @@
       scenario = requested as Scenario;
       reset();
     }
-    gameClients
-      .carcassonne()
+    gameClients.carcassonne
+      .load()
       .then((v) => (Board = v.default))
       .catch((e) => (error = e.message));
   });

@@ -4,7 +4,6 @@
   "type": "module",
   "dependencies": {
     "@board-games/game-core": "workspace:*",
-    "@board-games/shared": "workspace:*",
     "@board-games/uno": "workspace:*",
     "@board-games/catan": "workspace:*",
     "socket.io": "^4.8.1",

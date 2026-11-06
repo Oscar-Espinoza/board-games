@@ -7,7 +7,8 @@
     "./server": "./src/index.ts",
     "./Board.svelte": "./src/Board.svelte",
     "./practice": "./src/practice.ts",
-    "./HelpScene.svelte": "./src/HelpScene.svelte"
+    "./HelpScene.svelte": "./src/HelpScene.svelte",
+    "./client": "./src/client.ts"
   },
   "dependencies": {
     "@board-games/game-core": "workspace:*",

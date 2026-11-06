@@ -1,10 +1,16 @@
+export * from './random.js';
+export * from './protocol.js';
+
 export type ActionContext = {
   /** Current room owner, supplied by the authoritative room binding. */
   hostId: string;
 };
-
+export type GameView<Public = unknown, Private = unknown> = {
+  public: Public;
+  private: Private;
+};
 /** Rules receive identity from the server socket binding, never from action payloads. */
-export interface GameDefinition<State = any> {
+export interface GameDefinition<State = any, View extends GameView = GameView> {
   id: string;
   minPlayers: number;
   maxPlayers: number;
@@ -18,7 +24,7 @@ export interface GameDefinition<State = any> {
     context?: ActionContext,
   ): State;
   /** This is the only boundary through which canonical game state reaches a client. */
-  view(state: State, playerId: string): { public: unknown; private: unknown };
+  view(state: State, playerId: string): View;
   isFinished(state: State): boolean;
   /** Optional game-owned readiness guard; presence comes only from room bindings. */
   presence?(
@@ -27,16 +33,12 @@ export interface GameDefinition<State = any> {
     replacedPlayer?: string,
   ): State;
   /** Optional practice policy receives only the same projection as a player. */
-  botAction?(view: GameView): unknown | null;
+  botAction?(view: View): unknown | null;
 }
-export type PlayerId = string;
-export type RoomId = string;
 export type Player = {
-  id: PlayerId;
+  id: string;
   name: string;
   connected: boolean;
   reservedUntil: number | null;
   bot?: boolean;
 };
-export type GameView = { public: unknown; private: unknown };
-export * from './random.js';

@@ -1,7 +1,7 @@
 import { Server } from 'socket.io';
 import type { Server as HttpServer } from 'node:http';
 import { RoomError, Rooms } from './rooms.js';
-import type { ActionRequest, Reply } from '@board-games/shared';
+import type { ActionRequest, Reply } from '@board-games/game-core';
 export function attachSockets(server: HttpServer, rooms: Rooms) {
   const io = new Server(server, {
     maxHttpBufferSize: 16_384,

@@ -10,7 +10,8 @@
     "./layout": "./src/layout.ts",
     "./preload": "./src/preload.ts",
     "./Loading.svelte": "./src/Loading.svelte",
-    "./look": "./src/look.ts"
+    "./look": "./src/look.ts",
+    "./client": "./src/client.ts"
   },
   "dependencies": {
     "@board-games/game-core": "workspace:*",

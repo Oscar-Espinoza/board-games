@@ -52,7 +52,8 @@ const situations: Situation[] = [
 
 /** Chosen before a match. The first guess is always the best word; these only change
  * how sure Jev must be to keep going. */
-export type Personality = 'conservative' | 'normal' | 'risky';
+export const personalityNames = ['conservative', 'normal', 'risky'] as const;
+export type Personality = (typeof personalityNames)[number];
 const personalities: Record<
   Personality,
   {
