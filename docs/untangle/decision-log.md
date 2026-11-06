@@ -141,3 +141,26 @@ line numbers: the matching `inventory/` file.
 Recorded in [report.md](report.md) with reasons (large visual splits of the 3000-line Boards, moving
 Dominó's cosmetic poses out of canonical state, DOM-selector contracts in effects, the per-game
 skin-choice fieldset).
+
+## Status after the run
+
+- F1–F10, W1–W4, G-* and C1 landed in round 1 (commits `7a61704`…`cea76f5`, `ccb99c9`…`36658e3`), with
+  the practice-shell follow-up `fc601cd` and the Catan toolbar restore `4086396`.
+- **Step 5, round 1** (four fresh reviewers) found regressions, now fixed (`20c18f7`, `eb7bfba`, `7885572`):
+  - the practice shell swallowed rule errors that Codenames/Little Secret Boards await;
+  - reduced motion no longer won in Catan, Carcassonne, Codenames, Little Secret and Sushi;
+  - Sushi's Guide button opened the Rulebook instead of its dish guide;
+  - `modal()` re-ran on every panel switch;
+  - the Codenames seat count remounted the shell;
+  - Azul showed raw transport text;
+  - Catan accepted unknown `ROLL_DICE` fields;
+  - practice rematch was not reactive.
+- **Step 5, round 2** (two fresh reviewers) found low-severity leftovers, fixed in `16f5adf`:
+  - motion checkboxes showed the combined value;
+  - Carcassonne's motion button stayed live under reduced motion;
+  - dead props and unused locals (now enforced with `noUnusedLocals`/`noUnusedParameters`);
+  - copied clue/menu limits;
+  - one shared setup-ready retry predicate.
+  - The playout harness then caught a regression in that same commit (Sushi's menu uniqueness check), fixed in `b879227`.
+- **Not done:** listed in [report.md](report.md#skipped-on-purpose). The remaining findings from the last round were
+  either deliberately skipped or below the stop threshold.
