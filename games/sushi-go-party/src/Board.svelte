@@ -1,9 +1,14 @@
 <script lang="ts">
   import { prefersReducedMotion } from 'svelte/motion';
-  import { readJson, write } from '@board-games/shared/ui';
-  import { onMount, tick, type Snippet } from 'svelte';
-  import { setLocale, type Locale } from '@board-games/shared/runtime';
-  import { type view as project, type Choice } from './index.js';
+  import {
+    modal,
+    RevisionGate,
+    ViewerSkin,
+    viewerPreferences,
+    type BoardProps,
+  } from '@board-games/shared/ui';
+  import { onMount, tick } from 'svelte';
+  import type { view as project, Action, Choice } from './index.js';
   import {
     rolls,
     appetizers,
@@ -11,12 +16,18 @@
     desserts,
     kinds,
     face,
+    picksPerRound,
     type Kind,
     type PublicCard,
   } from './cards.js';
-  import { presets, validMenu, menuKinds, type Menu } from './menus.js';
+  import {
+    presets,
+    validMenu,
+    unavailable,
+    menuKinds,
+    type Menu,
+  } from './menus.js';
   import { t, cardName } from './labels.js';
-  import { EventCursor } from './presentation.js';
   import { tableAudio, passBundles } from './effects.js';
   import Dish from './table/FoodArt.svelte';
   import Card from './Card.svelte';
@@ -26,11 +37,7 @@
   import TableDecor from './table/TableDecor.svelte';
   import OpponentSeat from './table/OpponentSeat.svelte';
   import { desktopSeats, tableMenu, pawnColors } from './table/layout.js';
-  import {
-    gameSkin,
-    setGameSkin,
-    type Skin,
-  } from '@board-games/shared/ui/pixel';
+  import type { Skin } from '@board-games/shared/ui/pixel';
   import { m } from '@board-games/shared/messages';
   import { providePixel } from './pixel/context.js';
   import { pixelSounds, type PixelCue } from './pixel/sound.js';
@@ -46,31 +53,18 @@
     round = 0,
     connected = true,
     pending = false,
-    settingsContent,
     canRematch = false,
     rematch,
-    chooseSeat,
-    practice = false,
-    practiceAction,
-    practiceActionLabel = '',
-    practiceActionDisabled = false,
-  }: {
-    view: ReturnType<typeof project>;
-    playerId: string;
-    players: { id: string; name: string }[];
-    send: (action: any) => unknown;
-    locale?: Locale;
-    round?: number;
-    connected?: boolean;
-    pending?: boolean;
-    settingsContent?: Snippet;
-    canRematch?: boolean;
-    rematch?: () => Promise<void>;
-    chooseSeat?: (id: string) => void;
-    practice?: boolean;
-    practiceAction?: () => unknown;
-    practiceActionLabel?: string;
-    practiceActionDisabled?: boolean;
+    rulesContent,
+    settingsContent,
+    practiceStep,
+  }: BoardProps<ReturnType<typeof project>, Action> & {
+    /** The practice route's button that plays the other seats. */
+    practiceStep?: {
+      label: string;
+      disabled: boolean;
+      run: (seat: string) => unknown;
+    };
   } = $props();
   const pub = $derived(view.public),
     priv = $derived(view.private);
@@ -114,35 +108,29 @@
     requestVariant = $state(''),
     requestPriority = $state('');
   let root: HTMLElement;
-  let dialog: HTMLDialogElement;
-  let opener: HTMLElement | null = null;
-  let panel = $state<'guide' | 'settings' | 'tray' | null>(null),
+  let panel = $state<'rules' | 'guide' | 'settings' | 'tray' | null>(null),
     search = $state(''),
     tray = $state('');
   let custom = $state(false),
     customMenu = $state<Menu>(structuredClone(presets.first));
-  let sound = $state(true),
-    volume = $state(0.35),
-    motion = $state(true),
-    loaded = $state(false);
-  const systemReduced = $derived(prefersReducedMotion.current);
+  const prefs = viewerPreferences('sushi-go-party', {
+    sound: true as boolean,
+    volume: 0.35,
+    motion: null as boolean | null,
+  });
+  const motion = $derived(prefs.motion ?? !prefersReducedMotion.current);
   let announcement = $state(''),
     revealCards = $state<{ seat: string; card: PublicCard }[]>([]),
     scoring = $state(false);
   let scoredCards = $state<string[]>([]);
-  const cursor = new EventCursor(),
+  const gate = new RevisionGate(),
     audio = tableAudio(),
-    chip = pixelSounds();
-  /** Viewer-only look; the 8-bit stylesheet loads the first time it is chosen. */
-  let skin = $state<Skin>(gameSkin('sushi-go-party')),
-    pixelReady = $state(false),
-    beltMoving = $state(false);
-  $effect(() => {
-    if (skin === 'pixel' && !pixelReady)
-      void import('./pixel.css').then(() => (pixelReady = true));
-  });
-  const pixel = $derived(skin === 'pixel' && pixelReady);
+    chip = pixelSounds(),
+    skin = new ViewerSkin('sushi-go-party', () => import('./pixel.css'));
+  let beltMoving = $state(false);
+  const pixel = $derived(skin.pixel);
   providePixel(() => pixel);
+  const totalPicks = $derived(picksPerRound(pub.players.length));
   const podium = $derived(
     [...pub.players].sort(
       (a, b) => b.score - a.score || b.desserts.length - a.desserts.length,
@@ -155,7 +143,6 @@
         {},
       ),
     );
-  /** A revealed dish that completes a set on your own plate earns a jingle. */
   function combo(card: PublicCard) {
     const mine = own.tableau.filter(
       (c) => c.kind === card.kind && !c.boxed && c.collectedRound === pub.round,
@@ -189,10 +176,10 @@
     return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
   }
   function gesture() {
-    if (sound) (skin === 'pixel' ? chip : audio).unlock();
+    if (prefs.sound) (skin.choice === 'pixel' ? chip : audio).unlock();
   }
   function cue(name: PixelCue) {
-    if (sound && pixel) chip.play(name, volume);
+    if (prefs.sound && pixel) chip.play(name, prefs.volume);
   }
   function keep() {
     if (!selectedCard || !allowed || priv.committed) return;
@@ -202,7 +189,7 @@
       type: 'PICK',
       round: pub.round,
       turn: pub.turn,
-      promptId: priv.pickPromptId,
+      promptId: priv.pickPromptId!,
       card: selection,
       utensils: armed,
       ...(selectedCard.kind === 'special_order' && copyTarget
@@ -229,34 +216,20 @@
     gesture();
     void send({ type: 'SET_MENU', version: pub.setupVersion, menu });
   }
-  async function open(next: typeof panel, id = '') {
-    opener = document.activeElement as HTMLElement;
+  function open(next: typeof panel, id = '') {
     panel = next;
     tray = id;
-    await tick();
-    dialog.showModal();
-  }
-  function close() {
-    dialog.close();
-    panel = null;
-    opener?.focus();
   }
   onMount(() => {
-    const p = readJson('sushi-go-party:preferences');
-    sound = p.sound !== false;
-    motion = p.motion !== false;
-    volume =
-      typeof p.volume === 'number' ? Math.max(0, Math.min(1, p.volume)) : 0.35;
     const resize = () => clearPresentation();
     const visibility = () => {
       hidden = document.hidden;
       clearPresentation();
-      cursor.reset();
+      gate.reset();
     };
     visibility();
     document.addEventListener('visibilitychange', visibility);
     window.addEventListener('resize', resize);
-    loaded = true;
     return () => {
       window.removeEventListener('resize', resize);
       document.removeEventListener('visibilitychange', visibility);
@@ -266,13 +239,9 @@
     };
   });
   $effect(() => {
-    if (loaded) {
-      write('sushi-go-party:preferences', { sound, volume, motion });
-      // Preference or system motion changes cancel in-flight presentation.
-      void systemReduced;
-      clearPresentation();
-      cursor.reset();
-    }
+    void [prefs.sound, prefs.volume, motion];
+    clearPresentation();
+    gate.reset();
   });
   $effect(() => {
     const prompt = `${round}:${playerId}:${priv.pickPromptId}`;
@@ -299,10 +268,14 @@
       );
   });
   $effect(() => {
-    const events = cursor.take(
-      `${round}:${playerId}:${connected}`,
-      pub.presentation,
-    );
+    const events = gate.accept(
+      pub.presentation.sequence,
+      `${round}:${playerId}`,
+      connected,
+      view,
+    )
+      ? pub.presentation.events
+      : [];
     clearPresentation();
     if (!events.length || hidden || !connected) return;
     const version = motionVersion;
@@ -322,7 +295,7 @@
         : revealed.length
           ? label('revealed')
           : '';
-    if (sound && pixel) {
+    if (prefs.sound && pixel) {
       const finished = events.find((e) => e.type === 'finished');
       const mine = revealed
         .filter((r) => r.seat === playerId)
@@ -345,18 +318,18 @@
                   : revealed.length
                     ? 'reveal'
                     : 'pass',
-        volume,
+        prefs.volume,
       );
       if (passing && revealed.length)
         setTimeout(() => {
-          if (version === motionVersion) chip.play('pass', volume);
+          if (version === motionVersion) chip.play('pass', prefs.volume);
         }, 420);
-    } else if (sound)
+    } else if (prefs.sound)
       audio.play(
         scored ? 'score' : revealed.length ? 'ceramic' : 'paper',
-        volume,
+        prefs.volume,
       );
-    if (motion && !systemReduced) {
+    if (motion) {
       if (pixel && passing) {
         // The conveyor belt around the board steps round while hands travel.
         beltMoving = true;
@@ -404,7 +377,7 @@
 <div
   class="sushi-table"
   bind:this={root}
-  class:reduce={!motion || systemReduced}
+  class:reduce={!motion}
   class:scoring
   class:rich={true}
   class:px-tokens={pixel}
@@ -430,7 +403,7 @@
   <TableControls
     guideLabel={label('guide')}
     settingsLabel={label('settings')}
-    onguide={() => open('guide')}
+    onguide={() => open('rules')}
     onsettings={() => open('settings')}
   />
 
@@ -453,29 +426,13 @@
         players={scorePlayers}
         scoreLabel={(n, s) => `${n}: ${label('score', { score: s })}`}
         menu={richMenu}
-        round={pub.round}
-        pick={pub.turn}
-        totalPicks={pub.players.length <= 3
-          ? 10
-          : pub.players.length <= 5
-            ? 9
-            : pub.players.length <= 7
-              ? 8
-              : 7}
         boardLabel={label('table_board')}
         indicator={pub.phase === 'setup'
           ? label('menu_title')
           : label('table_pick', {
               round: pub.round,
               pick: pub.turn,
-              total:
-                pub.players.length <= 3
-                  ? 10
-                  : pub.players.length <= 5
-                    ? 9
-                    : pub.players.length <= 7
-                      ? 8
-                      : 7,
+              total: totalPicks,
             })}
         onrule={(kind) => {
           search = label(kind);
@@ -503,11 +460,9 @@
             ></defs
           ><path d="M220 650Q177 559 204 453" /><path
             d="M290 199Q346 112 465 112"
-          /><path
-            d="M975 112Q1119 119 1176 199"
-          />{#if pub.players.length >= 5}<path
-              d="M1299 452Q1293 495 1242 530"
-            /><path d="M1340 758Q1370 830 1270 865" />{/if}</svg
+          /><path d="M975 112Q1119 119 1176 199" /><path
+            d="M1299 452Q1293 495 1242 530"
+          /><path d="M1340 758Q1370 830 1270 865" /></svg
         >{/if}
 
       <div class="opponent-trays">
@@ -593,7 +548,7 @@
                   {i + 1}<select bind:value={customMenu.appetizers[i]}
                     >{#each appetizers as k}<option
                         value={k}
-                        disabled={k === 'edamame' && pub.players.length === 2}
+                        disabled={unavailable(k, pub.players.length)}
                         >{label(k)}</option
                       >{/each}</select
                   ></label
@@ -603,9 +558,8 @@
                   {i + 1}<select bind:value={customMenu.specials[i]}
                     >{#each specials as k}<option
                         value={k}
-                        disabled={(k === 'spoon' && pub.players.length === 2) ||
-                          ((k === 'menu' || k === 'special_order') &&
-                            pub.players.length >= 7)}>{label(k)}</option
+                        disabled={unavailable(k, pub.players.length)}
+                        >{label(k)}</option
                       >{/each}</select
                   ></label
                 >{/each}
@@ -643,7 +597,6 @@
           </div>
           <button
             class="primary"
-            data-testid="sgp-ready"
             disabled={!allowed || pub.ready.includes(playerId)}
             onclick={ready}
             >{label(
@@ -692,7 +645,6 @@
           <section
             class="decision"
             aria-label={label('prompt_' + priv.prompt.kind)}
-            data-testid={`sgp-prompt-${priv.prompt.kind}`}
             data-prompt={priv.prompt.id}
           >
             <p class="eyebrow">{name(playerId)}</p>
@@ -869,7 +821,6 @@
               ></i>{/if}
             {#if pub.phase === 'round-end'}<button
                 class="primary"
-                data-testid="sgp-ready"
                 disabled={!allowed || pub.ready.includes(playerId)}
                 onclick={ready}
                 >{label(
@@ -882,11 +833,11 @@
           </section>
         {/if}
 
-        {#if practiceAction}<button
+        {#if practiceStep}<button
             class="practice-action rich-practice-action"
-            disabled={practiceActionDisabled}
-            onclick={practiceAction}
-            data-testid="sgp-practice-others">{practiceActionLabel}</button
+            disabled={practiceStep.disabled}
+            onclick={() => practiceStep.run(playerId)}
+            >{practiceStep.label}</button
           >{/if}
         <section
           class="own-area"
@@ -961,7 +912,7 @@
                         >{/if}{:else}<span>{label('copy_first')}</span>{/if}
                   </div>{/if}
               </div>{/if}
-            <div class="hand" data-testid="sgp-hand">
+            <div class="hand">
               {#each priv.hand as card, i (card.handle)}<button
                   style:--card-angle={`${(i - (priv.hand.length - 1) / 2) * 2.3}deg`}
                   style:--card-rise={`${Math.min(12, Math.abs(i - (priv.hand.length - 1) / 2) * 5)}px`}
@@ -986,7 +937,6 @@
                 )}</span
               ><button
                 class="primary"
-                data-testid="sgp-keep"
                 disabled={!allowed ||
                   !selectedCard ||
                   !!priv.committed ||
@@ -1007,16 +957,18 @@
   class="sushi-dialog"
   class:px-tokens={pixel}
   class:sgp-pixel={pixel}
-  bind:this={dialog}
-  oncancel={close}
-  onclose={() => {
-    panel = null;
-  }}
+  {@attach modal(() => panel !== null)}
+  onclose={() => (panel = null)}
 >
-  <button class="dialog-close" aria-label={label('close')} onclick={close}
-    >×</button
+  <button
+    class="dialog-close"
+    aria-label={label('close')}
+    onclick={() => (panel = null)}>×</button
   >
-  {#if panel === 'guide'}<h2>{label('guide')}</h2>
+  {#if panel === 'rules'}{@render rulesContent?.()}{:else if panel === 'guide'}<h2
+    >
+      {label('guide')}
+    </h2>
     <input
       class="guide-search"
       type="search"
@@ -1024,12 +976,6 @@
       aria-label={label('search')}
       bind:value={search}
     />
-    {#each ['quick', 'advanced', 'conventions'] as section}{#if !search || `${label(section)} ${label('rules_' + section)}`
-          .toLocaleLowerCase()
-          .includes(search.toLocaleLowerCase())}<article class="guide-intro">
-          <h3>{label('rules_' + section)}</h3>
-          <p>{label(section)}</p>
-        </article>{/if}{/each}
     <div class="dish-guide">
       {#each kinds.filter((k) => !search || `${label(k)} ${label('rule_' + k)}`
             .toLocaleLowerCase()
@@ -1061,7 +1007,7 @@
     <label class="setting"
       ><span>{label('sound')}</span><input
         type="checkbox"
-        bind:checked={sound}
+        bind:checked={prefs.sound}
         onchange={gesture}
       /></label
     ><label class="setting"
@@ -1070,12 +1016,13 @@
         min="0"
         max="1"
         step=".05"
-        bind:value={volume}
+        bind:value={prefs.volume}
       /></label
     ><label class="setting"
       ><span>{label('motion')}</span><input
         type="checkbox"
-        bind:checked={motion}
+        checked={motion}
+        onchange={(e) => (prefs.motion = e.currentTarget.checked)}
       /></label
     >
     <fieldset class="skin-choice">
@@ -1085,32 +1032,12 @@
             type="radio"
             name="sgp-skin"
             {value}
-            checked={skin === value}
-            onchange={() => {
-              skin = value as Skin;
-              setGameSkin('sushi-go-party', skin);
-            }}
+            checked={skin.choice === value}
+            onchange={() => skin.choose(value as Skin)}
           />{text}</label
         >{/each}
     </fieldset>
-    {#if settingsContent}{@render settingsContent()}{:else}<label
-        class="setting"
-        >{label('language')}<select
-          value={locale}
-          onchange={(e) => setLocale(e.currentTarget.value as Locale)}
-          ><option value="en">English</option><option value="es">Español</option
-          ></select
-        ></label
-      >{/if}
-    {#if practice && chooseSeat}<div class="practice-seats">
-        <h3>{label('practice_seat')}</h3>
-        {#each players as p}<button
-            onclick={() => {
-              chooseSeat?.(p.id);
-              close();
-            }}>{p.name}</button
-          >{/each}
-      </div>{/if}
+    {@render settingsContent?.()}
   {:else if panel === 'tray'}{@const seat = pub.players.find(
       (p) => p.id === tray,
     )}{#if seat}<h2>{name(seat.id)} · {seat.score} ✦</h2>
@@ -1250,11 +1177,6 @@
     transform: translateX(-50%);
     text-align: center;
     width: min(480px, 62%);
-  }
-  .sushi-table:not(.rich) .table-center,
-  .sushi-table:not(.rich) .own-label {
-    color: #fff4dc;
-    text-shadow: 0 1px 1px #24463d88;
   }
   .eyebrow {
     font-size: 10px;
@@ -1698,15 +1620,6 @@
     width: 100%;
     margin: 8px 0 15px;
   }
-  .guide-intro {
-    background: #e9eed8;
-    border-radius: 14px;
-    padding: 4px 16px;
-    margin-bottom: 12px;
-  }
-  .guide-intro p {
-    font-size: 13px;
-  }
   .dish-guide {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1792,14 +1705,6 @@
   }
   .tray-cards p {
     font-size: 11px;
-  }
-  .practice-seats {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  .practice-seats h3 {
-    width: 100%;
   }
   .reduce * {
     animation: none !important;

@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { m } from '@board-games/shared/messages';
   import { TILES, teamOf } from '../index.js';
+  import { SEAT_INDEXES } from '../constants.js';
   import { placements } from '../layout.js';
   import type { DominoGame } from '../game.svelte.js';
   import type { PixelScene, PixelState, Rect } from './scene.js';
@@ -27,7 +28,7 @@
 
   const cheer = $derived(
     g.result
-      ? [0, 1, 2, 3].map(
+      ? SEAT_INDEXES.map(
           (r) =>
             g.result!.winner !== null &&
             teamOf(g.seatAt(r)) === g.result!.winner,
@@ -102,7 +103,6 @@
     scene?.update(pixelState);
   });
 
-  // End of hand: a banner drops in before the scores.
   let banner = $state<string | null>(null);
   let bannerTimer = 0;
   $effect(() => {

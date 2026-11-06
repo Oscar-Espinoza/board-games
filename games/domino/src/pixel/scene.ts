@@ -1,6 +1,7 @@
 import type { End } from '../index.js';
 import type { Placement, Pose } from '../layout.js';
-import { CAST, PIXEL_ART } from '../look.js';
+import { HARD_SLAM, flightMsPixel } from '../constants.js';
+import { CAST, PIXEL_ART } from './art.js';
 import {
   APRON,
   FELT,
@@ -454,7 +455,7 @@ export function createPixelTable(
     flights.set(id, {
       from,
       start: clock,
-      duration: 320 - force * 140,
+      duration: flightMsPixel(force),
       force,
       landed: false,
     });
@@ -480,7 +481,7 @@ export function createPixelTable(
     f.landed = true;
     const p = shown.get(id);
     if (!p) return;
-    const n = f.force > 0.55 ? 14 : 5;
+    const n = f.force > HARD_SLAM ? 14 : 5;
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + Math.random() * 0.4,
         v = 0.03 + Math.random() * 0.04 * (1 + f.force * 2);
@@ -492,7 +493,7 @@ export function createPixelTable(
         life: 380 + Math.random() * 200,
       });
     }
-    if (f.force > 0.55) {
+    if (f.force > HARD_SLAM) {
       freezeUntil = performance.now() + 80;
       shakeUntil = clock + 90 + 260 * f.force;
       shakeAmp = 1 + f.force * 3;
@@ -545,7 +546,7 @@ export function createPixelTable(
     if (a) {
       const t = clock - a.start;
       if (a.kind === 'play') {
-        const dur = 320 - a.force * 140;
+        const dur = flightMsPixel(a.force);
         if (t < dur * 0.45) return FRAMES.raise;
         if (t < dur + 320) return FRAMES.slam;
       } else if (t < 620)

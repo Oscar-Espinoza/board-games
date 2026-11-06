@@ -1,15 +1,15 @@
 <script lang="ts">
   import ScorePawn from './ScorePawn.svelte';
-  import type { PartyPlayer } from './data.js';
+  import type { ScoreSeat } from './data.js';
   import { usePixel } from '../pixel/context.js';
   import { dishSheet, cellStyle, dishCells } from '../pixel/sprites.js';
   const pixel = usePixel();
   let {
     players,
-    scoreLabel = (name: string, score: number) => `${name}: ${score} points`,
+    scoreLabel,
   }: {
-    players: Pick<PartyPlayer, 'id' | 'name' | 'score' | 'color'>[];
-    scoreLabel?: (name: string, score: number) => string;
+    players: ScoreSeat[];
+    scoreLabel: (name: string, score: number) => string;
   } = $props();
   // Clockwise stations around a 0–59 loop; exact scores stay on the seats.
   function point(score: number) {

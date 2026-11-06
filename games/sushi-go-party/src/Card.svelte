@@ -1,6 +1,6 @@
 <script lang="ts">
   import Dish from './table/FoodArt.svelte';
-  import { menu } from './table/data.js';
+  import { tileColors } from './table/data.js';
   import { t, variation, hues, patterns } from './labels.js';
   import { rolls, specials, desserts, type Face } from './cards.js';
   import type { Locale } from '@board-games/shared/runtime';
@@ -34,7 +34,7 @@
   class:small
   class:boxed={card.boxed}
   data-family={family}
-  style={`--dish-color:${card.boxed ? '#c4b69a' : (menu.find((tile) => tile.kind === card.kind)?.accent ?? hues[card.color])}`}
+  style={`--dish-color:${card.boxed ? '#c4b69a' : (tileColors[card.kind]?.accent ?? hues[card.color])}`}
 >
   <span class="pattern" aria-hidden="true"
     >{card.boxed

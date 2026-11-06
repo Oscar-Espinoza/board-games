@@ -1,7 +1,7 @@
 import type { Locale } from '@board-games/shared/runtime';
 import { t, hues } from '../labels.js';
-import type { Menu } from '../menus.js';
-import { menu as materials, type MenuTileData } from './data.js';
+import { menuKinds, type Menu } from '../menus.js';
+import { tileColors, type MenuTileData } from './data.js';
 
 export const pawnColors = [
   '#4dba90',
@@ -20,14 +20,8 @@ export function tableMenu(
   locale: Locale,
 ): MenuTileData[] {
   // The approved Original menu keeps its visual order; other menus use the same slots.
-  return [
-    'nigiri',
-    menu.roll,
-    ...menu.appetizers,
-    ...menu.specials,
-    menu.dessert,
-  ].map((kind) => {
-    const material = materials.find((tile) => tile.kind === kind);
+  return menuKinds(menu).map((kind) => {
+    const material = tileColors[kind];
     const suffix =
       kind === 'maki' && count >= 6
         ? '_large'

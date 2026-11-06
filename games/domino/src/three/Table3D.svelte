@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { m } from '@board-games/shared/messages';
   import { TILES } from '../index.js';
+  import { HARD_SLAM, SLAM_SHAKE_MS, flightMs3d } from '../constants.js';
   import { placements } from '../layout.js';
   import { media, type DominoGame, type Sounds } from '../game.svelte.js';
   import type { Rect, TableScene, TableState } from './scene.js';
@@ -38,7 +39,7 @@
       frequency: 3200,
       q: 1.2,
     });
-    if (force > 0.55)
+    if (force > HARD_SLAM)
       for (let i = 0; i < 4; i++)
         g.audio.noise({
           delay: 0.06 + i * 0.045 + Math.random() * 0.03,
@@ -62,17 +63,13 @@
     select: () => click(0.25),
     play: thud,
     pass: knock,
-    turn() {},
-    end() {},
-    // The tile lands a moment after it leaves the hand.
-    land: (force) => 300 - force * 120,
+    land: flightMs3d,
   };
   onMount(() => {
     g.sounds = sounds;
-    // A hard slam shakes the table as the tile lands.
     const off = g.on((e) => {
-      if (e.type === 'play' && g.motion && e.force > 0.55)
-        setTimeout(() => scene?.shake(e.force), 260);
+      if (e.type === 'play' && g.motion && e.force > HARD_SLAM)
+        setTimeout(() => scene?.shake(e.force), SLAM_SHAKE_MS);
     });
     return () => {
       off();
@@ -82,10 +79,12 @@
 
   function wheel(e: WheelEvent) {
     if (g.settingsOpen || g.rulesOpen || compact) return;
-    g.camera = Math.max(0, Math.min(1, g.camera + e.deltaY * 0.0012));
+    g.preferences.camera = Math.max(
+      0,
+      Math.min(1, g.preferences.camera + e.deltaY * 0.0012),
+    );
   }
 
-  // The three.js table.
   const tableState = $derived<TableState>({
     placements: placements(pub.chain, pub.poses),
     ghosts: g.ghosts,
@@ -110,7 +109,7 @@
       arrange: g.scattered && !g.pending,
     },
     charge: g.charge,
-    camera: g.camera,
+    camera: g.preferences.camera,
     motion: g.motion,
     last:
       pub.last?.type === 'play'
@@ -298,8 +297,8 @@
     <button
       aria-label={t.seated}
       title={t.seated}
-      aria-pressed={g.camera === 0}
-      onclick={() => (g.camera = 0)}
+      aria-pressed={g.preferences.camera === 0}
+      onclick={() => (g.preferences.camera = 0)}
       ><svg viewBox="0 0 24 24" aria-hidden="true"
         ><path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z" /><circle
           cx="12"
@@ -314,13 +313,13 @@
       max="1"
       step="0.01"
       aria-label={t.view}
-      bind:value={g.camera}
+      bind:value={g.preferences.camera}
     />
     <button
       aria-label={t.overhead}
       title={t.overhead}
-      aria-pressed={g.camera === 1}
-      onclick={() => (g.camera = 1)}
+      aria-pressed={g.preferences.camera === 1}
+      onclick={() => (g.preferences.camera = 1)}
       ><svg viewBox="0 0 24 24" aria-hidden="true"
         ><rect x="5" y="5" width="14" height="14" rx="2" /><path
           d="M12 1v3M12 20v3"

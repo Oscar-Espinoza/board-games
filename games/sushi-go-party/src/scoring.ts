@@ -12,18 +12,20 @@ export type Receipt = {
   immediate: number;
   total: number;
 };
+/** Uramaki prizes by finishing place; the 10-icon race and round end award the same. */
+export const uramakiPrize = (place: number) => [8, 5, 2][place] ?? 0;
 const count = (cs: Played[], kind: Kind) =>
   cs.filter((c) => !c.boxed && c.kind === kind).length;
 const icons = (cs: Played[], kind: Kind) =>
   cs
     .filter((c) => !c.boxed && c.kind === kind)
     .reduce((n, c) => n + c.icons, 0);
-export function colorCounts(cs: Played[]): Record<string, number> {
+function colorCounts(cs: Played[]): Record<string, number> {
   const out: Record<string, number> = {};
   for (const c of cs) if (!c.boxed) out[c.color] = (out[c.color] ?? 0) + 1;
   return out;
 }
-export function onigiriScore(shapes: string[]): number {
+function onigiriScore(shapes: string[]): number {
   const counts = Object.values(
     shapes.reduce<Record<string, number>>((out, v) => {
       out[v] = (out[v] ?? 0) + 1;
@@ -123,7 +125,7 @@ export function roundGroups(
     add(
       'uramaki',
       totals[seat] > 0 && totals[seat] === Math.max(...totals)
-        ? ([8, 5, 2][uramakiPlace] ?? 0)
+        ? uramakiPrize(uramakiPlace)
         : 0,
     );
   }

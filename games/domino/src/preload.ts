@@ -1,4 +1,6 @@
-import { COMPACT, PIXEL_ART, lookOf } from './look.js';
+import { gameSkin } from '@board-games/shared/ui/pixel';
+import { COMPACT } from './constants.js';
+import { PIXEL_ART } from './pixel/art.js';
 
 /**
  * Starts every heavy download for the table as soon as a Domino board is
@@ -23,7 +25,7 @@ export function preload() {
     document.head.append(el);
   };
   const phone = matchMedia(COMPACT).matches;
-  if (lookOf() === 'pixel') {
+  if (gameSkin('domino') === 'pixel') {
     void import('./pixel/PixelTable.svelte');
     // Phones show no characters, only the patio.
     for (const file of phone ? PIXEL.slice(0, 2) : PIXEL)

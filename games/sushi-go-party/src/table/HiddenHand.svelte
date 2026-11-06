@@ -1,17 +1,8 @@
 <script lang="ts">
-  let {
-    count,
-    bundle = false,
-    label,
-  }: { count: number; bundle?: boolean; label?: string } = $props();
+  let { count, label }: { count: number; label: string } = $props();
 </script>
 
-<div
-  class="hidden-hand"
-  class:bundle
-  role="img"
-  aria-label={label ?? `${count} hidden cards`}
->
+<div class="hidden-hand" role="img" aria-label={label}>
   {#each Array.from({ length: Math.min(count, 3) }, (_, i) => i) as i}
     <div class="card-back" style:--i={i}><span>✿</span></div>
   {/each}
@@ -55,18 +46,5 @@
   span {
     font-size: 32px;
     text-shadow: 1px 1px #772f3b;
-  }
-  .bundle {
-    position: relative;
-    width: 66px;
-    height: 81px;
-  }
-  .bundle .card-back {
-    position: absolute;
-    inset: 0;
-    width: 61px;
-    height: 75px;
-    transform: translate(calc(var(--i) * 5px), calc(var(--i) * -4px))
-      rotate(calc(var(--i) * 6deg));
   }
 </style>

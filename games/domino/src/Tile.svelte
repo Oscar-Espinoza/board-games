@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { SPOTS } from './spots.js';
   /** Aged-ivory tile face: `near` on the left (or top when vertical), `far` on the right. */
   let {
     near = 0,
@@ -11,43 +12,9 @@
     vertical?: boolean;
     back?: boolean;
   } = $props();
-  const grid: Record<number, [number, number][]> = {
-    0: [],
-    1: [[1, 1]],
-    2: [
-      [0, 0],
-      [2, 2],
-    ],
-    3: [
-      [0, 0],
-      [1, 1],
-      [2, 2],
-    ],
-    4: [
-      [0, 0],
-      [2, 0],
-      [0, 2],
-      [2, 2],
-    ],
-    5: [
-      [0, 0],
-      [2, 0],
-      [1, 1],
-      [0, 2],
-      [2, 2],
-    ],
-    6: [
-      [0, 0],
-      [0, 1],
-      [0, 2],
-      [2, 0],
-      [2, 1],
-      [2, 2],
-    ],
-  };
   // Each half is a 100×100 cell; pips sit on a 26/50/74 grid like a real set.
   const pips = (value: number, offset: number) =>
-    grid[value].map(([c, r]) => {
+    SPOTS[value].map(([c, r]) => {
       const x = offset + 26 + c * 24,
         y = 26 + r * 24;
       return vertical ? { x: y, y: x } : { x, y };
