@@ -64,3 +64,16 @@ export function readinessUnchanged(
     !after.ready.includes(playerId)
   );
 }
+
+/**
+ * A socket-free table on the game's real rules, for its `/practice/<id>` route.
+ * Lives in the game's `./practice` entry, never in room initialisation.
+ */
+export interface PracticeTable<View = GameView> {
+  readonly players: Player[];
+  /** The seat that must act next; the route shows it after every move. */
+  readonly actor: string;
+  view(seat: string): View;
+  /** Throws the rules' rejection (a message key) and leaves the table unchanged. */
+  send(seat: string, action: unknown): void;
+}

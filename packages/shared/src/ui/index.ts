@@ -4,3 +4,4 @@ export * from './storage.js';
 export * from './modal.js';
 export * from './messages.js';
 export * from './client.js';
+export * from './viewer.svelte.js';
