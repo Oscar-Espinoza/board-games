@@ -63,7 +63,6 @@
     locale = 'en',
     round = 0,
     connected = true,
-    errorCode,
     settingsContent,
     canConfigure = true,
     canRematch = false,
@@ -587,15 +586,9 @@
     drag = null;
     clearTimeout(returnTimer);
   }
-  const outdated = $derived(
-    errorCode === 'STALE_REVISION' || errorCode === 'MATCH_CHANGED',
-  );
   $effect(() => {
     void choiceIdentity;
     untrack(resetChoice);
-  });
-  $effect(() => {
-    if (outdated) untrack(resetChoice);
   });
   $effect(() => {
     const events = gate.take(round, p.events, connected);
@@ -1338,11 +1331,6 @@
     </details>
   </nav>
   <p class="camera-hint">{t('camera_hint')}</p>
-  {#if outdated}<p class="notice" role="status">
-      {errorCode === 'MATCH_CHANGED'
-        ? m.action_match_changed({}, { locale })
-        : m.action_stale({}, { locale })}
-    </p>{/if}
   <button
     class="guide-toggle corner-control"
     onclick={() => (guide = true)}
@@ -2411,20 +2399,6 @@
   .pan-buttons button {
     width: 44px;
     height: 44px;
-  }
-  .notice {
-    position: absolute;
-    z-index: 5;
-    top: 72px;
-    left: 50%;
-    max-width: min(480px, calc(100% - 32px));
-    transform: translateX(-50%);
-    padding: 8px 14px;
-    border-radius: 4px;
-    background: #f2d7ba;
-    color: #723f33;
-    font-size: 13px;
-    pointer-events: none;
   }
   .camera-hint {
     position: absolute;
