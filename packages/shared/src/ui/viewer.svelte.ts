@@ -2,6 +2,16 @@ import { gameSkin, setGameSkin, type Skin } from './pixel/skin.js';
 import { readJson, write } from './storage.js';
 
 type Preference = boolean | number | string | null;
+/** `true` saves as any boolean, `null` as "follow the system" or a boolean. */
+type Saved<T> = {
+  [K in keyof T]: T[K] extends boolean
+    ? boolean
+    : T[K] extends number
+      ? number
+      : T[K] extends null
+        ? boolean | null
+        : T[K];
+};
 
 /**
  * Per-viewer settings (sound, volume, motion…) persisted under one key per game.
@@ -11,17 +21,17 @@ type Preference = boolean | number | string | null;
 export function viewerPreferences<T extends Record<string, Preference>>(
   game: string,
   defaults: T,
-): T {
+): Saved<T> {
   const key = `board-games:preferences:${game}`;
   const saved = readJson(key);
-  const initial = { ...defaults };
+  const initial = { ...defaults } as Saved<T>;
   for (const name in defaults) {
     const value = saved[name];
     if (
       typeof value === typeof defaults[name] ||
       (defaults[name] === null && typeof value === 'boolean')
     )
-      initial[name] = value as T[typeof name];
+      initial[name] = value as Saved<T>[typeof name];
   }
   const preferences = $state(initial);
   $effect(() => {

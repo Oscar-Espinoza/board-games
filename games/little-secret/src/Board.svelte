@@ -64,7 +64,7 @@
   let root: HTMLElement;
   const prefs = viewerPreferences('little-secret', {
     sound: true,
-    motion: null as boolean | null,
+    motion: null,
   });
   let mounted = $state(false);
   const still = $derived(

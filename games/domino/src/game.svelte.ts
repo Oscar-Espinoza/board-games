@@ -301,8 +301,8 @@ export class DominoGame {
   );
   /** `camera` (3D): 0 = seated at the table, 1 = straight overhead. */
   readonly preferences = viewerPreferences('domino', {
-    sound: true as boolean,
-    motion: null as boolean | null,
+    sound: true,
+    motion: null,
     camera: 0.15,
   });
   settingsOpen = $state(false);

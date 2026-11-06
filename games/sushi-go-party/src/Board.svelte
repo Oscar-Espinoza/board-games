@@ -114,9 +114,9 @@
   let custom = $state(false),
     customMenu = $state<Menu>(structuredClone(presets.first));
   const prefs = viewerPreferences('sushi-go-party', {
-    sound: true as boolean,
+    sound: true,
     volume: 0.35,
-    motion: null as boolean | null,
+    motion: null,
   });
   const motion = $derived(prefs.motion ?? !prefersReducedMotion.current);
   let announcement = $state(''),

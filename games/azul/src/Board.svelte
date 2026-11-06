@@ -81,9 +81,9 @@
     recent = $state<Event[]>([]),
     hiddenLocations = $state<string[]>([]);
   const prefs = viewerPreferences('azul', {
-    sound: true as boolean,
-    volume: 0.25 as number,
-    motion: null as boolean | null,
+    sound: true,
+    volume: 0.25,
+    motion: null,
   });
   let mounted = $state(false),
     phone = $state(false),

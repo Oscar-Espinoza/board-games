@@ -48,8 +48,8 @@
   };
   let root: HTMLElement;
   const preferences = viewerPreferences('uno', {
-    sound: true as boolean,
-    motion: null as boolean | null,
+    sound: true,
+    motion: null,
   });
   let declared = $state(false),
     settingsOpen = $state(false),

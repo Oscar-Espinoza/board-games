@@ -52,6 +52,8 @@
   import { resourceArtwork, shade } from './table/artwork.js';
   import { provideSkin } from './table/skin.js';
   import { m } from '@board-games/shared/messages';
+  import { locales, setLocale } from '@board-games/shared/runtime';
+  import type { Locale } from '@board-games/shared/runtime';
   type PlayerView = ReturnType<typeof playerView>;
   let {
     view,
@@ -65,6 +67,11 @@
     rematch,
     settingsContent,
     rulesContent,
+    chooseSeat,
+    onLeave,
+    onInvite,
+    copied = false,
+    practice = false,
   }: BoardProps<PlayerView, Action> = $props();
 
   let root: HTMLElement;
@@ -73,8 +80,8 @@
   const pixel = $derived(skin.pixel);
   provideSkin(() => pixel);
   const preferences = viewerPreferences('catan', {
-    sound: true as boolean,
-    motion: null as boolean | null,
+    sound: true,
+    motion: null,
   });
   const motionEnabled = $derived(
     preferences.motion ?? !prefersReducedMotion.current,
@@ -755,12 +762,31 @@
   style:--px-table={pixel ? `url("${sheets.table}")` : undefined}
 >
   <nav class="table-navigation" aria-label={m.catalog({}, { locale })}>
+    <a href="/" onclick={() => onLeave?.()}
+      ><span aria-hidden="true">←</span> {m.back({}, { locale })}</a
+    >
     <button onclick={() => (rulesOpen = true)}
       ><span aria-hidden="true">▤</span>
       {m.library_rules({}, { locale })}</button
     >
   </nav>
   <div class="table-utilities">
+    {#if onInvite && !practice}<button onclick={() => onInvite()}
+        ><span aria-hidden="true">♟♟</span>
+        {copied ? m.copied({}, { locale }) : m.invite({}, { locale })}</button
+      >{:else if practice}<span class="practice-label"
+        >{m.catan_practice({}, { locale })}</span
+      >{/if}
+    <label class="table-language"
+      ><span aria-hidden="true">◎</span><select
+        aria-label={m.language({}, { locale })}
+        value={locale}
+        onchange={(e) => setLocale(e.currentTarget.value as Locale)}
+        >{#each locales as code}<option value={code}
+            >{code.toUpperCase()}</option
+          >{/each}</select
+      ></label
+    >
     <button
       class="settings-trigger"
       aria-label={m.catan_settings({}, { locale })}
@@ -769,6 +795,14 @@
       ><span aria-hidden="true">⚙</span>
       <span class="settings-label">{m.catan_settings({}, { locale })}</span
       ></button
+    >
+    <span
+      class="table-connection connection"
+      class:online={connected}
+      role="status"
+      ><i></i>{connected
+        ? m.connected({}, { locale })
+        : m.disconnected({}, { locale })}</span
     >
   </div>
   <dialog
@@ -850,11 +884,17 @@
           </div>{/if}
         <div class="seat-identity">
           <div class="civilization-name">{civilization(p.color)}</div>
-          <span class="seat-name"
-            >{name(p.id)}{p.id === playerId
-              ? ' · ' + m.you({}, { locale })
-              : ''}</span
-          >
+          {#if chooseSeat}<button
+              class="seat-name"
+              onclick={() => chooseSeat?.(p.id)}
+              >{name(p.id)}{p.id === playerId
+                ? ' · ' + m.you({}, { locale })
+                : ''}</button
+            >{:else}<span class="seat-name"
+              >{name(p.id)}{p.id === playerId
+                ? ' · ' + m.you({}, { locale })
+                : ''}</span
+            >{/if}
         </div>
         {#if p.id !== playerId}<button
             class="seat-trade"
@@ -1807,7 +1847,10 @@
     pointer-events: none;
     z-index: 1;
   }
-  button {
+  button,
+  .table-navigation a,
+  .table-language,
+  .table-connection {
     background: var(--wood);
     color: #fff1d6;
     border: 1px solid var(--gold);
@@ -1825,10 +1868,13 @@
     padding: 10px 13px;
     cursor: pointer;
   }
-  button:hover:not(:disabled):not([aria-disabled='true']) {
+  button:hover:not(:disabled):not([aria-disabled='true']),
+  .table-navigation a:hover {
     filter: brightness(1.16);
   }
-  button:focus-visible {
+  button:focus-visible,
+  a:focus-visible,
+  select:focus-visible {
     outline: 3px solid #ffe29b;
     outline-offset: 3px;
   }
@@ -1851,6 +1897,12 @@
     gap: 10px;
     z-index: 7;
   }
+  .table-navigation a {
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
   .table-navigation button {
     display: flex;
     align-items: center;
@@ -1869,7 +1921,9 @@
     gap: 8px;
     z-index: 7;
   }
-  .table-utilities button {
+  .table-utilities button,
+  .table-language,
+  .table-connection {
     font-size: clamp(11px, 0.95vw, 16px);
     padding: 9px 10px;
   }
@@ -1877,6 +1931,47 @@
     font-size: 21px;
     vertical-align: middle;
     color: #f1d594;
+  }
+  .table-language {
+    display: flex;
+    align-items: center;
+    padding: 0 7px;
+    gap: 4px;
+  }
+  .table-language select {
+    appearance: none;
+    width: auto;
+    border: 0;
+    background: transparent;
+    color: #fff1d6;
+    font: inherit;
+    padding: 5px 0;
+  }
+  .table-language option {
+    color: #302111;
+  }
+  .table-connection {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .table-connection i {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ef6b49;
+    box-shadow: 0 0 5px #ef6b4955;
+  }
+  .table-connection.online i {
+    background: #46d767;
+  }
+  .practice-label {
+    align-self: center;
+    font-size: 11px;
+    padding: 5px 8px;
+    background: #15281bc9;
+    border-radius: 3px;
+    max-width: 120px;
   }
   .roster {
     position: absolute;
@@ -2477,7 +2572,8 @@
     text-align: center;
     margin: 3px 0 8px;
   }
-  input {
+  input,
+  select {
     color: #322411;
     padding: 5px;
   }
@@ -2728,13 +2824,18 @@
     .table-utilities {
       gap: 5px;
     }
+    .table-navigation a,
     .table-navigation button {
       font-size: 12px;
       padding: 9px;
     }
-    .table-utilities button {
+    .table-utilities button,
+    .table-connection {
       padding: 8px 6px;
       font-size: 11px;
+    }
+    .table-utilities .practice-label {
+      display: none;
     }
     .roster > div {
       padding-left: 46px;
@@ -2802,6 +2903,7 @@
       left: 8px;
       gap: 5px;
     }
+    .table-navigation a,
     .table-navigation button {
       font-size: 10px;
       padding: 8px;
@@ -2819,7 +2921,17 @@
       font-size: 10px;
       padding: 6px;
     }
-    .settings-label {
+    .table-utilities > button:first-child > span {
+      display: none;
+    }
+    .table-language {
+      font-size: 11px;
+      padding: 0 4px;
+    }
+    .table-language > span,
+    .settings-label,
+    .table-connection,
+    .practice-label {
       display: none;
     }
     .table-utilities .settings-trigger > span[aria-hidden] {
@@ -3053,6 +3165,7 @@
     .seat-stats {
       font-size: 9px;
     }
+    .table-navigation a,
     .table-navigation button {
       font-size: 10px;
       padding: 7px;
@@ -3062,6 +3175,15 @@
     }
     .table-utilities .settings-label {
       display: none;
+    }
+    .table-utilities > button:first-child {
+      font-size: 10px;
+    }
+    .table-utilities > button:first-child > span {
+      display: none;
+    }
+    .table-connection {
+      font-size: 9px;
     }
     .extended [data-position='north'] {
       top: 2%;

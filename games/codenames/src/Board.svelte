@@ -72,7 +72,7 @@
   const prefs = viewerPreferences('codenames', {
     sound: true,
     volume: 0.5,
-    motion: null as boolean | null,
+    motion: null,
     layout: 'center' as 'left' | 'center' | 'right',
   });
   const still = $derived(

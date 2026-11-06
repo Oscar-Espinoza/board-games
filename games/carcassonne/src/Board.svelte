@@ -88,8 +88,8 @@
     overview = $state(false),
     overviewScope = $state<FeatureScope>('mine');
   const prefs = viewerPreferences('carcassonne', {
-    sound: true as boolean,
-    motion: null as boolean | null,
+    sound: true,
+    motion: null,
   });
   const motion = $derived(prefs.motion ?? !prefersReducedMotion.current);
   let cx = $state(50),

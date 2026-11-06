@@ -57,8 +57,6 @@ export class RevisionGate {
  */
 export function eventGate<E extends { sequence: number }>(
   cancelEffects: () => void = () => {},
-  fresh: (event: E, index: number, sequence: number) => boolean = (e, _, s) =>
-    e.sequence === s,
 ) {
   let baseline: { identity: string; sequence: number } | null = null;
   let disconnectedSnapshot: object | null = null;
@@ -106,7 +104,7 @@ export function eventGate<E extends { sequence: number }>(
           cancelEffects();
         return [];
       }
-      return events.filter((event, i) => fresh(event, i, sequence));
+      return events.filter((event) => event.sequence === sequence);
     },
   };
 }
