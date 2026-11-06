@@ -6,7 +6,6 @@
     colors,
     penalties,
     FLOOR_SIZE,
-    rowIssue,
     type Action,
     type View,
     type Source,

@@ -204,7 +204,7 @@ export function createPixelTable(
   }
   /** Warm, bright pixels near the top of the patio: the string-light bulbs. */
   function findBulbs(img: HTMLImageElement) {
-    const [c, g] = makeCanvas(img.width, img.height);
+    const [, g] = makeCanvas(img.width, img.height);
     g.drawImage(img, 0, 0);
     const h = Math.round(img.height * 0.3),
       d = g.getImageData(0, 0, img.width, h).data,

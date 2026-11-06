@@ -1,5 +1,4 @@
 import { shuffle } from '@board-games/game-core';
-// Integer topology and published layouts ported from crates/catan/src/board.rs.
 interface Hex {
   q: number;
   r: number;

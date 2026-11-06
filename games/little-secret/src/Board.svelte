@@ -717,7 +717,7 @@
       ><label class="check"
         ><input
           type="checkbox"
-          checked={still}
+          checked={!prefs.motion}
           onchange={(e) => (prefs.motion = !e.currentTarget.checked)}
         />{m.ls_motion()}</label
       >

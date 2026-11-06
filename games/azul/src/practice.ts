@@ -125,7 +125,7 @@ export function practice(scenario: Scenario = 'start2'): PracticeTable<View> {
     get players() {
       return seats.filter((p) => state.players.includes(p.id));
     },
-    view: (seat) => view(state),
+    view: () => view(state),
     send: (seat, action) => {
       state = apply(state, seat, action, random);
     },

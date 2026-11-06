@@ -2,7 +2,6 @@
   import { onMount, untrack } from 'svelte';
   import type { Component } from 'svelte';
   import { page } from '$app/state';
-  import { goto } from '$app/navigation';
   import { games, type GameId } from '@board-games/shared';
   import { errorText, read } from '@board-games/shared/ui';
   import { gameClients } from '$lib/games';

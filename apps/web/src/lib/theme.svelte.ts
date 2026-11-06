@@ -1,4 +1,4 @@
-import { read, write } from '@board-games/shared/ui';
+import { write } from '@board-games/shared/ui';
 import type { Skin } from '@board-games/shared/ui/pixel';
 
 export type Theme = Skin;

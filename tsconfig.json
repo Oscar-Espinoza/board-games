@@ -7,7 +7,9 @@
     "skipLibCheck": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
-    "types": ["node", "bun"]
+    "types": ["node", "bun"],
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": [
     "apps/server/src/**/*.ts",

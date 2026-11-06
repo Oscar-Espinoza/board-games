@@ -1,6 +1,9 @@
 import { games } from '@board-games/shared/games';
 import { rolls, appetizers, specials, desserts, type Kind } from './cards.js';
 const { minPlayers, maxPlayers } = games['sushi-go-party'];
+/** A menu is one roll, one dessert, this many appetizers and this many specials. */
+export const APPETIZER_SLOTS = 3;
+export const SPECIAL_SLOTS = 2;
 export type Menu = {
   roll: Kind;
   appetizers: Kind[];
@@ -84,16 +87,19 @@ export function validMenu(value: unknown, count: number): value is Menu {
     return false;
   if (
     !Array.isArray(m.appetizers) ||
-    m.appetizers.length !== 3 ||
+    m.appetizers.length !== APPETIZER_SLOTS ||
     !m.appetizers.every((k) => (appetizers as readonly unknown[]).includes(k))
   )
     return false;
   if (
     !Array.isArray(m.specials) ||
-    m.specials.length !== 2 ||
+    m.specials.length !== SPECIAL_SLOTS ||
     !m.specials.every((k) => (specials as readonly unknown[]).includes(k))
   )
     return false;
   const types = menuKinds(m);
-  return new Set(types).size === 8 && !types.some((k) => unavailable(k, count));
+  return (
+    new Set(types).size === 2 + APPETIZER_SLOTS + SPECIAL_SLOTS &&
+    !types.some((k) => unavailable(k, count))
+  );
 }

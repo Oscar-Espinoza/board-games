@@ -1,3 +1,4 @@
+/** Venezuelan pairs domino: double-six, four seats, partners opposite. */
 import { shuffle } from '@board-games/game-core';
 import type { GameDefinition } from '@board-games/game-core';
 import { games, seats } from '@board-games/shared/games';
@@ -10,7 +11,7 @@ import {
 } from './constants.js';
 import { idealPoses, plug, separate, type Pose } from './layout.js';
 
-/** Venezuelan pairs domino: double-six, four seats, partners opposite. */
+/** Points that win the match. */
 export const TARGET = 100;
 export type Tile = { id: number; a: number; b: number };
 export const TILES: readonly Tile[] = Object.freeze(

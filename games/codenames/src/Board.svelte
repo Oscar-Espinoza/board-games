@@ -3,7 +3,7 @@
   import { m } from '@board-games/shared/messages';
   import { games } from '@board-games/shared/games';
   import type { View, Team, Identity, PublicEvent, Action } from './types.js';
-  import { canChooseRole, canStart } from './setup.js';
+  import { canChooseRole, canStart, maxClueCount } from './setup.js';
   import Icon from './Icon.svelte';
   import './tokens.css';
   import wood from './table/wood.webp';
@@ -789,7 +789,7 @@
       >
       <label
         >{m.cn_count()}<select bind:value={clueCount}
-          >{#each Array.from( { length: 10 }, (_, i) => String(i) ) as count}<option
+          >{#each Array.from( { length: maxClueCount + 1 }, (_, i) => String(i) ) as count}<option
               value={count}>{count}</option
             >{/each}<option value="unlimited">∞</option></select
         ></label
@@ -919,7 +919,7 @@
       <label
         ><input
           type="checkbox"
-          checked={still}
+          checked={!prefs.motion}
           onchange={(e) => (prefs.motion = !e.currentTarget.checked)}
         />{m.cn_motion()}</label
       >

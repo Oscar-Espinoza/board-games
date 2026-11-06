@@ -5,12 +5,10 @@
     near = 0,
     far = 0,
     vertical = false,
-    back = false,
   }: {
     near?: number;
     far?: number;
     vertical?: boolean;
-    back?: boolean;
   } = $props();
   // Each half is a 100×100 cell; pips sit on a 26/50/74 grid like a real set.
   const pips = (value: number, offset: number) =>
@@ -21,27 +19,27 @@
     });
 </script>
 
-<span class="tile" class:vertical class:back aria-hidden="true"
-  >{#if !back}<svg viewBox={vertical ? '0 0 100 200' : '0 0 200 100'}
-      >{#each [...pips(near, 0), ...pips(far, 100)] as p}<circle
-          cx={p.x}
-          cy={p.y}
-          r="9.5"
-          class="rim"
-        /><circle cx={p.x} cy={p.y} r="8.6" class="pip" /><circle
-          cx={p.x + 1.6}
-          cy={p.y + 2}
-          r="5.2"
-          class="depth"
-        />{/each}
-      {#if vertical}<path d="M16 100H84" class="groove" /><path
-          d="M16 101.8H84"
-          class="lip"
-        />{:else}<path d="M100 16V84" class="groove" /><path
-          d="M101.8 16V84"
-          class="lip"
-        />{/if}</svg
-    >{/if}</span
+<span class="tile" class:vertical aria-hidden="true"
+  ><svg viewBox={vertical ? '0 0 100 200' : '0 0 200 100'}
+    >{#each [...pips(near, 0), ...pips(far, 100)] as p}<circle
+        cx={p.x}
+        cy={p.y}
+        r="9.5"
+        class="rim"
+      /><circle cx={p.x} cy={p.y} r="8.6" class="pip" /><circle
+        cx={p.x + 1.6}
+        cy={p.y + 2}
+        r="5.2"
+        class="depth"
+      />{/each}
+    {#if vertical}<path d="M16 100H84" class="groove" /><path
+        d="M16 101.8H84"
+        class="lip"
+      />{:else}<path d="M100 16V84" class="groove" /><path
+        d="M101.8 16V84"
+        class="lip"
+      />{/if}</svg
+  ></span
 >
 
 <style>
@@ -68,15 +66,6 @@
   }
   .vertical {
     border-radius: 24% / 12%;
-  }
-  .back {
-    background:
-      radial-gradient(
-        140% 110% at 28% 18%,
-        rgb(255 252 240 / 0.55),
-        transparent 55%
-      ),
-      linear-gradient(165deg, #eee3c8, #dccdab 65%, #cbb98f);
   }
   svg {
     display: block;

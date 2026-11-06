@@ -2046,6 +2046,7 @@
       <button onclick={toggleSound} aria-pressed={prefs.sound}
         >{t('sound')} · {prefs.sound ? t('on') : t('off')}</button
       ><button
+        disabled={prefersReducedMotion.current}
         onclick={() => (prefs.motion = !prefs.motion)}
         aria-pressed={motion}
         >{t('motion')} · {motion ? t('on') : t('off')}</button

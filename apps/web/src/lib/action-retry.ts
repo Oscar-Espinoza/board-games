@@ -21,7 +21,7 @@ const isRecord = (value: unknown) =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
 /** Only still-uncommitted intentions the game itself vouches for are safe to retry. */
-export function canRetryIntention(
+function canRetryIntention(
   initial: RoomView,
   current: RoomView,
   intention: unknown,

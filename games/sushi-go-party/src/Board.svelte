@@ -26,6 +26,8 @@
     unavailable,
     menuKinds,
     type Menu,
+    APPETIZER_SLOTS,
+    SPECIAL_SLOTS,
   } from './menus.js';
   import { t, cardName } from './labels.js';
   import { tableAudio, passBundles } from './effects.js';
@@ -55,7 +57,6 @@
     pending = false,
     canRematch = false,
     rematch,
-    rulesContent,
     settingsContent,
     practiceStep,
   }: BoardProps<ReturnType<typeof project>, Action> & {
@@ -544,7 +545,7 @@
                     >{/each}</select
                 ></label
               >
-              {#each [0, 1, 2] as i}<label
+              {#each Array.from({ length: APPETIZER_SLOTS }, (_, i) => i) as i}<label
                   >{label('appetizers')}
                   {i + 1}<select bind:value={customMenu.appetizers[i]}
                     >{#each appetizers as k}<option
@@ -554,7 +555,7 @@
                       >{/each}</select
                   ></label
                 >{/each}
-              {#each [0, 1] as i}<label
+              {#each Array.from({ length: SPECIAL_SLOTS }, (_, i) => i) as i}<label
                   >{label('specials')}
                   {i + 1}<select bind:value={customMenu.specials[i]}
                     >{#each specials as k}<option
@@ -1027,7 +1028,7 @@
     ><label class="setting"
       ><span>{label('motion')}</span><input
         type="checkbox"
-        checked={motion}
+        checked={prefs.motion}
         onchange={(e) => (prefs.motion = e.currentTarget.checked)}
       /></label
     >

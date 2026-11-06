@@ -23,6 +23,7 @@
         "@board-games/game-core": "workspace:*",
         "@board-games/jev-lab": "workspace:*",
         "@board-games/little-secret": "workspace:*",
+        "@board-games/shared": "workspace:*",
         "@board-games/sushi-go-party": "workspace:*",
         "@board-games/uno": "workspace:*",
         "sirv": "^3.0.2",

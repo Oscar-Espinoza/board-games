@@ -9,7 +9,6 @@ import { deliveryDelay, GLOW_DELAY, rollStrength } from './timing.js';
 const stepped = (duration: number) =>
   `steps(${Math.max(2, Math.round(duration / 80))}, end)`;
 
-/** Browser-only, Catan-only decoration. Canonical pieces always exist underneath. */
 /** Where the dice may land: the table box and the ellipse over the island. */
 type Throw = {
   table: DOMRect;
@@ -19,6 +18,7 @@ type Throw = {
   ry: number;
 };
 
+/** Browser-only, Catan-only decoration. Canonical pieces always exist underneath. */
 export function playEffects(
   root: HTMLElement,
   events: PresentationEvent[],

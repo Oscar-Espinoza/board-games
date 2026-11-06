@@ -51,6 +51,23 @@ export type GameClient = {
   ): boolean;
 };
 
+/** A `ready` during setup, still for the same configuration and not yet recorded. */
+export const retryReadyInSetup: NonNullable<GameClient['retryable']> = (
+  action,
+  before,
+  after,
+  playerId,
+) => {
+  const was = before.public as Record<string, any>;
+  const now = after.public as Record<string, any>;
+  return (
+    action.type === 'ready' &&
+    was.phase === 'setup' &&
+    now.phase === 'setup' &&
+    readinessUnchanged(action, was, now, playerId)
+  );
+};
+
 /** Setup readiness for the same configuration version, not yet recorded. */
 export function readinessUnchanged(
   intention: Intention,
