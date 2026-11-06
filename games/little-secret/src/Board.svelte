@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { onMount, untrack, type Snippet } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { m } from '@board-games/shared/messages';
-  import type { View, Role, Power, Symbol, Event } from './types.js';
+  import type { View, Role, Power, Symbol, Event, Action } from './types.js';
   import Badge from './Badge.svelte';
   import Paper from './table/Paper.svelte';
   import PlayerToken from './table/PlayerToken.svelte';
@@ -9,14 +9,19 @@
   import Outcome from './table/Outcome.svelte';
   import BallotReview from './table/BallotReview.svelte';
   import { seatPosition } from './table/layout.js';
-  import { eventGate, readJson, write } from '@board-games/shared/ui';
-  import { prefersReducedMotion } from 'svelte/motion';
-  import { soundEffects } from './effects.js';
   import {
-    gameSkin,
-    setGameSkin,
-    type Skin,
-  } from '@board-games/shared/ui/pixel';
+    createAudio,
+    errorText,
+    eventGate,
+    modal,
+    viewerPreferences,
+    ViewerSkin,
+    type BoardProps,
+  } from '@board-games/shared/ui';
+  import { prefersReducedMotion } from 'svelte/motion';
+  import { playCue } from './effects.js';
+  import { answerLength, clueLength, powersFrom } from './limits.js';
+  import { awarded } from './result.js';
   import { providePixel } from './pixel/context.js';
   import Sprite from './pixel/Sprite.svelte';
   import type { PixelCue } from './pixel/sound.js';
@@ -25,34 +30,18 @@
     playerId,
     players,
     send,
-    locale = 'en',
+    locale,
     round = 0,
     connected = true,
     pending = false,
     practice = false,
-    canConfigure = false,
+    canConfigure: host = false,
     settingsContent,
     rulesContent,
     canRematch = false,
-    rematch = async () => {},
-    errorCode = null,
-  }: {
-    view: View;
-    playerId: string;
-    players: { id: string; name: string; connected: boolean }[];
-    send: (action: unknown) => unknown;
-    locale?: string;
-    round?: number;
-    connected?: boolean;
-    pending?: boolean;
-    practice?: boolean;
-    canConfigure?: boolean;
-    settingsContent?: Snippet;
-    rulesContent?: Snippet;
-    canRematch?: boolean;
-    rematch?: () => Promise<void>;
-    errorCode?: string | null;
-  } = $props();
+    rematch,
+    errorCode,
+  }: BoardProps<View, Action> = $props();
   const s = $derived(view.public),
     mine = $derived(view.private),
     disabled = $derived(!connected || pending),
@@ -65,44 +54,39 @@
   let clueText = $state('');
   let secret = $state(false),
     target = $state(''),
-    symbol = $state<Symbol | ' '>(' '),
+    symbol = $state<Symbol | null>(null),
     answer = $state(''),
     localError = $state(''),
     busy = $state(false);
   let language = $state<'en' | 'es'>('en'),
     powers = $state(false),
     panel = $state<'rules' | 'settings' | null>(null);
-  let dialog: HTMLDialogElement,
-    root: HTMLElement,
-    opener: HTMLElement | null = null;
-  let sound = $state(true),
-    reduced = $state(false),
-    mounted = $state(false);
-  const systemReduced = $derived(prefersReducedMotion.current);
-  const audio = soundEffects(),
+  let root: HTMLElement;
+  const prefs = viewerPreferences('little-secret', {
+    sound: true,
+    motion: null as boolean | null,
+  });
+  let mounted = $state(false);
+  const still = $derived(
+    prefs.motion === null ? prefersReducedMotion.current : !prefs.motion,
+  );
+  const audio = createAudio(),
     animations = new Set<Animation>();
-  // 8-bit skin: viewer-only. Its CSS and chiptune pack load only when chosen.
-  let skin = $state<Skin>(gameSkin('little-secret')),
-    pixelReady = $state(false),
-    chip = $state<((cue: PixelCue) => void) | null>(null),
+  let chip = $state<((cue: PixelCue) => void) | null>(null),
     stamped = $state<string[]>([]);
-  $effect(() => {
-    if (skin === 'pixel' && !pixelReady)
-      void Promise.all([
+  const skin = new ViewerSkin('little-secret', async () => {
+      const [, pack] = await Promise.all([
         import('./pixel.css'),
         import('./pixel/sound.js'),
-      ]).then(([, sound]) => {
-        chip = sound.chiptune(audio.audio);
-        pixelReady = true;
-      });
-  });
-  const pixel = $derived(skin === 'pixel' && pixelReady);
+      ]);
+      chip = pack.chiptune(audio);
+    }),
+    pixel = $derived(skin.pixel);
   providePixel(() => pixel);
-  const still = $derived(reduced || systemReduced);
   function cue(name: PixelCue) {
-    if (pixel && sound && chip) chip(name);
+    if (pixel && prefs.sound && chip) chip(name);
   }
-  /** One chiptune cue for a batch of accepted events, most dramatic first. */
+  /** Most dramatic first. */
   function pixelCue(events: Event[]): PixelCue {
     const score = events.find((e) => e.type === 'score');
     if (score?.type === 'score')
@@ -132,16 +116,19 @@
   function cancel() {
     for (const a of animations) a.cancel();
     animations.clear();
-    audio.cancel();
+    audio.stop();
   }
   const gate = eventGate<Event>(cancel);
   $effect(() => {
-    s.mission;
-    s.cycle;
-    s.speaker;
-    playerId;
+    void [s.mission, s.cycle, s.speaker, playerId];
     clueText = '';
   });
+  /** Whether the player has already acted in the current step. */
+  const committed = (id: string) =>
+    (s.phase === 'setup' && s.ready.includes(id)) ||
+    (s.phase === 'vote' && s.committed.includes(id)) ||
+    (s.phase === 'tie' && s.rpsCommitted.includes(id)) ||
+    (s.phase === 'missionResult' && s.continued.includes(id));
   const entitled = $derived(s.prompt?.actor === playerId);
   const choices = $derived(
     s.phase === 'tie' ? s.candidates : living.filter((p) => p !== playerId),
@@ -158,45 +145,37 @@
   );
   const bannerLabel = $derived(ballotReview ? m.ls_ballots() : phaseLabel);
   function gesture() {
-    if (sound) void audio.unlock();
+    if (prefs.sound) void audio.unlock();
   }
-  async function act(action: unknown) {
+  async function act(action: Action) {
     if (disabled || busy) return;
     gesture();
     busy = true;
     localError = '';
     try {
       await send(action);
-      const type = (action as { type: string }).type;
-      if (type === 'clue') cue('clue');
-      else if (type === 'vote' || type === 'rps') cue('vote');
-      else if (type !== 'guess') cue('select');
-    } catch {
-      localError = m.ls_error();
+      if (action.type === 'clue') cue('clue');
+      else if (action.type === 'vote' || action.type === 'rps') cue('vote');
+      else if (action.type !== 'guess') cue('select');
+    } catch (error) {
+      localError = errorText((error as Error).message, locale);
     } finally {
       busy = false;
     }
   }
-  function open(next: 'rules' | 'settings', source: HTMLElement) {
+  function open(next: 'rules' | 'settings') {
     gesture();
-    opener = source;
     panel = next;
-    dialog.showModal();
-  }
-  function close() {
-    panel = null;
-    dialog.close();
-    opener?.focus();
   }
   $effect(() => {
-    const version = s.setupVersion;
+    void s.setupVersion;
     untrack(() => {
       language = s.options.wordLanguage;
       powers = s.options.powers;
     });
   });
   $effect(() => {
-    const identity = `${round}:${playerId}:${s.mission}`;
+    void [round, playerId, s.mission];
     untrack(() => {
       secret = false;
       ballotReview = null;
@@ -205,10 +184,10 @@
     });
   });
   $effect(() => {
-    const prompt = `${s.phase}:${s.prompt?.id}:${s.ballotId}:${s.rpsId}:${playerId}`;
+    void [s.phase, s.prompt?.id, s.ballotId, s.rpsId, playerId];
     untrack(() => {
       target = '';
-      symbol = ' ';
+      symbol = null;
       answer = '';
       localError = '';
     });
@@ -237,37 +216,32 @@
       stamped = accepted.flatMap((e) =>
         e.type === 'elimination' ? [e.player] : [],
       );
-      if (accepted.length && !reduced && !systemReduced && root?.animate) {
+      if (accepted.length && !still && root?.animate) {
         const a = root.animate([{ opacity: 0.82 }, { opacity: 1 }], {
           duration: 240,
         });
         animations.add(a);
         a.onfinish = () => animations.delete(a);
       }
-      if (sound && accepted.length) {
+      if (prefs.sound && accepted.length) {
         if (pixel && chip) chip(pixelCue(accepted));
         else
-          audio.play(
-            0.35,
+          playCue(
+            audio,
             accepted.some((e) => e.type === 'score') ? 'finish' : 'reveal',
+            0.35,
           );
       }
     });
   });
   $effect(() => {
-    const motion = reduced || systemReduced;
+    void still;
     untrack(cancel);
   });
   $effect(() => {
-    if (mounted) {
-      write('little-secret:preferences', { sound, reduced });
-      if (!sound) audio.cancel();
-    }
+    if (!prefs.sound) audio.stop();
   });
   onMount(() => {
-    const p = readJson('little-secret:preferences');
-    sound = p.sound !== false;
-    reduced = p.reduced === true;
     const hide = () => {
       secret = false;
       ballotReview = null;
@@ -277,12 +251,24 @@
     mounted = true;
     return () => {
       cancel();
-      audio.dispose();
+      audio.close();
       document.removeEventListener('visibilitychange', hide);
     };
   });
 </script>
 
+{#snippet targetSelect()}
+  <label
+    >{m.ls_choose()}<select
+      aria-label={m.ls_choose()}
+      bind:value={target}
+      disabled={disabled || busy}
+      ><option value="">—</option>{#each choices as id}<option value={id}
+          >{name(id)}</option
+        >{/each}</select
+    ></label
+  >
+{/snippet}
 <section
   class="ls-table"
   class:px-tokens={pixel}
@@ -290,19 +276,15 @@
   class:still={pixel && still}
   class:result-stage={!!s.result && !ballotReview}
   class:dense={players.length > 6}
-  data-testid="little-secret-board"
   data-phase={s.phase}
   bind:this={root}
 >
   <nav class="corners" aria-label={m.ls_settings()}>
-    <button
-      onclick={(e) => open('rules', e.currentTarget)}
-      aria-label={m.ls_rules()}
+    <button onclick={() => open('rules')} aria-label={m.ls_rules()}
       >?<span class="sr-only">{m.ls_rules()}</span></button
     >
-    <button
-      aria-label={m.ls_settings()}
-      onclick={(e) => open('settings', e.currentTarget)}>⚙</button
+    <button aria-label={m.ls_settings()} onclick={() => open('settings')}
+      >⚙</button
     >
   </nav>
   <header class="brand-note">
@@ -349,10 +331,7 @@
           class:active={s.speaker === p.id}
           class:own={p.id === playerId}
           class:selected={target === p.id && choosing}
-          class:winner={!!s.result &&
-            (s.result.winners.length
-              ? s.result.winners.includes(p.id)
-              : s.result.points[p.id] > 0)}
+          class:winner={!!s.result && awarded(s.result, p.id)}
           style={seatPosition(players.length, i)}
         >
           <div class="seat-top">
@@ -376,10 +355,7 @@
                 name={p.name}
                 seat={i + 1}
                 active={s.speaker === p.id ||
-                  (!!s.result &&
-                    (s.result.winners.length
-                      ? s.result.winners.includes(p.id)
-                      : s.result.points[p.id] > 0))}
+                  (!!s.result && awarded(s.result, p.id))}
                 muted={s.eliminated.includes(p.id)}
               />{/if}
             {#if s.powers[p.id]}<span
@@ -422,7 +398,7 @@
             >{/if}
           {#if !p.connected}<small class="status-stamp">{m.ls_offline()}</small
             >{/if}
-          {#if (s.phase === 'setup' && s.ready.includes(p.id)) || (s.phase === 'vote' && s.committed.includes(p.id)) || (s.phase === 'tie' && s.rpsCommitted.includes(p.id)) || (s.phase === 'missionResult' && s.continued.includes(p.id))}<small
+          {#if committed(p.id)}<small
               class="commit-mark"
               aria-label={m.ls_committed()}>✓</small
             >{/if}
@@ -448,7 +424,7 @@
                 >{m.ls_language()}<select
                   aria-label={m.ls_language()}
                   bind:value={language}
-                  disabled={!canConfigure || disabled}
+                  disabled={!host || disabled}
                   ><option value="en">English</option><option value="es"
                     >Español</option
                   ></select
@@ -458,10 +434,10 @@
                 ><input
                   type="checkbox"
                   bind:checked={powers}
-                  disabled={!canConfigure || disabled || players.length < 6}
+                  disabled={!host || disabled || players.length < powersFrom}
                 />{m.ls_powers()}</label
               >
-              {#if canConfigure}<button
+              {#if host}<button
                   disabled={disabled ||
                     busy ||
                     (language === s.options.wordLanguage &&
@@ -499,7 +475,7 @@
                 </p>{/if}{#if s.speaker === playerId}{#if s.powers[playerId] !== 'mime'}<input
                     aria-label={m.ls_table_clue()}
                     placeholder={m.ls_table_clue()}
-                    maxlength={80}
+                    maxlength={clueLength}
                     bind:value={clueText}
                     autocomplete="off"
                     disabled={disabled || busy}
@@ -519,7 +495,7 @@
             {:else if s.phase === 'debate'}<p>{m.ls_conversation()}</p>
               {#if s.powers[playerId] === 'novice'}<p>
                   {m.ls_novice_hint()}
-                </p>{/if}{#if canConfigure}<button
+                </p>{/if}{#if host}<button
                   class="primary"
                   disabled={disabled || busy}
                   onclick={() =>
@@ -530,16 +506,7 @@
                     })}>{m.ls_open_vote()}</button
                 >{/if}
             {:else if s.phase === 'vote' && living.includes(playerId) && !s.committed.includes(playerId)}
-              <label
-                >{m.ls_choose()}<select
-                  aria-label={m.ls_choose()}
-                  bind:value={target}
-                  disabled={disabled || busy}
-                  ><option value="">—</option>{#each choices as id}<option
-                      value={id}>{name(id)}</option
-                    >{/each}</select
-                ></label
-              ><button
+              {@render targetSelect()}<button
                 class="primary"
                 disabled={disabled || busy || !target}
                 onclick={() =>
@@ -565,8 +532,9 @@
               </div>
               <button
                 class="primary"
-                disabled={disabled || busy || symbol === ' '}
-                onclick={() => act({ type: 'rps', rpsId: s.rpsId, symbol })}
+                disabled={disabled || busy || !symbol}
+                onclick={() =>
+                  act({ type: 'rps', rpsId: s.rpsId, symbol: symbol! })}
                 >{m.ls_confirm_rps()}</button
               >
             {:else if entitled && s.prompt?.kind === 'journalist'}
@@ -580,7 +548,7 @@
                 <label
                   >{m.ls_answer()}<input
                     bind:value={answer}
-                    maxlength="120"
+                    maxlength={answerLength}
                     autocomplete="off"
                     disabled={disabled || busy}
                   /></label
@@ -592,16 +560,7 @@
               </form>
             {:else if entitled && (s.prompt?.kind === 'sage' || s.prompt?.kind === 'revenant')}
               <p>{m[`ls_${s.prompt.kind}_hint`]()}</p>
-              <label
-                >{m.ls_choose()}<select
-                  aria-label={m.ls_choose()}
-                  bind:value={target}
-                  disabled={disabled || busy}
-                  ><option value="">—</option>{#each choices as id}<option
-                      value={id}>{name(id)}</option
-                    >{/each}</select
-                ></label
-              ><button
+              {@render targetSelect()}<button
                 class="primary"
                 disabled={disabled || busy || !target}
                 onclick={() =>
@@ -631,7 +590,7 @@
                 {#if canRematch}<button
                     class="primary"
                     disabled={disabled || busy}
-                    onclick={() => rematch()}>{m.ls_rematch()}</button
+                    onclick={() => rematch?.()}>{m.ls_rematch()}</button
                   >{/if}{:else}<button
                   class="primary"
                   disabled={disabled || busy || s.continued.includes(playerId)}
@@ -680,7 +639,6 @@
                     >{/if}</button
                 >{#if secret}<div
                     class="letter"
-                    data-testid="own-secret"
                     {@attach (el) => {
                       if (pixel) el.scrollIntoView({ block: 'nearest' });
                     }}
@@ -718,13 +676,12 @@
     </div>{/if}
 </section>
 <dialog
-  bind:this={dialog}
+  {@attach modal(() => panel !== null)}
   class="ls-dialog"
   class:px-tokens={pixel}
   class:ls-pixel={pixel}
-  oncancel={(e) => {
-    e.preventDefault();
-    close();
+  onclose={(e) => {
+    if (!e.currentTarget.open) panel = null;
   }}
   aria-labelledby="ls-panel-title"
 >
@@ -732,7 +689,7 @@
     <h2 id="ls-panel-title">
       {panel === 'rules' ? m.ls_rules() : m.ls_settings()}
     </h2>
-    <button onclick={close}>{m.ls_close()}</button>
+    <button onclick={() => (panel = null)}>{m.ls_close()}</button>
   </div>
   {#if panel === 'rules'}{@render rulesContent?.()}{:else if panel === 'settings'}<div
       class="settings"
@@ -746,22 +703,23 @@
               type="radio"
               name="ls-skin"
               {value}
-              checked={skin === value}
-              onchange={() => {
-                skin = value as Skin;
-                setGameSkin('little-secret', skin);
-              }}
+              checked={skin.choice === value}
+              onchange={() => skin.choose(value as 'classic' | 'pixel')}
             />{label}</label
           >{/each}
       </fieldset>
       <label class="check"
         ><input
           type="checkbox"
-          bind:checked={sound}
+          bind:checked={prefs.sound}
           onchange={gesture}
         />{m.ls_sound()}</label
       ><label class="check"
-        ><input type="checkbox" bind:checked={reduced} />{m.ls_motion()}</label
+        ><input
+          type="checkbox"
+          checked={still}
+          onchange={(e) => (prefs.motion = !e.currentTarget.checked)}
+        />{m.ls_motion()}</label
       >
     </div>{/if}
 </dialog>
@@ -771,9 +729,6 @@
     font-family: 'Secret Hand';
     src: url('/fonts/little-secret/kalam.woff2') format('woff2');
     font-display: swap;
-  }
-  :global(body:has(.ls-table) .site-header) {
-    display: none;
   }
   .ls-table {
     position: fixed;

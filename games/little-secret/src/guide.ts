@@ -1,4 +1,5 @@
 import { m } from '@board-games/shared/messages';
+import { powers } from './limits.js';
 const ids = [
   'identity',
   'setup',
@@ -9,13 +10,7 @@ const ids = [
   'reactions',
   'scoring',
   'conventions',
-  'mime',
-  'novice',
-  'elder',
-  'sage',
-  'revenant',
-  'dictator',
-  'adept',
+  ...powers,
 ] as const;
 export default {
   title: m.ls_rules,

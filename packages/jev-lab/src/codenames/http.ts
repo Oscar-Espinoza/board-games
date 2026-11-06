@@ -34,7 +34,8 @@ export function handleGuess(req: IncomingMessage, res: ServerResponse) {
     const view = parseView(input?.view);
     if (!view) return fail(400, 'Bad request');
     if (!budget()) return fail(429, 'Jev lab budget spent');
-    const { unlimited, score, personality } = input;
+    // Older clients also send `unlimited`; the clue's count (0) already says it.
+    const { score, personality } = input;
     const valid =
       Number.isInteger(score?.ours) && Number.isInteger(score?.theirs);
     // A client that leaves drops its queued Jev call.
@@ -43,15 +44,13 @@ export function handleGuess(req: IncomingMessage, res: ServerResponse) {
     try {
       res.end(
         JSON.stringify(
-          await plan(
-            view,
-            unlimited === true,
-            valid ? score : undefined,
-            personalityNames.includes(personality)
+          await plan(view, {
+            score: valid ? score : undefined,
+            personality: personalityNames.includes(personality)
               ? (personality as Personality)
               : 'normal',
-            gone.signal,
-          ),
+            signal: gone.signal,
+          }),
         ),
       );
     } catch (error) {

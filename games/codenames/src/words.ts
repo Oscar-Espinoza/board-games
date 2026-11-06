@@ -1,8 +1,7 @@
 /** Original independently curated vocabulary, September 2026. No publisher deck.
  * General nouns from nature, daily life, places, science and arts. Accents matter.
  * Human regional Spanish review remains a documented release check. */
-export const packVersion = 'original-2026-09-v1';
-export const words = {
+const pack = {
   en: `anchor apple arrow artist autumn bakery balloon bamboo bank barn basket beach bear bell berry bicycle bird blanket boat bone book bottle bridge broom bubble bucket butterfly button cabin cactus camera candle canyon captain carpet castle cave cello chain chair cheese cherry chimney clock cloud coat comet compass coral corn crown crystal curtain dancer desert diamond dinosaur doctor dolphin door dragon dream drum duck eagle earth elephant engine envelope feather fence fern festival fire fish flag flower flute forest fork fountain fox frog garden ghost giant giraffe glass globe glove gold grape grass guitar hammer harbor hat hawk heart helmet hill honey horse hospital hotel house ice island jacket jaguar jar jelly jewel judge kettle key king kite knife ladder lake lamp lantern leaf lemon letter library light lightning lion lock machine magnet map marble mask meadow melon metal mirror moon mountain mouse mushroom needle nest net newspaper night notebook ocean olive onion opera orange owl palace palm panda paper park parrot peach pearl pencil pepper piano picture pigeon pillow pilot pine pirate planet plate pocket pond potato pumpkin puppet queen rabbit radio rain rainbow raven reef ribbon rice river road robot rock rocket roof rope rose ruby saddle sail salt sand school scissors seed shadow shark sheep shell shield ship shoe shop shovel silver sky snail snake snow soap sock spider spoon spring squirrel square star statue steam stone storm strawberry string submarine sugar summer sun swan sword table tail teacher telescope tent theater thread tiger toast tomato tooth tower train tree triangle trumpet tunnel turtle umbrella valley velvet village violin volcano wagon wall watch water wave web whale wheel window wing winter wolf wood worm zebra zipper acorn attic badge bolt canal cedar chalk circus cloak coffee copper crab creek daisy desk elbow emerald falcon galaxy gate goose iceberg ink iron jungle kangaroo kitchen lobster meadowlark mint monkey otter oyster pastry pebble penguin picnic porcupine postcard potatochip prism puzzle raccoon railway raspberry sailboat satellite seahorse seal silk slate snowflake stadium suitcase thunder ticket torch tractor tulip walnut waterfall windmill wizard yacht yogurt`.split(
     ' ',
   ),
@@ -10,5 +9,5 @@ export const words = {
     ' ',
   ),
 };
-// A repeated source word must never weight selection. Validated in pack tests.
-words.es = [...new Set(words.es)];
+// A repeated source word must never weight selection.
+export const words = { en: pack.en, es: [...new Set(pack.es)] };

@@ -1,14 +1,8 @@
 export type Role = 'disciple' | 'infiltrator' | 'journalist';
-export type Power =
-  'mime' | 'novice' | 'elder' | 'sage' | 'revenant' | 'dictator' | 'adept';
+import type { powers } from './limits.js';
+export type Power = (typeof powers)[number];
 export type Symbol = 'rock' | 'paper' | 'scissors';
 export type Options = { wordLanguage: 'en' | 'es'; powers: boolean };
-export type Pair = {
-  id: string;
-  words: [string, string];
-  aliases: [string[], string[]];
-};
-export type Packs = Record<'en' | 'es', Pair[]>;
 export type Phase =
   | 'setup'
   | 'volunteer'
@@ -74,7 +68,6 @@ export type Public = {
   history: Event[];
 };
 export type State = Omit<Public, 'committed' | 'rpsCommitted'> & {
-  packVersion: string;
   used: string[];
   password: string;
   alternative: string;
@@ -96,3 +89,15 @@ export type View = {
     solution: Solution | null;
   };
 };
+export type Action =
+  | { type: 'configure'; version: number; options: Options }
+  | { type: 'ready'; version: number }
+  | { type: 'volunteer'; mission: number }
+  | { type: 'clue'; text: string; mission: number; cycle: number }
+  | { type: 'openVote'; mission: number; cycle: number }
+  | { type: 'vote'; ballotId: string; target: string }
+  | { type: 'resolveTie'; promptId: string; target: string }
+  | { type: 'rps'; rpsId: string; symbol: Symbol }
+  | { type: 'guess'; promptId: string; answer: string }
+  | { type: 'revenant'; promptId: string; target: string | null }
+  | { type: 'continue'; mission: number };

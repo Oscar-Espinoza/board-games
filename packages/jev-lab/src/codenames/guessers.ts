@@ -1,7 +1,14 @@
 /** Guesser arms. Code owns the turn rules and stopping policy; Jev only judges words. */
 import { ask, type Call, type Question } from '../jev.ts';
-import type { ClueRef, Prompt, View } from './prompts.ts';
+import {
+  cardQuestions,
+  combinations,
+  questionKey,
+  unfinishedClues,
+} from './judging.ts';
+import type { Prompt } from './prompts.ts';
 import { shuffled, type Identity, type Scenario } from './scenarios.ts';
+import type { ClueRef, View } from './types.ts';
 
 export type Arm = 'noul' | 'choice' | 'set';
 /** free: engine budget count+1 for the current clue. leftover: count for the clue, +1 only for an unfinished earlier clue. */
@@ -29,7 +36,6 @@ export interface Options {
   prompt: Prompt;
   scorer: Scorer;
   bonus: Bonus;
-  /** Keep guessing while the next card's Noul is at least this. */
   tau: number;
   /** The optional leftover guess needs this Noul: near 0.5 it is a coin flip. */
   bonusTau: number;
@@ -51,22 +57,6 @@ function view(s: Scenario, order: string, guessed: string[]): View {
     history: s.history,
     guessedThisTurn: guessed,
   };
-}
-
-/** Our earlier clues with fewer friendly reveals than their count; public information. */
-const unfinished = (s: Scenario): ClueRef[] =>
-  s.history.flatMap((h, k) =>
-    h.team === 'ours' &&
-    h.guessed.filter((w) => s.key[w] === 'ours').length < h.count
-      ? [`history[${k}]`]
-      : [],
-  );
-
-function combinations<T>(items: T[], k: number): T[][] {
-  if (k === 0) return [[]];
-  return items.flatMap((x, i) =>
-    combinations(items.slice(i + 1), k - 1).map((rest) => [x, ...rest]),
-  );
 }
 
 const ranks = (step: number, ref: ClueRef, entries: [string, number][]) =>
@@ -97,7 +87,10 @@ export async function play(s: Scenario, arm: Arm, o: Options): Promise<Turn> {
     });
     return call.answers;
   };
-  const leftovers = o.bonus === 'leftover' ? unfinished(s) : [];
+  const leftovers =
+    o.bonus === 'leftover'
+      ? unfinishedClues(s.history, (w) => s.key[w] === 'ours')
+      : [];
   /** Set arm: one Choice over every `count`-word group from the Noul shortlist; the chosen group goes first. */
   const group = async (ranked: Judgment[]) => {
     const shortlist = ranked.slice(0, 6);
@@ -106,7 +99,7 @@ export async function play(s: Scenario, arm: Arm, o: Options): Promise<Turn> {
       count,
     );
     const v = view(s, o.order, []);
-    const answers = await send(o.prompt.state?.(v) ?? v, {
+    const answers = await send(v, {
       group: o.prompt.group(
         v,
         groups.map((g) => g.join(' + ')),
@@ -125,21 +118,16 @@ export async function play(s: Scenario, arm: Arm, o: Options): Promise<Turn> {
   if (arm === 'noul' || arm === 'set') {
     const v = view(s, o.order, []);
     const refs = ['clue', ...leftovers];
-    const questions = Object.fromEntries(
-      refs.flatMap((ref, r) =>
-        v.board.map((_, i) => [
-          `r${r}w${i}`,
-          o.scorer === 'score' ? o.prompt.level(ref, i) : o.prompt.card(ref, i),
-        ]),
-      ),
+    const questions = cardQuestions(refs, v.board, (ref, i) =>
+      o.scorer === 'score' ? o.prompt.level(ref, i) : o.prompt.card(ref, i),
     );
-    const answers = await send(o.prompt.state?.(v) ?? v, questions);
+    const answers = await send(v, questions);
     const judged = refs.map((ref, r) =>
       ranks(
         0,
         ref,
         v.board.map((w, i) => {
-          const a = answers[`r${r}w${i}`]!;
+          const a = answers[questionKey(r, i)]!;
           if (a.type === 'noul') return [w, a.noul];
           if (a.type === 'score')
             return [w, a.score / (Object.keys(a.probabilities).length - 1)];
@@ -177,7 +165,7 @@ export async function play(s: Scenario, arm: Arm, o: Options): Promise<Turn> {
       turn.guesses.map((g) => g.word),
     );
     if (!v.board.length) return { ...turn, stopped: 'exhausted' };
-    const answers = await send(o.prompt.state?.(v) ?? v, {
+    const answers = await send(v, {
       guess: o.prompt.pick(v, ref, step > 0),
     });
     const a = answers.guess!;

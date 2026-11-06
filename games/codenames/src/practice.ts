@@ -1,13 +1,10 @@
-import { seeded } from '@board-games/game-core';
 /** Deliberately local training fixtures. Never imported by multiplayer. */
-import { create, apply, view } from './index.js';
-import type { State, Team } from './types.js';
-export const seats = [
-  'Red spymaster',
-  'Red operative',
-  'Blue spymaster',
-  'Blue operative',
-].map((name, i) => ({ id: `training-${i}`, name, connected: true }));
+import { seeded } from '@board-games/game-core';
+import { m } from '@board-games/shared/messages';
+import type { PracticeTable } from '@board-games/shared/ui';
+import { apply, create, view } from './index.js';
+import type { Assignment, Team, View } from './types.js';
+
 export const scenarios = [
   'match',
   'midgame',
@@ -16,52 +13,56 @@ export const scenarios = [
   'assassin',
 ] as const;
 export type Scenario = (typeof scenarios)[number];
+export const seatCounts = [4, 5, 8, 12];
+
+/** Training seats alternate by pairs: 0-1 red, 2-3 blue, then red on even seats. */
+const teamOf = (seat: number): Team =>
+  seat < 2 || (seat >= 4 && seat % 2 === 0) ? 'red' : 'blue';
+
+export interface CodenamesPractice extends PracticeTable<View> {
+  /** The active team's operative: who guesses when a bot plays the operatives. */
+  readonly operative: string;
+  /** While on, the table stays on the active spymaster's seat, since the human only gives clues. */
+  botOperatives: boolean;
+  /** Called after any seat's action is accepted, so a page can let bots reply. */
+  onMove?: () => void;
+}
+
 export function practice(
   scenario: Scenario = 'match',
-  language: 'en' | 'es' = 'en',
-  size = 4,
-) {
+  { language = 'en', size = 4 }: { language?: 'en' | 'es'; size?: number } = {},
+): CodenamesPractice {
   // Preset positions need a known board; a full game deals a fresh one each time.
   const random = seeded(
     scenario === 'match' || scenario === 'setup'
       ? Math.floor(Math.random() * 2 ** 31)
       : 260912,
   );
-  const roster = [
-    ...seats,
-    ...Array.from({ length: Math.max(0, Math.min(12, size) - 4) }, (_, i) => ({
-      id: `training-${i + 4}`,
-      name: `Player ${i + 5}`,
-      connected: true,
-    })),
-  ];
-  let state = create(
-    roster.map((p) => p.id),
-    random,
-    { boardLanguage: language },
-  );
+  const ids = Array.from({ length: size }, (_, i) => `training-${i}`);
+  let state = create(ids, random, { boardLanguage: language });
   if (scenario !== 'setup') {
-    for (let i = 0; i < roster.length; i++)
+    ids.forEach((id, i) => {
       state = apply(
         state,
-        roster[i]!.id,
+        id,
         {
           type: 'chooseRole',
-          team: i < 2 || (i >= 4 && i % 2 === 0) ? 'red' : 'blue',
+          team: teamOf(i),
           role: i === 0 || i === 2 ? 'spymaster' : 'operative',
           version: state.setupVersion,
         },
         random,
       );
-    for (const p of roster)
+    });
+    for (const id of ids)
       state = apply(
         state,
-        p.id,
+        id,
         { type: 'ready', version: state.setupVersion },
         random,
       );
   }
-  const actorFor = (role: 'spymaster' | 'operative') =>
+  const seatOf = (role: Assignment['role']) =>
     state.players.find(
       (p) =>
         state.assignments[p]?.team === state.activeTeam &&
@@ -70,7 +71,7 @@ export function practice(
   const clue = (word: string, count: number | 'unlimited') => {
     state = apply(
       state,
-      actorFor('spymaster'),
+      seatOf('spymaster'),
       { type: 'submitClue', word, count },
       random,
     );
@@ -78,7 +79,7 @@ export function practice(
   const guessOwn = () => {
     state = apply(
       state,
-      actorFor('operative'),
+      seatOf('operative'),
       {
         type: 'guess',
         card: state.board.findIndex(
@@ -88,22 +89,22 @@ export function practice(
       random,
     );
   };
+  const word = (en: string, es: string) => (language === 'es' ? es : en);
   if (scenario === 'midgame') {
-    // Local deterministic example: one red, three blue, then two red agents.
     state.startingTeam = state.activeTeam = 'red';
     // Preserve the 9/8 starting-team deal if this seed starts blue.
     if (state.board.filter((c) => c.identity === 'red').length === 8)
       for (const c of state.board)
         if (c.identity === 'red' || c.identity === 'blue')
           c.identity = c.identity === 'red' ? 'blue' : 'red';
-    clue(language === 'es' ? 'Tiempo' : 'Time', 1);
+    clue(word('Time', 'Tiempo'), 1);
     guessOwn();
-    state = apply(state, actorFor('operative'), { type: 'endTurn' }, random);
-    clue(language === 'es' ? 'Agua' : 'Water', 2);
+    state = apply(state, seatOf('operative'), { type: 'endTurn' }, random);
+    clue(word('Water', 'Agua'), 2);
     guessOwn();
     guessOwn();
     guessOwn();
-    clue(language === 'es' ? 'Música' : 'Music', 2);
+    clue(word('Music', 'Música'), 2);
     guessOwn();
     guessOwn();
   }
@@ -117,11 +118,19 @@ export function practice(
       }
   }
   if (scenario === 'final' || scenario === 'assassin')
-    clue(language === 'es' ? 'Destino' : 'Destination', 1);
+    clue(word('Destination', 'Destino'), 1);
   return {
-    seats: roster,
-    get state(): State {
-      return state;
+    botOperatives: false,
+    get players() {
+      return ids.map((id, i) => ({
+        id,
+        name: `${teamOf(i) === 'red' ? m.cn_red() : m.cn_blue()} · ${i + 1}`,
+        connected: true,
+        reservedUntil: null,
+      }));
+    },
+    get operative() {
+      return seatOf('operative');
     },
     get actor() {
       if (state.phase === 'setup')
@@ -130,17 +139,16 @@ export function practice(
           state.players.find((p) => !state.ready.includes(p)) ??
           state.players[0]!
         );
-      const team: Team = state.activeTeam;
-      const role = state.phase === 'clue' ? 'spymaster' : 'operative';
-      return state.players.find(
-        (p) =>
-          state.assignments[p]?.team === team &&
-          state.assignments[p]?.role === role,
-      )!;
+      return seatOf(
+        state.phase === 'clue' || this.botOperatives
+          ? 'spymaster'
+          : 'operative',
+      );
     },
-    view: (player: string) => view(state, player),
-    send(player: string, action: unknown) {
-      state = apply(state, player, action, random);
+    view: (seat: string) => view(state, seat),
+    send(seat: string, action: unknown) {
+      state = apply(state, seat, action, random);
+      this.onMove?.();
     },
   };
 }

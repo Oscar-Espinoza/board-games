@@ -122,25 +122,19 @@
       >{step === 0 ? m.cn_count() : step === 1 ? '≥ 1' : m.cn_end_turn()}</text
     >
   {:else}
-    {#each Array.from({ length: 15 }, (_, i) => i) as i}<g
+    {#each Array.from({ length: 15 }, (_, i) => i) as i}{@const marked =
+        lesson.scene === 'finish'
+          ? i % 4 === 0 && (i !== 8 || step === 2)
+          : step === 2 && i === 7}<g
         transform="translate({28 + (i % 5) * 76} {22 + Math.floor(i / 5) * 51})"
       >
         <rect
           width="65"
           height="40"
           rx="4"
-          fill={(
-            lesson.scene === 'finish'
-              ? i % 4 === 0 && (i !== 8 || step === 2)
-              : step === 2 && i === 7
-          )
-            ? '#a93645'
-            : '#f5eedc'}
+          fill={marked ? '#a93645' : '#f5eedc'}
         />
-        {#if lesson.scene === 'finish' ? i % 4 === 0 && (i !== 8 || step === 2) : step === 2 && i === 7}<path
-            d="M12 17h41v2H12z"
-            fill="#f5eedc"
-          />{:else}<path
+        {#if marked}<path d="M12 17h41v2H12z" fill="#f5eedc" />{:else}<path
             d="M12 15h41M18 23h29"
             stroke="#b88b47"
             stroke-width="3"

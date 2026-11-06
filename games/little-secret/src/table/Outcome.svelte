@@ -3,27 +3,22 @@
   import { m } from '@board-games/shared/messages';
   import PlayerToken from './PlayerToken.svelte';
   import { usePixel } from '../pixel/context.js';
+  import { awarded } from '../result.js';
   import Sprite from '../pixel/Sprite.svelte';
   const pixel = usePixel();
   let {
     state,
     players,
   }: { state: Public; players: { id: string; name: string }[] } = $props();
-  const awarded = $derived(
-    players.filter(
-      (p) =>
-        state.result &&
-        (state.result.winners.length
-          ? state.result.winners.includes(p.id)
-          : state.result.points[p.id] > 0),
-    ),
+  const honored = $derived(
+    players.filter((p) => state.result && awarded(state.result, p.id)),
   );
   const factions = $derived([
-    ...new Set(awarded.map((p) => state.result!.roles[p.id])),
+    ...new Set(honored.map((p) => state.result!.roles[p.id])),
   ]);
 </script>
 
-<div class="outcome" class:px={pixel()} data-testid="ls-outcome">
+<div class="outcome" class:px={pixel()}>
   {#if pixel()}<div class="px-scene" aria-hidden="true">
       <Sprite
         sheet="props"
@@ -63,7 +58,7 @@
       : factions.map((f) => m[`ls_${f as Role}`]()).join(' + ')}
   </h3>
   <div class="honorees">
-    {#each awarded as p}<div>
+    {#each honored as p}<div>
         <PlayerToken
           name={p.name}
           seat={players.findIndex((other) => other.id === p.id) + 1}

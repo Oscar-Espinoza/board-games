@@ -1,5 +1,17 @@
 <script lang="ts">
-  let { name }: { name: string } = $props();
+  type Name =
+    | 'logo'
+    | 'agents'
+    | 'players'
+    | 'key'
+    | 'history'
+    | 'check'
+    | 'close'
+    | 'red'
+    | 'blue'
+    | 'civilian'
+    | 'assassin';
+  let { name }: { name: Name } = $props();
 </script>
 
 <svg
@@ -30,12 +42,6 @@
   {:else if name === 'key'}<path
       d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12Z"
     /><circle cx="12" cy="12" r="3" />
-  {:else if name === 'settings'}<path
-      d="m9 2-1 3-3 1-2 4 2 2-1 3 3 3 3-1 2 2 4-2v-3l3-2-1-4-3-1-1-3Z"
-    /><circle cx="11" cy="11" r="3" />
-  {:else if name === 'invite'}<path
-      d="m10 7 3-3a5 5 0 0 1 7 7l-3 3M14 17l-3 3a5 5 0 0 1-7-7l3-3m1 6 8-8"
-    />
   {:else if name === 'history'}<path
       d="M3 10a9 9 0 1 1 1 7M3 3v7h7m2-4v6l4 3"
     />
@@ -47,10 +53,7 @@
     />
   {:else if name === 'blue'}<circle cx="12" cy="12" r="8" fill="currentColor" />
   {:else if name === 'civilian'}<circle cx="12" cy="12" r="8" />
-  {:else if name === 'assassin' || name === 'close'}<path
-      d="m5 5 14 14M19 5 5 19"
-    />
-  {:else}<path d="M4 3h7v18H4zm9 0h7v18h-7" />{/if}
+  {:else}<path d="m5 5 14 14M19 5 5 19" />{/if}
 </svg>
 
 <style>
