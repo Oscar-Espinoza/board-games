@@ -1,7 +1,13 @@
 import { shuffle } from '@board-games/game-core';
 import type { GameDefinition } from '@board-games/game-core';
 import { games, seats } from '@board-games/shared/games';
-import { HAND_SIZE, HARD_SLAM, MAX_TEAM_NAME, SEATS } from './constants.js';
+import {
+  HAND_SIZE,
+  HARD_SLAM,
+  MAX_TEAM_NAME,
+  SEATS,
+  SLAM_SPAN,
+} from './constants.js';
 import { idealPoses, plug, separate, type Pose } from './layout.js';
 
 /** Venezuelan pairs domino: double-six, four seats, partners opposite. */
@@ -217,7 +223,7 @@ function scatter(
   random: () => number,
 ) {
   if (force <= HARD_SLAM) return;
-  const k = (force - HARD_SLAM) / (1 - HARD_SLAM);
+  const k = (force - HARD_SLAM) / SLAM_SPAN;
   const at = s.chain.findIndex((l) => l.id === placed);
   const home = idealPoses(s.chain);
   const clamp = (v: number, c: number, m: number) =>

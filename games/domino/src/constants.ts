@@ -7,6 +7,8 @@ export const HAND_SIZE = 7;
 export const MAX_TEAM_NAME = 16;
 /** A strike above this force slams: it shoves nearby tiles and shakes the table. */
 export const HARD_SLAM = 0.55;
+/** `1 - HARD_SLAM`, written out so slam poses stay bit-identical to earlier matches. */
+export const SLAM_SPAN = 0.45;
 /** Holding an end ghost this long charges a strike to full force. */
 export const CHARGE_MS = 1100;
 /** Milliseconds a played tile flies, by force (0–1): the 3D patio and the 8-bit table. */
